@@ -4,7 +4,6 @@ import 'package:percent_indicator/percent_indicator.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../shared/widgets/beltei_app_bar.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +29,6 @@ class GradesDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: BelteiAppBar(showSearch: true, showNotification: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(

@@ -5,7 +5,7 @@ import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/student/screens/student_shell.dart';
 import '../../features/student/screens/student_dashboard_screen.dart';
 import '../../features/student/screens/course_list_screen.dart';
-import '../../features/student/screens/course_detail_screen.dart';
+import '../../features/student/screens/course_detail_screen.dart' as student_course;
 import '../../features/student/screens/attendance_dashboard_screen.dart';
 import '../../features/student/screens/attendance_history_screen.dart';
 import '../../features/student/screens/grades_dashboard_screen.dart';
@@ -36,6 +36,15 @@ import '../../features/teacher/screens/leave_request_review_screen.dart';
 import '../../features/teacher/screens/teacher_student_analytics_screen.dart';
 import '../../features/teacher/screens/create_announcement_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
+import '../../features/admin/screens/admin_shell.dart';
+import '../../features/admin/screens/admin_dashboard_screen.dart';
+import '../../features/admin/screens/user_management_screen.dart';
+import '../../features/admin/screens/student_detail_screen.dart';
+import '../../features/admin/screens/teacher_detail_screen.dart';
+import '../../features/admin/screens/academic_management_screen.dart';
+import '../../features/admin/screens/course_detail_screen.dart';
+import '../../features/admin/screens/finance_management_screen.dart';
+import '../../features/admin/screens/system_settings_screen.dart';
 
 class AppRoutes {
   static const splash = '/';
@@ -70,6 +79,13 @@ class AppRoutes {
   static const teacherAlerts = '/teacher/alerts';
   static const teacherProfile = '/teacher/profile';
   static const teacherAnnouncement = '/teacher/alerts/announcement';
+
+  // Admin
+  static const adminHome     = '/admin';
+  static const adminUsers    = '/admin/users';
+  static const adminAcademic = '/admin/academic';
+  static const adminFinance  = '/admin/finance';
+  static const adminSettings = '/admin/settings';
 }
 
 final appRouter = GoRouter(
@@ -87,6 +103,8 @@ final appRouter = GoRouter(
       path: AppRoutes.forgotPassword,
       builder: (context, state) => const ForgotPasswordScreen(),
     ),
+
+    // ── Student shell ────────────────────────────────────────────────────────
     ShellRoute(
       builder: (context, state, child) => StudentShell(child: child),
       routes: [
@@ -101,7 +119,7 @@ final appRouter = GoRouter(
             GoRoute(
               path: ':id',
               builder: (context, state) =>
-                  CourseDetailScreen(courseId: state.pathParameters['id']!),
+                  student_course.CourseDetailScreen(courseId: state.pathParameters['id']!),
             ),
           ],
         ),
@@ -180,6 +198,8 @@ final appRouter = GoRouter(
         ),
       ],
     ),
+
+    // ── Teacher shell ────────────────────────────────────────────────────────
     ShellRoute(
       builder: (context, state, child) => TeacherShell(child: child),
       routes: [
@@ -253,6 +273,52 @@ final appRouter = GoRouter(
         GoRoute(
           path: AppRoutes.teacherProfile,
           builder: (context, state) => const TeacherProfileScreen(),
+        ),
+      ],
+    ),
+
+    // ── Admin shell ──────────────────────────────────────────────────────────
+    ShellRoute(
+      builder: (context, state, child) => AdminShell(child: child),
+      routes: [
+        GoRoute(
+          path: AppRoutes.adminHome,
+          builder: (context, state) => const AdminDashboardScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.adminUsers,
+          builder: (context, state) => const UserManagementScreen(),
+          routes: [
+            GoRoute(
+              path: 'students/:id',
+              builder: (context, state) =>
+                  StudentDetailScreen(studentId: state.pathParameters['id']!),
+            ),
+            GoRoute(
+              path: 'teachers/:id',
+              builder: (context, state) =>
+                  TeacherDetailScreen(teacherId: state.pathParameters['id']!),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: AppRoutes.adminAcademic,
+          builder: (context, state) => const AcademicManagementScreen(),
+          routes: [
+            GoRoute(
+              path: 'courses/:id',
+              builder: (context, state) =>
+                  CourseDetailScreen(courseId: state.pathParameters['id']!),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: AppRoutes.adminFinance,
+          builder: (context, state) => const FinanceManagementScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.adminSettings,
+          builder: (context, state) => const SystemSettingsScreen(),
         ),
       ],
     ),

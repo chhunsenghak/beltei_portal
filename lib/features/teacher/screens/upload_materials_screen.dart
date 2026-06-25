@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../shared/widgets/beltei_app_bar.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -95,7 +94,6 @@ class _UploadMaterialsScreenState extends State<UploadMaterialsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: BelteiAppBar(showNotification: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(

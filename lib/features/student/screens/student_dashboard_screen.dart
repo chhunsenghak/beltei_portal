@@ -8,13 +8,6 @@ import '../../../shared/widgets/section_header.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
-const _kStudent = (
-  name: 'SOVANN REAKSA',
-  id: 'ID: B-2024-00892',
-  faculty: 'Faculty of Business Administration',
-  major: 'Accounting & Finance | Semester 5',
-);
-
 const _kAcademic = (
   gpa: '3.85',
   cgpa: '3.72',
@@ -73,96 +66,19 @@ class StudentDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(),
-          SliverToBoxAdapter(child: _buildStudentHeader()),
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.screenPadding),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildQuickActions(context),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildAcademicSummary(),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildAttendanceOverview(),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildFinancialSummary(context),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildRecentActivities(context),
-                const SizedBox(height: 24),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── App bar ────────────────────────────────────────────────────────────────
-
-  Widget _buildAppBar() {
-    return SliverAppBar(
-      pinned: true,
-      automaticallyImplyLeading: false,
-      backgroundColor: AppColors.primaryNavy,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-          onPressed: () {},
-        ),
-      ],
-      title: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Image.asset('assets/images/beltei_logo.png', height: 48, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            Text('BELTEI Campus', style: AppTextStyles.h3White),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Student header card ────────────────────────────────────────────────────
-
-  Widget _buildStudentHeader() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.splashDark, AppColors.splashLight],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-      child: Row(
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.white.withValues(alpha: 0.2),
-            child: const Icon(Icons.person, color: Colors.white, size: 36),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_kStudent.name, style: AppTextStyles.h2White),
-                const SizedBox(height: 2),
-                Text(_kStudent.id,
-                    style: AppTextStyles.captionWhite.copyWith(fontSize: 12)),
-                Text(_kStudent.faculty,
-                    style: AppTextStyles.captionWhite.copyWith(fontSize: 11)),
-                Text(_kStudent.major,
-                    style: AppTextStyles.captionWhite.copyWith(fontSize: 11)),
-              ],
-            ),
-          ),
+          _buildQuickActions(context),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildAcademicSummary(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildAttendanceOverview(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildFinancialSummary(context),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildRecentActivities(context),
+          const SizedBox(height: 24),
         ],
       ),
     );

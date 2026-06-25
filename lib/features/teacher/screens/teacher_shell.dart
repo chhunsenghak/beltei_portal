@@ -32,8 +32,64 @@ class _TeacherShellState extends State<TeacherShell> {
   Widget build(BuildContext context) {
     final active = _activeIndex(context);
     return Scaffold(
-      body: widget.child,
+      body: Column(
+        children: [
+          _buildShellHeader(context),
+          Expanded(child: widget.child),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(context, active),
+    );
+  }
+
+  Widget _buildShellHeader(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgPage,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: MediaQuery.of(context).padding.top),
+          SizedBox(
+            height: 56,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 0, right: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ClipRect(
+                    child: Transform.translate(
+                      offset: const Offset(-10, 0),
+                      child: Image.asset(
+                        'assets/images/beltei_logo.png',
+                        height: 40,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'BELTEI Campus',
+                    style: AppTextStyles.h3.copyWith(
+                      color: AppColors.primaryNavy,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

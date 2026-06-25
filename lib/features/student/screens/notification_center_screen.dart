@@ -100,43 +100,12 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(),
       body: Column(
         children: [
           _buildFilterChips(),
           Expanded(child: _buildList()),
         ],
       ),
-    );
-  }
-
-  // ── App bar ────────────────────────────────────────────────────────────────
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.bgPage,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      automaticallyImplyLeading: false,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      title: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Image.asset('assets/images/beltei_logo.png', height: 48, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            Text('Notifications', style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.done_all, size: 16, color: AppColors.primaryBlue),
-          label: Text('Mark all read', style: AppTextStyles.link),
-        ),
-      ],
     );
   }
 

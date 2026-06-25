@@ -36,7 +36,6 @@ class StudentProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -63,32 +62,6 @@ class StudentProfileScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  // ── App bar ────────────────────────────────────────────────────────────────
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: AppColors.bgPage,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      automaticallyImplyLeading: false,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      title: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Image.asset('assets/images/beltei_logo.png', height: 48, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            Text('Campus Connect', style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
-          ],
-        ),
-      ),
-      actions: [
-        IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-      ],
     );
   }
 

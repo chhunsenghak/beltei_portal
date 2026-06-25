@@ -31,6 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onLogin() {
     switch (_selectedRole) {
+      case _Role.admin:
+        context.go(AppRoutes.adminHome);
       case _Role.teacher:
         context.go(AppRoutes.teacherHome);
       default:

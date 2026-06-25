@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../shared/widgets/beltei_app_bar.dart';
 import '../../../shared/widgets/status_badge.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -112,7 +111,6 @@ class _CourseListScreenState extends State<CourseListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: BelteiAppBar(showSearch: true, showNotification: true),
       body: Column(
         children: [
           _buildSearchBar(),

@@ -5,7 +5,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/app_router.dart';
-import '../../../shared/widgets/beltei_app_bar.dart';
 import '../../../shared/widgets/section_header.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -41,7 +40,6 @@ class AttendanceDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: BelteiAppBar(showSearch: true, showNotification: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(

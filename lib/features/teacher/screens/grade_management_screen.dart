@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../shared/widgets/beltei_app_bar.dart';
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +84,6 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: BelteiAppBar(showNotification: true),
       body: Column(
         children: [
           Expanded(

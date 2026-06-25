@@ -64,72 +64,21 @@ class TeacherDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context),
-          SliverToBoxAdapter(child: _buildTeacherHeader()),
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.screenPadding),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _buildStatsGrid(),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildQuickActions(context),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildTodaySchedule(context),
-                const SizedBox(height: AppSpacing.sectionGap),
-                _buildPendingLeaves(context),
-                const SizedBox(height: 24),
-              ]),
-            ),
-          ),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        children: [
+          _buildTeacherHeader(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildStatsGrid(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildQuickActions(context),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildTodaySchedule(context),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildPendingLeaves(context),
+          const SizedBox(height: 24),
         ],
       ),
-    );
-  }
-
-  // ── App bar ────────────────────────────────────────────────────────────────
-
-  Widget _buildAppBar(BuildContext context) {
-    return SliverAppBar(
-      pinned: true,
-      automaticallyImplyLeading: false,
-      backgroundColor: AppColors.primaryNavy,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      title: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Row(
-          children: [
-            Image.asset('assets/images/beltei_logo.png', height: 48, fit: BoxFit.contain),
-            const SizedBox(width: 10),
-            Text('BELTEI Portal', style: AppTextStyles.h3White),
-          ],
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.notifications_outlined, color: Colors.white),
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.statusAmber,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          onPressed: () {},
-        ),
-      ],
     );
   }
 
