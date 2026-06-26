@@ -4,9 +4,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/app_router.dart';
-
-// ── Mock roles ────────────────────────────────────────────────────────────────
-enum _Role { student, teacher, admin }
+import '../../../core/services/auth_service.dart';
+import '../models/app_user.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,27 +15,52 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
-  _Role _selectedRole = _Role.student;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _idController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _onLogin() {
-    switch (_selectedRole) {
-      case _Role.admin:
-        context.go(AppRoutes.adminHome);
-      case _Role.teacher:
-        context.go(AppRoutes.teacherHome);
-      default:
-        context.go(AppRoutes.studentHome);
+  Future<void> _onLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email and password.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final result = await _authService.signIn(email: email, password: password);
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result.user != null) {
+      switch (result.user!.role) {
+        case UserRole.admin:
+          context.go(AppRoutes.adminHome);
+        case UserRole.teacher:
+          context.go(AppRoutes.teacherHome);
+        case UserRole.student:
+          context.go(AppRoutes.studentHome);
+      }
+    } else {
+      setState(() => _errorMessage = result.error ?? 'Login failed');
     }
   }
 
@@ -84,17 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 20),
           _buildTitle(),
           const SizedBox(height: 28),
-          _buildIdField(),
+          _buildEmailField(),
           const SizedBox(height: 14),
           _buildPasswordField(),
           const SizedBox(height: 14),
           _buildRememberRow(),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 12),
+            _buildError(),
+          ],
           const SizedBox(height: 24),
           _buildLoginButton(),
-          const SizedBox(height: 24),
-          _buildRoleDivider(),
-          const SizedBox(height: 16),
-          _buildRoleSelector(),
           const SizedBox(height: 24),
           _buildSupportRow(),
         ],
@@ -124,18 +148,19 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildIdField() {
+  Widget _buildEmailField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Student ID / Employee ID', style: AppTextStyles.bodySemiBold),
+        Text('Email', style: AppTextStyles.bodySemiBold),
         const SizedBox(height: 6),
         TextField(
-          controller: _idController,
-          keyboardType: TextInputType.text,
-          decoration: InputDecoration(
-            hintText: 'Enter your ID',
-            prefixIcon: const Icon(Icons.badge_outlined, size: 20, color: AppColors.textLabel),
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            hintText: 'Enter your email',
+            prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppColors.textLabel),
           ),
         ),
       ],
@@ -193,68 +218,57 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildError() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.statusRedBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.statusRed.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 16, color: AppColors.statusRed),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: AppTextStyles.caption.copyWith(color: AppColors.statusRed),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLoginButton() {
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
-      child: ElevatedButton.icon(
-        onPressed: _onLogin,
-        icon: const Icon(Icons.login, size: 20),
-        label: const Text('Login'),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _onLogin,
         style: ElevatedButton.styleFrom(
           textStyle: AppTextStyles.button,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
           ),
         ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.login, size: 20),
+                  SizedBox(width: 8),
+                  Text('Login'),
+                ],
+              ),
       ),
-    );
-  }
-
-  Widget _buildRoleDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: AppColors.border)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text('SELECT YOUR ROLE', style: AppTextStyles.label),
-        ),
-        const Expanded(child: Divider(color: AppColors.border)),
-      ],
-    );
-  }
-
-  Widget _buildRoleSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: _Role.values.map((role) {
-        final isActive = _selectedRole == role;
-        final label = role.name[0].toUpperCase() + role.name.substring(1);
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedRole = role),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.primaryNavy : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
-                border: Border.all(
-                  color: isActive ? AppColors.primaryNavy : AppColors.border,
-                  width: 1.5,
-                ),
-              ),
-              child: Text(
-                label,
-                style: AppTextStyles.bodySemiBold.copyWith(
-                  color: isActive ? AppColors.textWhite : AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 

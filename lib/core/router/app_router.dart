@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
@@ -46,6 +48,18 @@ import '../../features/admin/screens/course_detail_screen.dart';
 import '../../features/admin/screens/finance_management_screen.dart';
 import '../../features/admin/screens/system_settings_screen.dart';
 
+// Notifies GoRouter whenever the Supabase auth state changes so the redirect
+// runs again and unauthenticated users are sent to /login.
+class _AuthNotifier extends ChangeNotifier {
+  _AuthNotifier() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      notifyListeners();
+    });
+  }
+}
+
+final _authNotifier = _AuthNotifier();
+
 class AppRoutes {
   static const splash = '/';
   static const login = '/login';
@@ -90,6 +104,17 @@ class AppRoutes {
 
 final appRouter = GoRouter(
   initialLocation: AppRoutes.splash,
+  refreshListenable: _authNotifier,
+  redirect: (context, state) {
+    final isAuthenticated =
+        Supabase.instance.client.auth.currentSession != null;
+    final loc = state.matchedLocation;
+    final isPublic = loc == AppRoutes.splash ||
+        loc == AppRoutes.login ||
+        loc == AppRoutes.forgotPassword;
+    if (!isAuthenticated && !isPublic) return AppRoutes.login;
+    return null;
+  },
   routes: [
     GoRoute(
       path: AppRoutes.splash,

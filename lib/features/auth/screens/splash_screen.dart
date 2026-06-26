@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/auth_service.dart';
+import '../models/app_user.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -52,9 +54,23 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.addListener(_onAnimationTick);
     _controller.forward();
 
-    _controller.addStatusListener((status) {
+    _controller.addStatusListener((status) async {
       if (status == AnimationStatus.completed && mounted) {
-        context.go(AppRoutes.login);
+        final authService = AuthService();
+        if (authService.currentSession != null) {
+          final user = await authService.getProfile();
+          if (!mounted) return;
+          switch (user?.role) {
+            case UserRole.admin:
+              context.go(AppRoutes.adminHome);
+            case UserRole.teacher:
+              context.go(AppRoutes.teacherHome);
+            default:
+              context.go(AppRoutes.studentHome);
+          }
+        } else {
+          context.go(AppRoutes.login);
+        }
       }
     });
   }
