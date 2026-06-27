@@ -1,0 +1,9 @@
+name: beltei_seeder
+description: Database seeder for BELTEI Campus Portal
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  supabase: ^2.0.0

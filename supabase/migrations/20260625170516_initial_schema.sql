@@ -10,7 +10,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE profiles (
   id          UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email       TEXT NOT NULL,
-  full_name   TEXT NOT NULL,
+  first_name   TEXT NOT NULL,
+  last_name   TEXT NOT NULL,
   role        TEXT NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
   phone       TEXT,
   avatar_url  TEXT,
@@ -249,11 +250,19 @@ ALTER TABLE announcements    ENABLE ROW LEVEL SECURITY;
 -- Helper: check if current user is admin
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin');
-$$ LANGUAGE sql SECURITY DEFINER;
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- ── Profiles ─────────────────────────────────────────────────────────────────
 CREATE POLICY "Own profile readable"   ON profiles FOR SELECT USING (auth.uid() = id OR is_admin());
+CREATE POLICY "Teacher views student profiles" ON profiles FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM enrollments e
+    JOIN courses c ON c.id = e.course_id
+    WHERE e.student_id = profiles.id
+      AND c.teacher_id = auth.uid()
+  )
+);
 CREATE POLICY "Own profile updatable"  ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Admin full access"      ON profiles FOR ALL    USING (is_admin());
 
@@ -306,6 +315,14 @@ CREATE POLICY "Admin manages attendance" ON attendance FOR ALL USING (is_admin()
 -- ── Leave Requests ───────────────────────────────────────────────────────────
 CREATE POLICY "User views own requests"   ON leave_requests FOR SELECT USING (requester_id = auth.uid());
 CREATE POLICY "User creates own request"  ON leave_requests FOR INSERT WITH CHECK (requester_id = auth.uid());
+CREATE POLICY "Teacher views student requests" ON leave_requests FOR SELECT USING (
+  requester_type = 'student' AND EXISTS (
+    SELECT 1 FROM enrollments e
+    JOIN courses c ON c.id = e.course_id
+    WHERE e.student_id = leave_requests.requester_id
+      AND c.teacher_id = auth.uid()
+  )
+);
 CREATE POLICY "Admin manages all requests" ON leave_requests FOR ALL USING (is_admin());
 
 -- ── Invoices ─────────────────────────────────────────────────────────────────
@@ -343,17 +360,30 @@ CREATE POLICY "Teacher manages own announcements" ON announcements FOR ALL USING
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, email, full_name, role)
+  INSERT INTO public.profiles (id, email, first_name, last_name, role)
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'first_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'role', 'student')
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ============================================================
+-- GRANTS
+-- ============================================================
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO service_role;
