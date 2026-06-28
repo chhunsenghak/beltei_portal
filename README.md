@@ -99,6 +99,11 @@ supabase db reset
 # Push to remote (production)
 supabase db push
 ```
+```powershell
+# Database seeding
+.\seed.ps1               # Seed local DB with test data
+.\reset-db.ps1           # Reset DB then seed (combines db reset + seed)
+```
 
 ### Daily Development Commands
 
