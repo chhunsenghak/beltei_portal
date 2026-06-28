@@ -1,31 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-class CourseDetailScreen extends StatefulWidget {
+class CourseDetailScreen extends ConsumerStatefulWidget {
   const CourseDetailScreen({super.key, required this.courseId});
   final String courseId;
 
   @override
-  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+  ConsumerState<CourseDetailScreen> createState() => _CourseDetailScreenState();
 }
 
-class _CourseDetailScreenState extends State<CourseDetailScreen> {
+class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
+  bool _loaded = false;
   bool _hasUnsavedChanges = false;
 
-  final _codeController = TextEditingController(text: 'CS-301');
-  final _nameController = TextEditingController(text: 'Advanced Database Systems');
-  final _descController = TextEditingController(
-      text: 'This course covers the architectural foundations and implementation '
-          'techniques of modern database management systems. Topics include storage '
-          'management, query processing, transaction management, and distributed...');
-  final _creditsController = TextEditingController(text: '3');
+  final _codeController    = TextEditingController();
+  final _nameController    = TextEditingController();
+  final _descController    = TextEditingController();
+  final _creditsController = TextEditingController();
 
-  String _department = 'Computer Science';
-  String _semester   = 'Semester 1';
-  String _teacher    = 'Dr. Samnang Chea';
+  String _department = 'N/A';
+  String _semester   = 'N/A';
+  String _teacher    = 'N/A';
+
+  int _enrolledCount = 0;
+  int _maxStudents   = 40;
 
   @override
   void initState() {
@@ -42,63 +46,99 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     super.dispose();
   }
 
+  void _populate(AdminCourseDetail detail) {
+    if (_loaded) return;
+    _loaded = true;
+    _codeController.text    = detail.code;
+    _nameController.text    = detail.name;
+    _descController.text    = detail.description ?? '';
+    _creditsController.text = '${detail.credits}';
+    _department     = detail.departmentName ?? 'N/A';
+    _semester       = detail.semesterName ?? 'N/A';
+    _teacher        = detail.teacherName ?? 'N/A';
+    _enrolledCount  = detail.enrolledCount;
+    _maxStudents    = detail.maxStudents;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final asyncDetail = ref.watch(courseDetailProvider(widget.courseId));
+    asyncDetail.whenData((d) { if (d != null) _populate(d); });
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
-          onPressed: () => context.pop(),
-        ),
-        title: Text('Edit Course',
-            style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined,
-                color: AppColors.textSecondary),
-            onPressed: () {},
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primaryNavy,
-              child: Icon(Icons.person_outline, color: Colors.white, size: 16),
+      body: Column(
+        children: [
+          _buildNavRow(context),
+          Expanded(
+            child: asyncDetail.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Could not load course data', style: AppTextStyles.body),
+                  ],
+                ),
+              ),
+              data: (detail) {
+                if (detail == null) {
+                  return Center(child: Text('Course not found', style: AppTextStyles.body));
+                }
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                  child: Column(
+                    children: [
+                      _buildGeneralInfoSection(),
+                      const SizedBox(height: 16),
+                      _buildFacultySection(),
+                      const SizedBox(height: 16),
+                      _buildEnrolledStudentsSection(),
+                      const SizedBox(height: 16),
+                      if (_hasUnsavedChanges) ...[
+                        _buildUnsavedWarning(),
+                        const SizedBox(height: 16),
+                      ],
+                      _buildActions(context),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
-        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          children: [
-            _buildGeneralInfoSection(),
-            const SizedBox(height: 16),
-            _buildFacultySection(),
-            const SizedBox(height: 16),
-            _buildEnrolledStudentsSection(),
-            const SizedBox(height: 16),
-            if (_hasUnsavedChanges) ...[
-              _buildUnsavedWarning(),
-              const SizedBox(height: 16),
-            ],
-            _buildActions(context),
-            const SizedBox(height: 24),
-          ],
-        ),
+    );
+  }
+
+  Widget _buildNavRow(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
+            onPressed: () => context.pop(),
+          ),
+          Text('Edit Course',
+              style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
+        ],
       ),
     );
   }
 
   Widget _buildGeneralInfoSection() {
+    final departments = ['N/A', 'Computer Science', 'Business Admin',
+        'Engineering', 'Languages', 'Mathematics', 'Law'];
+    if (!departments.contains(_department)) departments.insert(1, _department);
+
     return _Section(
       title: 'General Information',
       children: [
@@ -106,17 +146,17 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         const SizedBox(height: 12),
         _LabelField(label: 'Course Name', controller: _nameController),
         const SizedBox(height: 12),
-        _LabelField(
-            label: 'Description', controller: _descController, maxLines: 4),
+        _LabelField(label: 'Description', controller: _descController, maxLines: 4),
         const SizedBox(height: 12),
-        _LabelField(label: 'Credits', controller: _creditsController,
+        _LabelField(
+            label: 'Credits',
+            controller: _creditsController,
             keyboardType: TextInputType.number),
         const SizedBox(height: 12),
         _LabelDropdown(
           label: 'Department',
-          value: _department,
-          items: ['Computer Science', 'Business Admin', 'Engineering',
-                  'Languages', 'Mathematics', 'Law'],
+          value: departments.contains(_department) ? _department : departments.first,
+          items: departments,
           onChanged: (v) => setState(() {
             _department = v!;
             _hasUnsavedChanges = true;
@@ -126,7 +166,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         _LabelDropdown(
           label: 'Semester',
           value: _semester,
-          items: ['Semester 1', 'Semester 2', 'Semester 3'],
+          items: {_semester, 'Semester 1', 'Semester 2', 'Semester 3'}.toList(),
           onChanged: (v) => setState(() {
             _semester = v!;
             _hasUnsavedChanges = true;
@@ -143,8 +183,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         _LabelDropdown(
           label: 'Lead Teacher',
           value: _teacher,
-          items: ['Dr. Samnang Chea', 'Dr. Sam Sokha', 'Prof. Linda Smith',
-                  'Mr. Chan Dara', 'Mr. Ratha Tep'],
+          items: [_teacher],
           onChanged: (v) => setState(() {
             _teacher = v!;
             _hasUnsavedChanges = true;
@@ -155,6 +194,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   Widget _buildEnrolledStudentsSection() {
+    final pct = _maxStudents > 0 ? _enrolledCount / _maxStudents : 0.0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -167,29 +207,26 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           const Icon(Icons.people_outline, color: AppColors.primaryBlue, size: 20),
           const SizedBox(width: 8),
           Text('Enrolled Students',
-              style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.primaryBlue)),
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primaryBlue)),
           const Spacer(),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('124',
+              Text('$_enrolledCount',
                   style: AppTextStyles.metric.copyWith(
                       color: AppColors.primaryNavy, fontSize: 22)),
-              Text('Capacity: 150 (82% full)',
-                  style: AppTextStyles.label.copyWith(
-                      fontSize: 9, letterSpacing: 0)),
+              Text('Capacity: $_maxStudents (${(pct * 100).toInt()}% full)',
+                  style: AppTextStyles.label.copyWith(fontSize: 9, letterSpacing: 0)),
               const SizedBox(height: 4),
               SizedBox(
                 width: 120,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: 124 / 150,
+                    value: pct.clamp(0.0, 1.0),
                     minHeight: 6,
                     backgroundColor: AppColors.border,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.primaryBlue),
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
                   ),
                 ),
               ),
@@ -210,12 +247,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline,
-              size: 16, color: Color(0xFFF9A825)),
+          const Icon(Icons.info_outline, size: 16, color: Color(0xFFF9A825)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Unsaved Changes — You have edited the credits field. Click save to apply the changes.',
+              'Unsaved Changes — You have edited the credits field. Click save to apply.',
               style: AppTextStyles.caption.copyWith(color: const Color(0xFF5D4037)),
             ),
           ),
@@ -228,9 +264,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     return Column(
       children: [
         ElevatedButton(
-          onPressed: () {
-            setState(() => _hasUnsavedChanges = false);
-          },
+          onPressed: () => setState(() => _hasUnsavedChanges = false),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
             backgroundColor: AppColors.primaryNavy,
@@ -262,8 +296,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               const Icon(Icons.delete_outline, size: 18),
               const SizedBox(width: 8),
               Text('Delete Course',
-                  style: AppTextStyles.button.copyWith(
-                      color: AppColors.statusRed)),
+                  style: AppTextStyles.button.copyWith(color: AppColors.statusRed)),
             ],
           ),
         ),

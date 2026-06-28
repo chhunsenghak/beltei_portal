@@ -1,98 +1,140 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-class TeacherDetailScreen extends StatefulWidget {
+class TeacherDetailScreen extends ConsumerStatefulWidget {
   const TeacherDetailScreen({super.key, required this.teacherId});
   final String teacherId;
 
   @override
-  State<TeacherDetailScreen> createState() => _TeacherDetailScreenState();
+  ConsumerState<TeacherDetailScreen> createState() => _TeacherDetailScreenState();
 }
 
-class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
-  final _firstNameController = TextEditingController(text: 'Thomas');
-  final _lastNameController = TextEditingController(text: 'Anderson');
-  final _designationController = TextEditingController(text: 'Senior Lecturer');
-  final _officeController =
-      TextEditingController(text: 'Campus 10, Building B, Room 402, Phnom Penh');
+class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
+  bool _loaded = false;
+  bool _saving = false;
 
-  String _department = 'Information Technology';
+  final _firstNameController   = TextEditingController();
+  final _lastNameController    = TextEditingController();
+  final _designationController = TextEditingController();
+  final _phoneController       = TextEditingController();
 
-  final _assignedCourses = ['Data Structures (CS301)', 'Database Systems (CS204)',
-    'Network Security (CS412)', 'Web Dev II (CS205)'];
+  String? _departmentId;
+  List<String> _assignedCourses = [];
+  int _totalStudents = 0;
 
   @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _designationController.dispose();
-    _officeController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  void _populate(AdminTeacherDetail detail) {
+    if (_loaded) return;
+    _loaded = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _firstNameController.text   = detail.firstName;
+      _lastNameController.text    = detail.lastName;
+      _designationController.text = detail.position ?? '';
+      _phoneController.text       = detail.phone ?? '';
+      setState(() {
+        _departmentId    = detail.departmentId;
+        _assignedCourses = List<String>.from(detail.assignedCourses);
+        _totalStudents   = detail.totalStudents;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final asyncDetail = ref.watch(teacherDetailProvider(widget.teacherId));
+    asyncDetail.whenData((d) { if (d != null) _populate(d); });
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
-          onPressed: () => context.pop(),
-        ),
-        title: Text('Teacher Detail',
-            style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined,
-                color: AppColors.textSecondary),
-            onPressed: () {},
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primaryNavy,
-              child: Icon(Icons.person_outline, color: Colors.white, size: 16),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildNavRow(context),
+          Expanded(
+            child: asyncDetail.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Could not load teacher data\n$e', style: AppTextStyles.body, textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+              data: (detail) {
+                if (detail == null) {
+                  return Center(child: Text('Teacher not found', style: AppTextStyles.body));
+                }
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildProfileHeader(context, detail),
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildPersonalInfoSection(),
+                            const SizedBox(height: 16),
+                            _buildAssignedCoursesSection(),
+                            const SizedBox(height: 16),
+                            _buildWorkloadSection(detail),
+                            const SizedBox(height: 16),
+                            _buildAdminActionsSection(context),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.border),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(context),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              child: Column(
-                children: [
-                  _buildPersonalInfoSection(),
-                  const SizedBox(height: 16),
-                  _buildAssignedCoursesSection(),
-                  const SizedBox(height: 16),
-                  _buildWorkloadSection(),
-                  const SizedBox(height: 16),
-                  _buildAdminActionsSection(context),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
+  Widget _buildNavRow(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
+            onPressed: () => context.pop(),
+          ),
+          Text('Teacher Detail',
+              style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(BuildContext context, AdminTeacherDetail detail) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -103,8 +145,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
               CircleAvatar(
                 radius: 48,
                 backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-                child: Text('TA',
-                    style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy, fontSize: 24)),
+                child: Text(detail.initials,
+                    style: AppTextStyles.h1.copyWith(
+                        color: AppColors.primaryNavy, fontSize: 24)),
               ),
               Positioned(
                 bottom: 0, right: 0,
@@ -121,7 +164,7 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text('Dr. Thomas P. Anderson', style: AppTextStyles.h2),
+          Text(detail.fullName, style: AppTextStyles.h2),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -129,45 +172,33 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
               color: AppColors.primaryBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
             ),
-            child: Text('Senior Faculty',
+            child: Text(detail.position ?? 'Faculty',
                 style: AppTextStyles.label.copyWith(
                     color: AppColors.primaryBlue, letterSpacing: 0.3)),
           ),
           const SizedBox(height: 8),
-          Text('Employee ID: BT-EDU-4829',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.primaryBlue)),
+          Text('Employee ID: ${detail.employeeCode}',
+              style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue)),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.email_outlined,
-                  size: 14, color: AppColors.textSecondary),
+              const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 4),
-              Text('t.anderson@beltei.edu.kh', style: AppTextStyles.caption),
+              Text(detail.email, style: AppTextStyles.caption),
             ],
           ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.phone_outlined,
-                  size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Text('+855 23 999 888', style: AppTextStyles.caption),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(200, 42),
-              backgroundColor: AppColors.primaryNavy,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
+          if (detail.phone != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(detail.phone!, style: AppTextStyles.caption),
+              ],
             ),
-            child: Text('Save Changes', style: AppTextStyles.button),
-          ),
+          ],
         ],
       ),
     );
@@ -192,42 +223,17 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          _LabeledField(label: 'First Name', controller: _firstNameController),
-          const SizedBox(height: 12),
-          _LabeledField(label: 'Last Name', controller: _lastNameController),
-          const SizedBox(height: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text('Department',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-              const SizedBox(height: 4),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgInput,
-                  borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _department,
-                    isExpanded: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    items: ['Information Technology', 'Computer Science',
-                            'Mathematics', 'Business', 'Engineering']
-                        .map((e) => DropdownMenuItem(
-                            value: e, child: Text(e, style: AppTextStyles.body)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _department = v!),
-                  ),
-                ),
-              ),
+              Expanded(child: _LabeledField(label: 'First Name', controller: _firstNameController)),
+              const SizedBox(width: 12),
+              Expanded(child: _LabeledField(label: 'Last Name', controller: _lastNameController)),
             ],
           ),
           const SizedBox(height: 12),
-          _LabeledField(label: 'Designation', controller: _designationController),
+          _LabeledField(label: 'Phone Number', controller: _phoneController),
           const SizedBox(height: 12),
-          _LabeledField(label: 'Office Address', controller: _officeController, maxLines: 2),
+          _LabeledField(label: 'Designation / Position', controller: _designationController),
         ],
       ),
     );
@@ -248,52 +254,78 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Assigned Courses', style: AppTextStyles.h3),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 14, color: Colors.white),
-                label: Text('Assign Course',
-                    style: AppTextStyles.button.copyWith(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.chipRadius)),
+              SizedBox(
+                width: 130, // enough for "Assign Course" label
+                child: ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.add, size: 14, color: Colors.white),
+                  label: Text('Assign Course',
+                      style: AppTextStyles.button.copyWith(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.chipRadius)),
+                  ),
                 ),
               ),
+              // ElevatedButton.icon(
+              //   onPressed: () {},
+              //   icon: const Icon(Icons.add, size: 14, color: Colors.white),
+              //   label: Text('Assign Course',
+              //       style: AppTextStyles.button.copyWith(fontSize: 12)),
+              //   style: ElevatedButton.styleFrom(
+              //     backgroundColor: AppColors.primaryBlue,
+              //     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              //     shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(AppSpacing.chipRadius)),
+              //   ),
+              // ),
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _assignedCourses.map((course) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.bgPage,
-                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
-                  border: Border.all(color: AppColors.border),
+          _assignedCourses.isEmpty
+              ? Text('No courses assigned', style: AppTextStyles.caption)
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _assignedCourses.map((course) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgPage,
+                        borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(course,
+                                style: AppTextStyles.caption
+                                    .copyWith(fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => setState(() => _assignedCourses.remove(course)),
+                            child: const Icon(Icons.close,
+                                size: 14, color: AppColors.textLabel),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(course, style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () => setState(() => _assignedCourses.remove(course)),
-                      child: const Icon(Icons.close, size: 14, color: AppColors.textLabel),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildWorkloadSection() {
+  Widget _buildWorkloadSection(AdminTeacherDetail detail) {
+    final courseCount = detail.assignedCourses.length;
+    const maxCourses = 6;
+    final pct = maxCourses > 0 ? courseCount / maxCourses : 0.0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -309,36 +341,31 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Credit Hours (Weekly)',
-                  style: AppTextStyles.caption),
-              Text('18 / 24 hrs',
-                  style: AppTextStyles.bodySemiBold.copyWith(
-                      color: AppColors.primaryNavy)),
+              Text('Active Courses', style: AppTextStyles.caption),
+              Text('$courseCount / $maxCourses courses',
+                  style: AppTextStyles.bodySemiBold
+                      .copyWith(color: AppColors.primaryNavy)),
             ],
           ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: 18 / 24,
+              value: pct.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.border,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
             ),
           ),
           const SizedBox(height: 4),
-          Text('Optimal workload range (75%)',
+          Text('Workload ${(pct * 100).toInt()}%',
               style: AppTextStyles.label.copyWith(fontSize: 9, letterSpacing: 0)),
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(
-                child: _StatBox(value: '342', label: 'Total Students'),
-              ),
+              Expanded(child: _StatBox(value: '$_totalStudents', label: 'Total Students')),
               const SizedBox(width: 12),
-              Expanded(
-                child: _StatBox(value: '4.8/5', label: 'Rating'),
-              ),
+              Expanded(child: _StatBox(value: '$courseCount', label: 'Courses')),
             ],
           ),
         ],
@@ -360,18 +387,23 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
           Text('Administrative Actions', style: AppTextStyles.h3),
           const SizedBox(height: 14),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: _saving ? null : () => _saveChanges(context),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
               backgroundColor: AppColors.primaryNavy,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
             ),
-            child: Text('Save All Changes', style: AppTextStyles.button),
+            child: _saving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text('Save All Changes', style: AppTextStyles.button),
           ),
           const SizedBox(height: 10),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: _saving ? null : () {
+              setState(() => _loaded = false);
+              ref.invalidate(teacherDetailProvider(widget.teacherId));
+            },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
               side: const BorderSide(color: AppColors.border),
@@ -381,23 +413,73 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
             ),
             child: Text('Discard Edits', style: AppTextStyles.body),
           ),
-          const SizedBox(height: 16),
-          Center(
-            child: GestureDetector(
-              onTap: () {},
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.person_off_outlined,
-                      size: 16, color: AppColors.statusRed),
-                  const SizedBox(width: 6),
-                  Text('Deactivate Teacher Profile',
-                      style: AppTextStyles.body.copyWith(
-                          color: AppColors.statusRed,
-                          fontWeight: FontWeight.w500)),
-                ],
-              ),
-            ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _saving ? null : () => _showDeleteDialog(context),
+            icon: const Icon(Icons.delete_outline, color: AppColors.statusRed, size: 16),
+            label: Text('Delete Teacher', style: AppTextStyles.caption.copyWith(color: AppColors.statusRed)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveChanges(BuildContext context) async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(adminServiceProvider).updateTeacher(
+        teacherId: widget.teacherId,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        position: _designationController.text.trim(),
+        departmentId: _departmentId ?? '',
+      );
+      ref.invalidate(teacherDetailProvider(widget.teacherId));
+      ref.invalidate(adminTeachersProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Teacher updated successfully'), backgroundColor: AppColors.statusGreen),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.statusRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Teacher', style: AppTextStyles.h3),
+        content: const Text('This will permanently remove the teacher account. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusRed),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _saving = true);
+              try {
+                await ref.read(adminServiceProvider).deleteUser(widget.teacherId);
+                ref.invalidate(adminTeachersProvider);
+                if (context.mounted) context.pop();
+              } catch (e) {
+                if (mounted) setState(() => _saving = false);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.statusRed),
+                  );
+                }
+              }
+            },
+            child: Text('Delete', style: AppTextStyles.button),
           ),
         ],
       ),
@@ -406,11 +488,9 @@ class _TeacherDetailScreenState extends State<TeacherDetailScreen> {
 }
 
 class _LabeledField extends StatelessWidget {
-  const _LabeledField(
-      {required this.label, required this.controller, this.maxLines = 1});
+  const _LabeledField({required this.label, required this.controller});
   final String label;
   final TextEditingController controller;
-  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +502,6 @@ class _LabeledField extends StatelessWidget {
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          maxLines: maxLines,
           style: AppTextStyles.body,
           decoration: InputDecoration(
             filled: true,

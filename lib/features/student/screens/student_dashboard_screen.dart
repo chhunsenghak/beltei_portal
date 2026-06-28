@@ -1,69 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/student_service.dart';
+import '../../../core/supabase/database.types.dart';
 import '../../../shared/widgets/section_header.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _kAcademic = (
-  gpa: '3.85',
-  cgpa: '3.72',
-  creditsDone: 82,
-  creditsLeft: 38,
-);
+final _currencyFmt = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
-const _kAttendance = (
-  overallRate: '94.2%',
-  present: 48,
-  absent: 2,
-  leave: 1,
-);
+String _fmtDate(String iso) {
+  try {
+    return DateFormat('MMM dd, yyyy').format(DateTime.parse(iso));
+  } catch (_) {
+    return iso;
+  }
+}
 
-const _kFinance = (
-  totalFee: '\$1,250.00',
-  paid: '\$850.00',
-  outstanding: '\$400.00',
-  dueDate: 'Oct 15, 2024',
-  status: 'PARTIAL',
-);
-
-final _kActivities = [
-  (
-    icon: Icons.quiz_outlined,
-    iconBg: AppColors.statusBlueBg,
-    iconColor: AppColors.primaryBlue,
-    title: 'Quiz 1: Microeconomics',
-    subtitle: 'Grade released: 9.5/10',
-    time: '2 HOURS AGO',
-  ),
-  (
-    icon: Icons.credit_card_outlined,
-    iconBg: AppColors.statusGreenBg,
-    iconColor: AppColors.statusGreen,
-    title: 'Tuition Payment Success',
-    subtitle: 'Amount: \$450.00 | Receipt #00938',
-    time: 'YESTERDAY',
-  ),
-  (
-    icon: Icons.campaign_outlined,
-    iconBg: AppColors.statusAmberBg,
-    iconColor: AppColors.statusAmber,
-    title: 'Faculty Holiday Notice',
-    subtitle: 'Campus closed on upcoming Monday.',
-    time: 'SEP 24, 2024',
-  ),
-];
+double _computeCgpa(List<SemesterGrades> semesters) {
+  double totalPoints = 0;
+  int totalCredits = 0;
+  for (final sem in semesters) {
+    for (final c in sem.courses) {
+      if (c.gpaPoints != null) {
+        totalPoints += c.gpaPoints! * c.credits;
+        totalCredits += c.credits;
+      }
+    }
+  }
+  return totalCredits > 0 ? totalPoints / totalCredits : 0;
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class StudentDashboardScreen extends StatelessWidget {
+class StudentDashboardScreen extends ConsumerWidget {
   const StudentDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
@@ -71,13 +51,13 @@ class StudentDashboardScreen extends StatelessWidget {
         children: [
           _buildQuickActions(context),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAcademicSummary(),
+          _buildAcademicSummary(ref),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAttendanceOverview(),
+          _buildAttendanceOverview(ref),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildFinancialSummary(context),
+          _buildFinancialSummary(context, ref),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildRecentActivities(context),
+          _buildRecentActivities(context, ref),
           const SizedBox(height: 24),
         ],
       ),
@@ -89,9 +69,9 @@ class StudentDashboardScreen extends StatelessWidget {
   Widget _buildQuickActions(BuildContext context) {
     final actions = [
       (icon: Icons.calendar_today_outlined, label: 'Attendance', route: AppRoutes.attendanceDashboard),
-      (icon: Icons.beach_access_outlined, label: 'Leave', route: AppRoutes.leaveRequestDashboard),
-      (icon: Icons.menu_book_outlined, label: 'Courses', route: AppRoutes.courseList),
-      (icon: Icons.grade_outlined, label: 'Grades', route: AppRoutes.gradesDashboard),
+      (icon: Icons.beach_access_outlined,   label: 'Leave',      route: AppRoutes.leaveRequestDashboard),
+      (icon: Icons.menu_book_outlined,      label: 'Courses',    route: AppRoutes.courseList),
+      (icon: Icons.grade_outlined,          label: 'Grades',     route: AppRoutes.gradesDashboard),
     ];
 
     return Column(
@@ -116,8 +96,7 @@ class StudentDashboardScreen extends StatelessWidget {
                       child: Icon(a.icon, color: AppColors.primaryNavy, size: 24),
                     ),
                     const SizedBox(height: 6),
-                    Text(a.label,
-                        style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                    Text(a.label, style: AppTextStyles.caption.copyWith(fontSize: 11)),
                   ],
                 ),
               ),
@@ -130,70 +109,133 @@ class StudentDashboardScreen extends StatelessWidget {
 
   // ── Academic summary ───────────────────────────────────────────────────────
 
-  Widget _buildAcademicSummary() {
+  Widget _buildAcademicSummary(WidgetRef ref) {
+    final gradesAsync = ref.watch(studentGradesProvider);
+    final coursesAsync = ref.watch(studentCoursesProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: 'Academic Summary',
-          icon: Icons.school_outlined,
-        ),
+        SectionHeader(title: 'Academic Summary', icon: Icons.school_outlined),
         const SizedBox(height: 12),
-        _SummaryGrid(items: [
-          _SummaryItem(label: 'GPA (Current)', value: _kAcademic.gpa, valueColor: AppColors.primaryNavy),
-          _SummaryItem(label: 'CGPA', value: _kAcademic.cgpa),
-          _SummaryItem(label: 'Credits Done', value: '${_kAcademic.creditsDone}'),
-          _SummaryItem(label: 'Credits Left', value: '${_kAcademic.creditsLeft}'),
-        ]),
+        gradesAsync.when(
+          loading: () => _SummaryGrid(items: [
+            _SummaryItem(label: 'GPA (Current)', value: '—'),
+            _SummaryItem(label: 'CGPA', value: '—'),
+            _SummaryItem(label: 'Credits Done', value: '—'),
+            _SummaryItem(label: 'This Semester', value: '—'),
+          ]),
+          error: (_, _) => _SummaryGrid(items: [
+            _SummaryItem(label: 'GPA (Current)', value: 'N/A'),
+            _SummaryItem(label: 'CGPA', value: 'N/A'),
+            _SummaryItem(label: 'Credits Done', value: 'N/A'),
+            _SummaryItem(label: 'This Semester', value: 'N/A'),
+          ]),
+          data: (semesters) {
+            final current = semesters.where((s) => s.isCurrent).firstOrNull
+                ?? (semesters.isNotEmpty ? semesters.first : null);
+            final gpa = current != null
+                ? current.semesterGpa.toStringAsFixed(2)
+                : '—';
+            final cgpa = semesters.isNotEmpty
+                ? _computeCgpa(semesters).toStringAsFixed(2)
+                : '—';
+            final creditsDone = semesters
+                .where((s) => !s.isCurrent)
+                .fold(0, (sum, s) => sum + s.totalCredits);
+            final currentCredits = current?.totalCredits ?? 0;
+
+            return coursesAsync.when(
+              loading: () => _SummaryGrid(items: [
+                _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
+                _SummaryItem(label: 'CGPA', value: cgpa),
+                _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
+                _SummaryItem(label: 'This Semester', value: '—'),
+              ]),
+              error: (_, _) => _SummaryGrid(items: [
+                _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
+                _SummaryItem(label: 'CGPA', value: cgpa),
+                _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
+                _SummaryItem(label: 'This Semester', value: '$currentCredits cr'),
+              ]),
+              data: (courses) {
+                final currentCourseCredits = courses
+                    .where((c) => c.isCurrentSemester)
+                    .fold(0, (sum, c) => sum + c.credits);
+                return _SummaryGrid(items: [
+                  _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
+                  _SummaryItem(label: 'CGPA', value: cgpa),
+                  _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
+                  _SummaryItem(label: 'This Semester', value: '$currentCourseCredits cr'),
+                ]);
+              },
+            );
+          },
+        ),
       ],
     );
   }
 
   // ── Attendance overview ────────────────────────────────────────────────────
 
-  Widget _buildAttendanceOverview() {
+  Widget _buildAttendanceOverview(WidgetRef ref) {
+    final attendanceAsync = ref.watch(studentAttendanceProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: 'Attendance Overview',
-          icon: Icons.person_outline,
-        ),
+        SectionHeader(title: 'Attendance Overview', icon: Icons.person_outline),
         const SizedBox(height: 12),
-        _SummaryGrid(items: [
-          _SummaryItem(
-            label: 'Overall Rate',
-            value: _kAttendance.overallRate,
-            valueColor: AppColors.primaryBlue,
-          ),
-          _SummaryItem(
-            label: 'Present',
-            value: '${_kAttendance.present}',
-            trailingIcon: Icons.check_circle_outline,
-            trailingColor: AppColors.statusGreen,
-          ),
-          _SummaryItem(
-            label: 'Absent',
-            value: '${_kAttendance.absent}',
-            valueColor: AppColors.statusRed,
-            trailingIcon: Icons.cancel_outlined,
-            trailingColor: AppColors.statusRed,
-          ),
-          _SummaryItem(
-            label: 'Leave',
-            value: '${_kAttendance.leave}',
-            valueColor: AppColors.statusAmber,
-            trailingIcon: Icons.watch_later_outlined,
-            trailingColor: AppColors.statusAmber,
-          ),
-        ]),
+        attendanceAsync.when(
+          loading: () => _SummaryGrid(items: [
+            _SummaryItem(label: 'Overall Rate', value: '—'),
+            _SummaryItem(label: 'Present', value: '—'),
+            _SummaryItem(label: 'Absent', value: '—'),
+            _SummaryItem(label: 'Leave', value: '—'),
+          ]),
+          error: (_, _) => _SummaryGrid(items: [
+            _SummaryItem(label: 'Overall Rate', value: 'N/A'),
+            _SummaryItem(label: 'Present', value: 'N/A'),
+            _SummaryItem(label: 'Absent', value: 'N/A'),
+            _SummaryItem(label: 'Leave', value: 'N/A'),
+          ]),
+          data: (att) => _SummaryGrid(items: [
+            _SummaryItem(
+              label: 'Overall Rate',
+              value: '${(att.overallRate * 100).toStringAsFixed(1)}%',
+              valueColor: AppColors.primaryBlue,
+            ),
+            _SummaryItem(
+              label: 'Present',
+              value: '${att.present}',
+              trailingIcon: Icons.check_circle_outline,
+              trailingColor: AppColors.statusGreen,
+            ),
+            _SummaryItem(
+              label: 'Absent',
+              value: '${att.absent}',
+              valueColor: AppColors.statusRed,
+              trailingIcon: Icons.cancel_outlined,
+              trailingColor: AppColors.statusRed,
+            ),
+            _SummaryItem(
+              label: 'Leave',
+              value: '${att.excused}',
+              valueColor: AppColors.statusAmber,
+              trailingIcon: Icons.watch_later_outlined,
+              trailingColor: AppColors.statusAmber,
+            ),
+          ]),
+        ),
       ],
     );
   }
 
   // ── Financial summary ──────────────────────────────────────────────────────
 
-  Widget _buildFinancialSummary(BuildContext context) {
+  Widget _buildFinancialSummary(BuildContext context, WidgetRef ref) {
+    final financeAsync = ref.watch(studentFinanceProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -204,136 +246,24 @@ class StudentDashboardScreen extends StatelessWidget {
           onAction: () => context.go(AppRoutes.financeDashboard),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFinanceTopRow(),
-              const SizedBox(height: 12),
-              const Divider(color: AppColors.border),
-              const SizedBox(height: 12),
-              _buildFinanceAmounts(),
-              const SizedBox(height: 12),
-              _buildDueDateBanner(),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton.icon(
-                  onPressed: () => context.go(AppRoutes.onlinePayment),
-                  icon: const Icon(Icons.payment, size: 16),
-                  label: Text('Pay Now', style: AppTextStyles.button),
-                ),
-              ),
-            ],
-          ),
+        financeAsync.when(
+          loading: () => const _FinanceLoadingCard(),
+          error: (_, _) => const _FinanceErrorCard(),
+          data: (fin) => _FinanceSummaryCard(finance: fin, context: context),
         ),
       ],
-    );
-  }
-
-  Widget _buildFinanceTopRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Total Semester Fee', style: AppTextStyles.label),
-              const SizedBox(height: 4),
-              Text(_kFinance.totalFee,
-                  style: AppTextStyles.metric.copyWith(fontSize: 22)),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.statusAmberBg,
-            borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
-          ),
-          child: Text(
-            _kFinance.status,
-            style: AppTextStyles.label.copyWith(color: AppColors.statusAmber),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFinanceAmounts() {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Paid', style: AppTextStyles.label),
-              const SizedBox(height: 2),
-              Text(_kFinance.paid,
-                  style: AppTextStyles.metricSmall.copyWith(
-                      color: AppColors.statusGreen, fontSize: 18)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Outstanding', style: AppTextStyles.label),
-              const SizedBox(height: 2),
-              Text(_kFinance.outstanding,
-                  style: AppTextStyles.metricSmall.copyWith(
-                      color: AppColors.statusRed, fontSize: 18)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDueDateBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.statusAmberBg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.access_time, color: AppColors.statusAmber, size: 18),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('DUE DATE REMINDER',
-                  style: AppTextStyles.label.copyWith(color: AppColors.statusAmber)),
-              Text(_kFinance.dueDate,
-                  style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.statusAmber)),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
   // ── Recent activities ──────────────────────────────────────────────────────
 
-  Widget _buildRecentActivities(BuildContext context) {
+  Widget _buildRecentActivities(BuildContext context, WidgetRef ref) {
+    final notifAsync = ref.watch(studentNotificationsProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: 'Recent Activities',
-          icon: Icons.history,
-        ),
+        SectionHeader(title: 'Recent Activities', icon: Icons.history),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -341,27 +271,265 @@ class StudentDashboardScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            children: [
-              ..._kActivities.asMap().entries.map((e) {
-                final isLast = e.key == _kActivities.length - 1;
-                return _buildActivityItem(e.value, showDivider: !isLast);
-              }),
-              const Divider(height: 1, color: AppColors.border),
-              TextButton(
-                onPressed: () {},
-                child: Text('VIEW FULL HISTORY',
-                    style: AppTextStyles.label.copyWith(
-                        color: AppColors.primaryBlue, letterSpacing: 1.0)),
-              ),
-            ],
+          child: notifAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            error: (_, _) => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Could not load activities.'),
+            ),
+            data: (notifications) {
+              final recent = notifications.take(3).toList();
+              if (recent.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: Text('No recent activities.')),
+                );
+              }
+              return Column(
+                children: [
+                  ...recent.asMap().entries.map((e) {
+                    final isLast = e.key == recent.length - 1;
+                    return _NotifActivityItem(
+                      notif: e.value,
+                      showDivider: !isLast,
+                    );
+                  }),
+                  const Divider(height: 1, color: AppColors.border),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.notificationCenter),
+                    child: Text('VIEW ALL NOTIFICATIONS',
+                        style: AppTextStyles.label.copyWith(
+                            color: AppColors.primaryBlue, letterSpacing: 1.0)),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildActivityItem(dynamic activity, {required bool showDivider}) {
+// ── Finance card variants ──────────────────────────────────────────────────────
+
+class _FinanceLoadingCard extends StatelessWidget {
+  const _FinanceLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+    );
+  }
+}
+
+class _FinanceErrorCard extends StatelessWidget {
+  const _FinanceErrorCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Text('Could not load finance data.'),
+    );
+  }
+}
+
+class _FinanceSummaryCard extends StatelessWidget {
+  const _FinanceSummaryCard({required this.finance, required this.context});
+  final FinanceSummary finance;
+  final BuildContext context;
+
+  Color get _statusColor => switch (finance.status) {
+        'PAID' => AppColors.statusGreen,
+        'OVERDUE' => AppColors.statusRed,
+        _ => AppColors.statusAmber,
+      };
+
+  Color get _statusBg => switch (finance.status) {
+        'PAID' => AppColors.statusGreenBg,
+        'OVERDUE' => AppColors.statusRedBg,
+        _ => AppColors.statusAmberBg,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total Semester Fee', style: AppTextStyles.label),
+                    const SizedBox(height: 4),
+                    Text(
+                      _currencyFmt.format(finance.totalFees),
+                      style: AppTextStyles.metric.copyWith(fontSize: 22),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusBg,
+                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                ),
+                child: Text(
+                  finance.status,
+                  style: AppTextStyles.label.copyWith(color: _statusColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(color: AppColors.border),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Paid', style: AppTextStyles.label),
+                    const SizedBox(height: 2),
+                    Text(
+                      _currencyFmt.format(finance.totalPaid),
+                      style: AppTextStyles.metricSmall.copyWith(
+                          color: AppColors.statusGreen, fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Outstanding', style: AppTextStyles.label),
+                    const SizedBox(height: 2),
+                    Text(
+                      _currencyFmt.format(finance.outstanding),
+                      style: AppTextStyles.metricSmall.copyWith(
+                          color: AppColors.statusRed, fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (finance.nextDueDate != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.statusAmberBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time, color: AppColors.statusAmber, size: 18),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('DUE DATE REMINDER',
+                          style: AppTextStyles.label.copyWith(color: AppColors.statusAmber)),
+                      Text(
+                        _fmtDate(finance.nextDueDate!),
+                        style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.statusAmber),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () => context.go(AppRoutes.onlinePayment),
+              icon: const Icon(Icons.payment, size: 16),
+              label: Text('Pay Now', style: AppTextStyles.button),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Notification activity item ─────────────────────────────────────────────────
+
+class _NotifActivityItem extends StatelessWidget {
+  const _NotifActivityItem({required this.notif, required this.showDivider});
+  final NotificationRow notif;
+  final bool showDivider;
+
+  IconData get _icon => switch (notif.type) {
+        'grade' => Icons.grade_outlined,
+        'attendance' => Icons.calendar_today_outlined,
+        'payment' => Icons.credit_card_outlined,
+        'announcement' => Icons.campaign_outlined,
+        'leave' => Icons.event_busy_outlined,
+        _ => Icons.notifications_outlined,
+      };
+
+  Color get _iconColor => switch (notif.type) {
+        'grade' => AppColors.primaryBlue,
+        'attendance' => AppColors.textSecondary,
+        'payment' => AppColors.statusGreen,
+        'announcement' => AppColors.statusAmber,
+        'leave' => AppColors.statusRed,
+        _ => AppColors.primaryNavy,
+      };
+
+  Color get _iconBg => switch (notif.type) {
+        'grade' => AppColors.statusBlueBg,
+        'payment' => AppColors.statusGreenBg,
+        'announcement' => AppColors.statusAmberBg,
+        'leave' => AppColors.statusRedBg,
+        _ => AppColors.statusGrayBg,
+      };
+
+  String _timeAgo(DateTime? createdAt) {
+    if (createdAt == null) return '';
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return DateFormat('MMM d').format(createdAt);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
@@ -372,26 +540,30 @@ class StudentDashboardScreen extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: activity.iconBg as Color,
+                  color: _iconBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(activity.icon as IconData,
-                    color: activity.iconColor as Color, size: 20),
+                child: Icon(_icon, color: _iconColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(activity.title as String, style: AppTextStyles.bodyMedium),
+                    Text(notif.title,
+                        style: AppTextStyles.bodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(activity.subtitle as String,
-                        style: AppTextStyles.caption),
+                    Text(notif.body,
+                        style: AppTextStyles.caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Text(activity.time as String,
+              Text(_timeAgo(notif.createdAt),
                   style: AppTextStyles.label.copyWith(fontSize: 10)),
             ],
           ),
@@ -402,7 +574,7 @@ class StudentDashboardScreen extends StatelessWidget {
   }
 }
 
-// ── Reusable 2x2 summary grid ──────────────────────────────────────────────────
+// ── Reusable 2×2 summary grid ──────────────────────────────────────────────────
 
 class _SummaryGrid extends StatelessWidget {
   const _SummaryGrid({required this.items});

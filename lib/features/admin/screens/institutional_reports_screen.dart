@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
 
 final _kReportModules = [
   (
@@ -41,19 +43,18 @@ final _kReportModules = [
   ),
 ];
 
-class InstitutionalReportsScreen extends StatefulWidget {
+class InstitutionalReportsScreen extends ConsumerStatefulWidget {
   const InstitutionalReportsScreen({super.key});
 
   @override
-  State<InstitutionalReportsScreen> createState() =>
+  ConsumerState<InstitutionalReportsScreen> createState() =>
       _InstitutionalReportsScreenState();
 }
 
 class _InstitutionalReportsScreenState
-    extends State<InstitutionalReportsScreen> {
-  String _semester   = 'Semester 1';
-  String _department = 'All Departments';
-  bool _viewMonthly  = true;
+    extends ConsumerState<InstitutionalReportsScreen> {
+  String _semester  = 'All Semesters';
+  bool _viewMonthly = true;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +91,12 @@ class _InstitutionalReportsScreenState
   }
 
   Widget _buildFilters() {
+    final semesterItems = <String>[
+      'All Semesters',
+      ...ref.watch(adminSemestersProvider).valueOrNull?.map((s) => s.name) ?? <String>[],
+    ];
+    final semValue = semesterItems.contains(_semester) ? _semester : semesterItems.first;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -112,27 +119,11 @@ class _InstitutionalReportsScreenState
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _FilterDrop(
-                  label: 'Semester',
-                  value: _semester,
-                  items: ['Semester 1', 'Semester 2', 'Full Year'],
-                  onChanged: (v) => setState(() => _semester = v!),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _FilterDrop(
-                  label: 'Department',
-                  value: _department,
-                  items: ['All Departments', 'Computer Science',
-                          'Business', 'Engineering', 'Law'],
-                  onChanged: (v) => setState(() => _department = v!),
-                ),
-              ),
-            ],
+          _FilterDrop(
+            label: 'Semester',
+            value: semValue,
+            items: semesterItems,
+            onChanged: (v) => setState(() => _semester = v!),
           ),
           const SizedBox(height: 12),
           ElevatedButton(

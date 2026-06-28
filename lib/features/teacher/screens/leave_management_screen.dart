@@ -1,107 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/teacher_providers.dart';
+import '../../../core/services/teacher_service.dart';
+import '../../../core/supabase/database.types.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-class _LeaveRequest {
-  _LeaveRequest({
-    required this.id,
-    required this.initials,
-    required this.name,
-    required this.studentId,
-    required this.course,
-    required this.type,
-    required this.dates,
-    required this.status,
-  });
-  final String id, initials, name, studentId, course, type, dates;
-  String status; // 'pending', 'approved', 'rejected'
+String _fmtDateRange(String start, String end) {
+  try {
+    final s = DateFormat('MMM d').format(DateTime.parse(start));
+    final e = DateFormat('MMM d, yyyy').format(DateTime.parse(end));
+    return s == e ? s : '$s – $e';
+  } catch (_) {
+    return '$start – $end';
+  }
 }
-
-final _kRequests = [
-  _LeaveRequest(
-    id: 'lr1',
-    initials: 'ER',
-    name: 'Elena Rodriguez',
-    studentId: 'B24-88902',
-    course: 'Business Ethics 301',
-    type: 'Medical Leave',
-    dates: 'Oct 12 – Oct 14, 2023',
-    status: 'pending',
-  ),
-  _LeaveRequest(
-    id: 'lr2',
-    initials: 'JT',
-    name: 'James K. Thompson',
-    studentId: 'B24-88945',
-    course: 'Intro to Psychology',
-    type: 'Personal/Family',
-    dates: 'Oct 15, 2023',
-    status: 'pending',
-  ),
-  _LeaveRequest(
-    id: 'lr3',
-    initials: 'LN',
-    name: 'Linh Nguyen',
-    studentId: 'B24-88911',
-    course: 'Advanced Calculus',
-    type: 'Medical Leave',
-    dates: 'Oct 18 – Oct 20, 2023',
-    status: 'pending',
-  ),
-  _LeaveRequest(
-    id: 'lr4',
-    initials: 'MC',
-    name: 'Marcus Chen',
-    studentId: 'B24-88776',
-    course: 'Digital Marketing',
-    type: 'External Competition',
-    dates: 'Oct 10 – Oct 12, 2023',
-    status: 'approved',
-  ),
-];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class LeaveManagementScreen extends StatefulWidget {
+class LeaveManagementScreen extends ConsumerStatefulWidget {
   const LeaveManagementScreen({super.key});
 
   @override
-  State<LeaveManagementScreen> createState() => _LeaveManagementScreenState();
+  ConsumerState<LeaveManagementScreen> createState() =>
+      _LeaveManagementScreenState();
 }
 
-class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
+class _LeaveManagementScreenState
+    extends ConsumerState<LeaveManagementScreen> {
   String _filter = 'all';
-  late final List<_LeaveRequest> _requests =
-      _kRequests.map((r) => _LeaveRequest(
-            id: r.id,
-            initials: r.initials,
-            name: r.name,
-            studentId: r.studentId,
-            course: r.course,
-            type: r.type,
-            dates: r.dates,
-            status: r.status,
-          )).toList();
 
-  List<_LeaveRequest> get _filtered {
-    if (_filter == 'all') return _requests;
-    return _requests.where((r) => r.status == _filter).toList();
+  List<StudentLeaveDetail> _filtered(List<StudentLeaveDetail> all) {
+    if (_filter == 'all') return all;
+    return all.where((r) => r.status.name == _filter).toList();
   }
-
-  void _approve(String id) => setState(() {
-        _requests.firstWhere((r) => r.id == id).status = 'approved';
-      });
-
-  void _reject(String id) => setState(() {
-        _requests.firstWhere((r) => r.id == id).status = 'rejected';
-      });
 
   @override
   Widget build(BuildContext context) {
+    final leavesAsync = ref.watch(teacherStudentLeavesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: Column(
@@ -109,21 +51,43 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
           _buildHeader(),
           _buildFilterChips(),
           Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmpty()
-                : ListView.separated(
-                    padding:
-                        const EdgeInsets.all(AppSpacing.screenPadding),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) => _LeaveCard(
-                          request: _filtered[i],
-                          onApprove: () => _approve(_filtered[i].id),
-                          onReject: () => _reject(_filtered[i].id),
-                          onTap: () => context.push(
-                              '/teacher/students/leave/${_filtered[i].id}'),
-                        ),
+            child: leavesAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline,
+                        color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Could not load leave requests',
+                        style: AppTextStyles.bodyMedium),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(teacherStudentLeavesProvider),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+              data: (all) {
+                final items = _filtered(all);
+                if (items.isEmpty) return _buildEmpty();
+                return ListView.separated(
+                  padding:
+                      const EdgeInsets.all(AppSpacing.screenPadding),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (_, i) => _LeaveCard(
+                    request: items[i],
+                    onTap: () => context.push(
+                        '/teacher/students/leave/${items[i].id}'),
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -142,21 +106,30 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Leave Requests', style: AppTextStyles.h1),
-              Row(
-                children: [
-                  Text('Sort by: ',
-                      style: AppTextStyles.caption),
-                  Text('Newest First',
-                      style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primaryBlue,
-                          fontWeight: FontWeight.w600)),
-                  const Icon(Icons.keyboard_arrow_down,
-                      size: 16, color: AppColors.primaryBlue),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.statusAmberBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.statusAmber.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.visibility_outlined,
+                        size: 14, color: AppColors.statusAmber),
+                    const SizedBox(width: 4),
+                    Text('View Only',
+                        style: AppTextStyles.label.copyWith(
+                            color: AppColors.statusAmber)),
+                  ],
+                ),
               ),
             ],
           ),
-          Text('Manage and review student absence submissions.',
+          Text('Student absence submissions for your courses.',
               style: AppTextStyles.caption),
         ],
       ),
@@ -167,10 +140,10 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 
   Widget _buildFilterChips() {
     final chips = [
-      (value: 'all',      label: 'All Requests', dot: null),
-      (value: 'pending',  label: 'Pending',       dot: AppColors.statusAmber),
-      (value: 'approved', label: 'Approved',      dot: AppColors.statusGreen),
-      (value: 'rejected', label: 'Rejected',      dot: AppColors.statusRed),
+      (value: 'all', label: 'All Requests', dot: null),
+      (value: 'pending', label: 'Pending', dot: AppColors.statusAmber),
+      (value: 'approved', label: 'Approved', dot: AppColors.statusGreen),
+      (value: 'rejected', label: 'Rejected', dot: AppColors.statusRed),
     ];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -187,7 +160,9 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isActive ? AppColors.primaryNavy : AppColors.bgCard,
+                  color: isActive
+                      ? AppColors.primaryNavy
+                      : AppColors.bgCard,
                   borderRadius:
                       BorderRadius.circular(AppSpacing.chipRadius),
                   border: Border.all(
@@ -204,7 +179,8 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: isActive ? Colors.white : c.dot!,
+                          color:
+                              isActive ? Colors.white : c.dot!,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -212,8 +188,12 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                     ],
                     Text(c.label,
                         style: AppTextStyles.caption.copyWith(
-                          color: isActive ? Colors.white : AppColors.textSecondary,
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                          color: isActive
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                          fontWeight: isActive
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         )),
                   ],
                 ),
@@ -234,8 +214,8 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
               color: AppColors.textLabel, size: 48),
           const SizedBox(height: 12),
           Text('No requests found',
-              style: AppTextStyles.body.copyWith(
-                  color: AppColors.textSecondary)),
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -245,67 +225,84 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 // ── Leave card ────────────────────────────────────────────────────────────────
 
 class _LeaveCard extends StatelessWidget {
-  const _LeaveCard({
-    required this.request,
-    required this.onApprove,
-    required this.onReject,
-    required this.onTap,
-  });
+  const _LeaveCard({required this.request, required this.onTap});
 
-  final _LeaveRequest request;
-  final VoidCallback onApprove, onReject, onTap;
+  final StudentLeaveDetail request;
+  final VoidCallback onTap;
 
-  Color get _statusColor {
-    switch (request.status) {
-      case 'approved': return AppColors.statusGreen;
-      case 'rejected': return AppColors.statusRed;
-      default:         return AppColors.statusAmber;
-    }
-  }
+  Color get _statusColor => switch (request.status) {
+        LeaveStatus.approved => AppColors.statusGreen,
+        LeaveStatus.rejected => AppColors.statusRed,
+        _ => AppColors.statusAmber,
+      };
 
-  Color get _statusBg {
-    switch (request.status) {
-      case 'approved': return AppColors.statusGreenBg;
-      case 'rejected': return AppColors.statusRedBg;
-      default:         return AppColors.statusAmberBg;
-    }
-  }
+  Color get _statusBg => switch (request.status) {
+        LeaveStatus.approved => AppColors.statusGreenBg,
+        LeaveStatus.rejected => AppColors.statusRedBg,
+        _ => AppColors.statusAmberBg,
+      };
 
-  String get _statusLabel {
-    switch (request.status) {
-      case 'approved': return 'Approved';
-      case 'rejected': return 'Rejected';
-      default:         return 'Pending';
-    }
-  }
+  String get _statusLabel => switch (request.status) {
+        LeaveStatus.approved => 'Approved',
+        LeaveStatus.rejected => 'Rejected',
+        _ => 'Pending',
+      };
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildCardHeader(),
-          const SizedBox(height: 12),
-          _buildMeta(Icons.menu_book_outlined,
-              'Course: ${request.course}'),
-          const SizedBox(height: 4),
-          _buildMeta(Icons.beach_access_outlined,
-              'Type: ${request.type}'),
-          const SizedBox(height: 4),
-          _buildMeta(Icons.calendar_today_outlined,
-              'Dates: ${request.dates}'),
-          if (request.status == 'pending') ...[
-            const SizedBox(height: 14),
-            _buildActions(),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCardHeader(),
+            const SizedBox(height: 12),
+            _buildMeta(Icons.beach_access_outlined,
+                'Type: ${request.type}'),
+            const SizedBox(height: 4),
+            _buildMeta(Icons.calendar_today_outlined,
+                'Dates: ${_fmtDateRange(request.startDate, request.endDate)}'),
+            const SizedBox(height: 4),
+            _buildMeta(Icons.notes_outlined,
+                request.reason,
+                maxLines: 2),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.statusBlueBg,
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.chipRadius),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.visibility_outlined,
+                          size: 12, color: AppColors.primaryBlue),
+                      const SizedBox(width: 4),
+                      Text('View Details',
+                          style: AppTextStyles.label.copyWith(
+                              color: AppColors.primaryBlue)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AppColors.primaryNavy),
+              ],
+            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -326,8 +323,9 @@ class _LeaveCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(request.name, style: AppTextStyles.bodyMedium),
-              Text('ID: ${request.studentId}',
+              Text(request.studentName,
+                  style: AppTextStyles.bodyMedium),
+              Text('ID: ${request.studentCode}',
                   style: AppTextStyles.caption),
             ],
           ),
@@ -347,49 +345,20 @@ class _LeaveCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMeta(IconData icon, String text) {
+  Widget _buildMeta(IconData icon, String text, {int maxLines = 1}) {
     return Row(
+      crossAxisAlignment: maxLines > 1
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       children: [
         Icon(icon, size: 13, color: AppColors.textSecondary),
         const SizedBox(width: 6),
         Expanded(
           child: Text(text,
               style: AppTextStyles.body
-                  .copyWith(color: AppColors.textSecondary)),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActions() {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: onApprove,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.statusGreen,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-            child: Text('Approve', style: AppTextStyles.button),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: onReject,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.statusRed,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-            child: Text('Reject', style: AppTextStyles.button),
-          ),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onTap,
-          child: const Icon(Icons.arrow_forward_ios,
-              size: 16, color: AppColors.primaryNavy),
+                  .copyWith(color: AppColors.textSecondary),
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis),
         ),
       ],
     );

@@ -1,107 +1,108 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/supabase/database.types.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-enum _LeaveStatus { pending, approved, rejected }
-
-class _LeaveItem {
-  const _LeaveItem({
-    required this.id,
-    required this.course,
-    required this.type,
-    required this.dateRange,
-    required this.status,
-    required this.icon,
-  });
-  final String id, course, type, dateRange;
-  final _LeaveStatus status;
-  final IconData icon;
+String _fmtDateRange(String start, String end) {
+  try {
+    final s = DateFormat('MMM d').format(DateTime.parse(start));
+    final e = DateFormat('MMM d, yyyy').format(DateTime.parse(end));
+    return '$s - $e';
+  } catch (_) {
+    return '$start – $end';
+  }
 }
 
-const _kLeaves = [
-  _LeaveItem(
-    id: '1',
-    course: 'Digital Marketing 101',
-    type: 'Sick Leave',
-    dateRange: 'Oct 12 - Oct 14, 2023',
-    status: _LeaveStatus.pending,
-    icon: Icons.sick_outlined,
-  ),
-  _LeaveItem(
-    id: '2',
-    course: 'Advanced Mathematics',
-    type: 'Family Event',
-    dateRange: 'Sep 25 - Sep 25, 2023',
-    status: _LeaveStatus.approved,
-    icon: Icons.calendar_today_outlined,
-  ),
-  _LeaveItem(
-    id: '3',
-    course: 'Introduction to Law',
-    type: 'Medical Checkup',
-    dateRange: 'Aug 14 - Aug 14, 2023',
-    status: _LeaveStatus.rejected,
-    icon: Icons.local_hospital_outlined,
-  ),
-  _LeaveItem(
-    id: '4',
-    course: 'Economics Foundations',
-    type: 'Overseas Program',
-    dateRange: 'Jul 10 - Jul 20, 2023',
-    status: _LeaveStatus.approved,
-    icon: Icons.flight_takeoff_outlined,
-  ),
-];
+IconData _iconForType(String type) {
+  final t = type.toLowerCase();
+  if (t.contains('sick') || t.contains('medical')) {
+    return Icons.local_hospital_outlined;
+  }
+  if (t.contains('family')) return Icons.family_restroom_outlined;
+  if (t.contains('travel') || t.contains('overseas')) {
+    return Icons.flight_takeoff_outlined;
+  }
+  return Icons.event_note_outlined;
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class LeaveRequestDashboardScreen extends StatelessWidget {
+class LeaveRequestDashboardScreen extends ConsumerWidget {
   const LeaveRequestDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final leavesAsync = ref.watch(studentLeaveRequestsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      floatingActionButton: _buildNewRequestFab(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(),
-            const SizedBox(height: AppSpacing.md),
-            _buildStatusChips(),
-            const SizedBox(height: AppSpacing.md),
-            ..._kLeaves.map((leave) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _LeaveCard(
-                    leave: leave,
-                    onTap: () => context.go('/student/leave/${leave.id}'),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/student/leave/create'),
+        backgroundColor: AppColors.primaryBlue,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text('New Request',
+            style: AppTextStyles.button.copyWith(fontSize: 14)),
+      ),
+      body: leavesAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load leave requests',
+                  style: AppTextStyles.bodyMedium),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(studentLeaveRequestsProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (leaves) => SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTitle(),
+              const SizedBox(height: AppSpacing.md),
+              _buildStatusChips(leaves),
+              const SizedBox(height: AppSpacing.md),
+              if (leaves.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Text('No leave requests yet.'),
                   ),
-                )),
-            const SizedBox(height: 80),
-          ],
+                )
+              else
+                ...leaves.map((leave) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _LeaveCard(
+                        leave: leave,
+                        onTap: () => context
+                            .go('/student/leave/${leave.id}'),
+                      ),
+                    )),
+              const SizedBox(height: 80),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  // ── FAB ────────────────────────────────────────────────────────────────────
-
-  Widget _buildNewRequestFab(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () => context.go('/student/leave/create'),
-      backgroundColor: AppColors.primaryBlue,
-      icon: const Icon(Icons.add, color: Colors.white),
-      label: Text('New Request', style: AppTextStyles.button.copyWith(fontSize: 14)),
-    );
-  }
-
-  // ── Title ──────────────────────────────────────────────────────────────────
 
   Widget _buildTitle() {
     return Column(
@@ -115,20 +116,30 @@ class LeaveRequestDashboardScreen extends StatelessWidget {
     );
   }
 
-  // ── Status summary chips ───────────────────────────────────────────────────
-
-  Widget _buildStatusChips() {
-    final pending = _kLeaves.where((l) => l.status == _LeaveStatus.pending).length;
-    final approved = _kLeaves.where((l) => l.status == _LeaveStatus.approved).length;
-    final rejected = _kLeaves.where((l) => l.status == _LeaveStatus.rejected).length;
+  Widget _buildStatusChips(List<LeaveRequestRow> leaves) {
+    final pending =
+        leaves.where((l) => l.status == LeaveStatus.pending).length;
+    final approved =
+        leaves.where((l) => l.status == LeaveStatus.approved).length;
+    final rejected =
+        leaves.where((l) => l.status == LeaveStatus.rejected).length;
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        _StatusChip(count: pending, label: 'Pending', color: AppColors.statusAmber),
-        _StatusChip(count: approved, label: 'Approved', color: AppColors.statusGreen),
-        _StatusChip(count: rejected, label: 'Rejected', color: AppColors.statusRed),
+        _StatusChip(
+            count: pending,
+            label: 'Pending',
+            color: AppColors.statusAmber),
+        _StatusChip(
+            count: approved,
+            label: 'Approved',
+            color: AppColors.statusGreen),
+        _StatusChip(
+            count: rejected,
+            label: 'Rejected',
+            color: AppColors.statusRed),
       ],
     );
   }
@@ -137,7 +148,10 @@ class LeaveRequestDashboardScreen extends StatelessWidget {
 // ── Status chip ────────────────────────────────────────────────────────────────
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.count, required this.label, required this.color});
+  const _StatusChip(
+      {required this.count,
+      required this.label,
+      required this.color});
   final int count;
   final String label;
   final Color color;
@@ -145,7 +159,8 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
@@ -157,7 +172,8 @@ class _StatusChip extends StatelessWidget {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration:
+                BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           Text('$count $label', style: AppTextStyles.bodyMedium),
@@ -167,23 +183,23 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-// ── Leave card ────────────────────────────────────────────────────────────────
+// ── Leave card ─────────────────────────────────────────────────────────────────
 
 class _LeaveCard extends StatelessWidget {
   const _LeaveCard({required this.leave, required this.onTap});
-  final _LeaveItem leave;
+  final LeaveRequestRow leave;
   final VoidCallback onTap;
 
   Color get _statusColor => switch (leave.status) {
-        _LeaveStatus.pending => AppColors.statusAmber,
-        _LeaveStatus.approved => AppColors.statusGreen,
-        _LeaveStatus.rejected => AppColors.statusRed,
+        LeaveStatus.pending => AppColors.statusAmber,
+        LeaveStatus.approved => AppColors.statusGreen,
+        LeaveStatus.rejected => AppColors.statusRed,
       };
 
   String get _statusLabel => switch (leave.status) {
-        _LeaveStatus.pending => 'Pending',
-        _LeaveStatus.approved => 'Approved',
-        _LeaveStatus.rejected => 'Rejected',
+        LeaveStatus.pending => 'Pending',
+        LeaveStatus.approved => 'Approved',
+        LeaveStatus.rejected => 'Rejected',
       };
 
   @override
@@ -206,23 +222,35 @@ class _LeaveCard extends StatelessWidget {
                 color: AppColors.statusGrayBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(leave.icon, color: AppColors.primaryNavy, size: 22),
+              child: Icon(_iconForType(leave.type),
+                  color: AppColors.primaryNavy, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(leave.course, style: AppTextStyles.h3),
+                  Text(leave.type, style: AppTextStyles.h3),
                   const SizedBox(height: 2),
-                  Text('${leave.type} • ${leave.dateRange}',
-                      style: AppTextStyles.caption),
+                  Text(
+                    _fmtDateRange(leave.startDate, leave.endDate),
+                    style: AppTextStyles.caption,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    leave.reason,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 6),
                   _buildStatusBadge(),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textLabel),
+            const Icon(Icons.chevron_right,
+                color: AppColors.textLabel),
           ],
         ),
       ),
@@ -236,12 +264,14 @@ class _LeaveCard extends StatelessWidget {
         Container(
           width: 7,
           height: 7,
-          decoration: BoxDecoration(color: _statusColor, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+              color: _statusColor, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
         Text(_statusLabel,
             style: AppTextStyles.caption.copyWith(
-                color: _statusColor, fontWeight: FontWeight.w600)),
+                color: _statusColor,
+                fontWeight: FontWeight.w600)),
       ],
     );
   }

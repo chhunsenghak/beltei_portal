@@ -1,44 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-final _kRecords = [
-  (initials: 'CN', name: 'Chann Nimol',  studentId: '2024-0812', course: 'English Proficiency II',   date: 'Oct 24, 2023', status: 'P'),
-  (initials: 'ST', name: 'Sok Thida',    studentId: '2024-0544', course: 'Business Statistics',      date: 'Oct 24, 2023', status: 'A'),
-  (initials: 'KR', name: 'Keo Rithy',    studentId: '2024-0992', course: 'Modern Khmer Literature',  date: 'Oct 24, 2023', status: 'L'),
-  (initials: 'VP', name: 'Vann Phally',  studentId: '2024-1201', course: 'English Proficiency II',   date: 'Oct 24, 2023', status: 'E'),
-  (initials: 'RM', name: 'Ratha Morn',   studentId: '2024-0831', course: 'Business Statistics',      date: 'Oct 24, 2023', status: 'P'),
-  (initials: 'SR', name: 'Serey Roth',   studentId: '2024-0663', course: 'Modern Khmer Literature',  date: 'Oct 24, 2023', status: 'P'),
-];
-
-class AttendanceManagementScreen extends StatefulWidget {
+class AttendanceManagementScreen extends ConsumerStatefulWidget {
   const AttendanceManagementScreen({super.key});
 
   @override
-  State<AttendanceManagementScreen> createState() =>
+  ConsumerState<AttendanceManagementScreen> createState() =>
       _AttendanceManagementScreenState();
 }
 
 class _AttendanceManagementScreenState
-    extends State<AttendanceManagementScreen> {
+    extends ConsumerState<AttendanceManagementScreen> {
   bool _bulkEditMode = false;
   final Set<int> _selected = {};
-  String _courseFilter = 'All Courses';
+  String _studentQuery = '';
+
+  List<AdminAttendanceRecord> _applyFilter(List<AdminAttendanceRecord> records) {
+    if (_studentQuery.trim().isEmpty) return records;
+    final q = _studentQuery.toLowerCase();
+    return records
+        .where((r) =>
+            r.studentName.toLowerCase().contains(q) ||
+            r.studentCode.toLowerCase().contains(q))
+        .toList();
+  }
+
+  Color _statusColor(String s) {
+    switch (s) {
+      case 'present': return AppColors.statusGreen;
+      case 'absent':  return AppColors.statusRed;
+      case 'late':    return AppColors.statusAmber;
+      default:        return AppColors.statusGray;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final async = ref.watch(adminAttendanceProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      bottomSheet: _bulkEditMode && _selected.isNotEmpty
-          ? _buildBulkActionBar()
-          : null,
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildFilterPanel(),
-          Expanded(child: _buildRecordTable()),
-        ],
+      body: async.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load attendance data', style: AppTextStyles.body),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.invalidate(adminAttendanceProvider),
+                child: Text('Retry', style: AppTextStyles.link),
+              ),
+            ],
+          ),
+        ),
+        data: (allRecords) {
+          final records = _applyFilter(allRecords);
+          return Column(
+            children: [
+              _buildHeader(),
+              _buildFilterPanel(),
+              Expanded(child: _buildRecordTable(records)),
+              if (_bulkEditMode && _selected.isNotEmpty) _buildBulkActionBar(records.length),
+            ],
+          );
+        },
       ),
     );
   }
@@ -50,8 +84,10 @@ class _AttendanceManagementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Attendance', style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
-          Text('Management', style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
+          Text('Attendance',
+              style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
+          Text('Management',
+              style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 4),
           Text('Review and manage daily attendance across all campuses.',
               style: AppTextStyles.caption),
@@ -61,7 +97,8 @@ class _AttendanceManagementScreenState
               Row(
                 children: [
                   Text('Bulk Edit',
-                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500)),
+                      style: AppTextStyles.caption
+                          .copyWith(fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   Switch(
                     value: _bulkEditMode,
@@ -107,64 +144,12 @@ class _AttendanceManagementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Course', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 4),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgInput,
-              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _courseFilter,
-                isExpanded: true,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                items: ['All Courses', 'English Proficiency II',
-                        'Business Statistics', 'Modern Khmer Literature']
-                    .map((e) => DropdownMenuItem(
-                        value: e, child: Row(children: [
-                          const Icon(Icons.school_outlined, size: 14, color: AppColors.textSecondary),
-                          const SizedBox(width: 6),
-                          Text(e, style: AppTextStyles.body),
-                        ])))
-                    .toList(),
-                onChanged: (v) => setState(() => _courseFilter = v!),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text('Date Range', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+          Text('Student',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           TextField(
-            onChanged: (_) {},
-            decoration: InputDecoration(
-              hintText: 'Select dates',
-              hintStyle: AppTextStyles.caption,
-              prefixIcon: const Icon(Icons.calendar_month_outlined,
-                  size: 16, color: AppColors.textSecondary),
-              filled: true,
-              fillColor: AppColors.bgInput,
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.primaryNavy),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text('Student', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 4),
-          TextField(
-            onChanged: (_) {},
+            onChanged: (v) => setState(() => _studentQuery = v),
             decoration: InputDecoration(
               hintText: 'ID or Name',
               hintStyle: AppTextStyles.caption,
@@ -189,7 +174,7 @@ class _AttendanceManagementScreenState
           ),
           const SizedBox(height: 12),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () => setState(() {}),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 46),
               backgroundColor: AppColors.primaryBlue,
@@ -203,7 +188,7 @@ class _AttendanceManagementScreenState
     );
   }
 
-  Widget _buildRecordTable() {
+  Widget _buildRecordTable(List<AdminAttendanceRecord> records) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       decoration: BoxDecoration(
@@ -215,12 +200,16 @@ class _AttendanceManagementScreenState
         children: [
           _buildTableHeader(),
           Expanded(
-            child: ListView.builder(
-              itemCount: _kRecords.length,
-              itemBuilder: (context, i) => _buildTableRow(i),
-            ),
+            child: records.isEmpty
+                ? Center(
+                    child: Text('No attendance records found',
+                        style: AppTextStyles.caption))
+                : ListView.builder(
+                    itemCount: records.length,
+                    itemBuilder: (context, i) => _buildTableRow(i, records[i]),
+                  ),
           ),
-          _buildPagination(),
+          _buildPagination(records.length),
         ],
       ),
     );
@@ -235,26 +224,36 @@ class _AttendanceManagementScreenState
       child: Row(
         children: [
           if (_bulkEditMode) const SizedBox(width: 28),
-          Expanded(flex: 3, child: Text('STUDENT', style: AppTextStyles.label.copyWith(fontSize: 9))),
-          Expanded(flex: 3, child: Text('COURSE', style: AppTextStyles.label.copyWith(fontSize: 9))),
-          Expanded(flex: 2, child: Text('DATE', style: AppTextStyles.label.copyWith(fontSize: 9))),
+          Expanded(
+              flex: 3,
+              child: Text('STUDENT',
+                  style: AppTextStyles.label.copyWith(fontSize: 9))),
+          Expanded(
+              flex: 3,
+              child: Text('COURSE',
+                  style: AppTextStyles.label.copyWith(fontSize: 9))),
+          Expanded(
+              flex: 2,
+              child:
+                  Text('DATE', style: AppTextStyles.label.copyWith(fontSize: 9))),
           Text('ST', style: AppTextStyles.label.copyWith(fontSize: 9)),
         ],
       ),
     );
   }
 
-  Widget _buildTableRow(int i) {
-    final r = _kRecords[i];
+  Widget _buildTableRow(int i, AdminAttendanceRecord r) {
     final isSelected = _selected.contains(i);
     final statusColor = _statusColor(r.status);
-    final statusLabel = _statusLabel(r.status);
 
     return GestureDetector(
       onTap: _bulkEditMode
           ? () => setState(() {
-                if (isSelected) { _selected.remove(i); }
-                else { _selected.add(i); }
+                if (isSelected) {
+                  _selected.remove(i);
+                } else {
+                  _selected.add(i);
+                }
               })
           : null,
       child: Container(
@@ -270,8 +269,11 @@ class _AttendanceManagementScreenState
                 child: Checkbox(
                   value: isSelected,
                   onChanged: (_) => setState(() {
-                    if (isSelected) { _selected.remove(i); }
-                    else { _selected.add(i); }
+                    if (isSelected) {
+                      _selected.remove(i);
+                    } else {
+                      _selected.add(i);
+                    }
                   }),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   activeColor: AppColors.primaryNavy,
@@ -283,7 +285,8 @@ class _AttendanceManagementScreenState
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
+                    backgroundColor:
+                        AppColors.primaryNavy.withValues(alpha: 0.1),
                     child: Text(r.initials,
                         style: AppTextStyles.label.copyWith(
                             color: AppColors.primaryNavy, fontSize: 9)),
@@ -293,14 +296,14 @@ class _AttendanceManagementScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(r.name,
-                            style: AppTextStyles.caption.copyWith(
-                                fontWeight: FontWeight.w600),
+                        Text(r.studentName,
+                            style: AppTextStyles.caption
+                                .copyWith(fontWeight: FontWeight.w600),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
-                        Text('ID: ${r.studentId}',
-                            style: AppTextStyles.label.copyWith(
-                                fontSize: 8, letterSpacing: 0)),
+                        Text('ID: ${r.studentCode}',
+                            style: AppTextStyles.label
+                                .copyWith(fontSize: 8, letterSpacing: 0)),
                       ],
                     ),
                   ),
@@ -309,14 +312,14 @@ class _AttendanceManagementScreenState
             ),
             Expanded(
               flex: 3,
-              child: Text(r.course,
+              child: Text(r.courseName,
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
             ),
             Expanded(
               flex: 2,
-              child: Text(r.date,
+              child: Text(r.fmtDate,
                   style: AppTextStyles.caption.copyWith(fontSize: 10)),
             ),
             Container(
@@ -326,9 +329,9 @@ class _AttendanceManagementScreenState
                 shape: BoxShape.circle,
               ),
               child: Center(
-                child: Text(statusLabel,
-                    style: AppTextStyles.label.copyWith(
-                        color: statusColor, fontSize: 9)),
+                child: Text(r.statusCode,
+                    style: AppTextStyles.label
+                        .copyWith(color: statusColor, fontSize: 9)),
               ),
             ),
           ],
@@ -337,7 +340,7 @@ class _AttendanceManagementScreenState
     );
   }
 
-  Widget _buildPagination() {
+  Widget _buildPagination(int count) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: const BoxDecoration(
@@ -346,7 +349,7 @@ class _AttendanceManagementScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Showing 1 to ${_kRecords.length} of 1,248 entries',
+          Text('Showing $count record${count == 1 ? '' : 's'}',
               style: AppTextStyles.caption.copyWith(fontSize: 11)),
           Row(
             children: [
@@ -360,7 +363,7 @@ class _AttendanceManagementScreenState
     );
   }
 
-  Widget _buildBulkActionBar() {
+  Widget _buildBulkActionBar(int total) {
     return Container(
       height: 60,
       color: AppColors.primaryNavy,
@@ -379,17 +382,6 @@ class _AttendanceManagementScreenState
       ),
     );
   }
-
-  Color _statusColor(String s) {
-    switch (s) {
-      case 'P': return AppColors.statusGreen;
-      case 'A': return AppColors.statusRed;
-      case 'L': return AppColors.statusAmber;
-      default:  return AppColors.statusGray;
-    }
-  }
-
-  String _statusLabel(String s) => s;
 }
 
 class _PageBtn extends StatelessWidget {

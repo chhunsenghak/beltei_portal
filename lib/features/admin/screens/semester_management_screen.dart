@@ -1,70 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-final _kSemesters = [
-  (
-    name: 'Semester 1, 2023-2024',
-    status: 'ACTIVE',
-    startDate: 'Oct 15, 2023',
-    endDate: 'Mar 20, 2024',
-    registrationOpen: true,
-    icon: Icons.calendar_today_outlined,
-    iconColor: AppColors.primaryNavy,
-    iconBg: AppColors.statusBlueBg,
-  ),
-  (
-    name: 'Semester 2, 2023-2024',
-    status: 'UPCOMING',
-    startDate: 'Apr 01, 2024',
-    endDate: 'Aug 30, 2024',
-    registrationOpen: false,
-    icon: Icons.access_time_outlined,
-    iconColor: AppColors.statusAmber,
-    iconBg: AppColors.statusAmberBg,
-  ),
-  (
-    name: 'Semester 2, 2022-2023',
-    status: 'CLOSED',
-    startDate: 'Mar 15, 2023',
-    endDate: 'Aug 20, 2023',
-    registrationOpen: false,
-    icon: Icons.history_outlined,
-    iconColor: AppColors.statusGray,
-    iconBg: AppColors.statusGrayBg,
-  ),
-  (
-    name: 'Semester 1, 2022-2023',
-    status: 'CLOSED',
-    startDate: 'Oct 01, 2022',
-    endDate: 'Feb 28, 2023',
-    registrationOpen: false,
-    icon: Icons.history_outlined,
-    iconColor: AppColors.statusGray,
-    iconBg: AppColors.statusGrayBg,
-  ),
-];
+// ── Screen ────────────────────────────────────────────────────────────────────
 
-class SemesterManagementScreen extends StatefulWidget {
+class SemesterManagementScreen extends ConsumerStatefulWidget {
   const SemesterManagementScreen({super.key});
 
   @override
-  State<SemesterManagementScreen> createState() =>
+  ConsumerState<SemesterManagementScreen> createState() =>
       _SemesterManagementScreenState();
 }
 
-class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
-  late final List<bool> _registrationStates;
-
-  @override
-  void initState() {
-    super.initState();
-    _registrationStates = _kSemesters.map((s) => s.registrationOpen).toList();
-  }
+class _SemesterManagementScreenState
+    extends ConsumerState<SemesterManagementScreen> {
+  final Map<String, bool> _regToggles = {};
 
   @override
   Widget build(BuildContext context) {
+    final semestersAsync = ref.watch(adminSemestersProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       floatingActionButton: FloatingActionButton(
@@ -72,38 +31,63 @@ class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
         backgroundColor: AppColors.primaryBlue,
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        children: [
-          Text('Semester Management',
-              style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
-          const SizedBox(height: 4),
-          Text('Configure and monitor academic periods and registration windows.',
-              style: AppTextStyles.caption),
-          const SizedBox(height: 20),
-          ...List.generate(_kSemesters.length, (i) {
-            final s = _kSemesters[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _SemesterCard(
-                semester: s,
-                registrationOpen: _registrationStates[i],
-                onRegistrationToggle: (val) =>
-                    setState(() => _registrationStates[i] = val),
+      body: semestersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load semesters', style: AppTextStyles.bodyMedium),
+              TextButton(
+                onPressed: () => ref.invalidate(adminSemestersProvider),
+                child: const Text('Retry'),
               ),
-            );
-          }),
-          const SizedBox(height: 16),
-          _buildCurrentFocusCard(),
-          const SizedBox(height: 12),
-          _buildRegistrationAnalyticsCard(),
-          const SizedBox(height: 80),
-        ],
+            ],
+          ),
+        ),
+        data: (semesters) {
+          for (final s in semesters) {
+            _regToggles.putIfAbsent(s.id, () => s.isCurrent);
+          }
+
+          final current = semesters.where((s) => s.isCurrent).firstOrNull;
+
+          return ListView(
+            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+            children: [
+              Text('Semester Management',
+                  style: AppTextStyles.h1
+                      .copyWith(color: AppColors.primaryNavy)),
+              const SizedBox(height: 4),
+              Text(
+                  'Configure and monitor academic periods and registration windows.',
+                  style: AppTextStyles.caption),
+              const SizedBox(height: 20),
+              ...semesters.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _SemesterCard(
+                      semester: s,
+                      registrationOpen: _regToggles[s.id] ?? false,
+                      onRegistrationToggle: (val) =>
+                          setState(() => _regToggles[s.id] = val),
+                    ),
+                  )),
+              const SizedBox(height: 16),
+              if (current != null) _buildCurrentFocusCard(current),
+              if (current != null) const SizedBox(height: 12),
+              _buildRegistrationAnalyticsCard(semesters),
+              const SizedBox(height: 80),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCurrentFocusCard() {
+  Widget _buildCurrentFocusCard(AdminSemester current) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -113,21 +97,25 @@ class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CURRENT FOCUS',
+          Text('CURRENT SEMESTER',
               style: AppTextStyles.label.copyWith(
                   color: Colors.white.withValues(alpha: 0.7), letterSpacing: 1)),
           const SizedBox(height: 4),
-          Text('Grading Phase',
+          Text(current.name,
               style: AppTextStyles.h2.copyWith(color: Colors.white)),
-          const SizedBox(height: 8),
-          Text('Ends in 12 days',
+          const SizedBox(height: 4),
+          Text('${current.fmtStart} – ${current.fmtEnd}',
               style: AppTextStyles.captionWhite),
         ],
       ),
     );
   }
 
-  Widget _buildRegistrationAnalyticsCard() {
+  Widget _buildRegistrationAnalyticsCard(List<AdminSemester> semesters) {
+    final total = semesters.length;
+    final closed = semesters.where((s) => s.statusLabel == 'CLOSED').length;
+    final completionPct = total > 0 ? closed / total : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -141,9 +129,10 @@ class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Registration Analytics', style: AppTextStyles.h3),
+                Text('Semester Overview', style: AppTextStyles.h3),
                 const SizedBox(height: 4),
-                Text('85% of target capacity reached for Semester 2.',
+                Text(
+                    '$total total semesters • $closed completed',
                     style: AppTextStyles.caption),
               ],
             ),
@@ -151,10 +140,11 @@ class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
           SizedBox(
             width: 44, height: 44,
             child: CircularProgressIndicator(
-              value: 0.85,
+              value: completionPct,
               strokeWidth: 5,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryBlue),
             ),
           ),
         ],
@@ -163,6 +153,8 @@ class _SemesterManagementScreenState extends State<SemesterManagementScreen> {
   }
 }
 
+// ── Semester card ─────────────────────────────────────────────────────────────
+
 class _SemesterCard extends StatelessWidget {
   const _SemesterCard({
     required this.semester,
@@ -170,27 +162,35 @@ class _SemesterCard extends StatelessWidget {
     required this.onRegistrationToggle,
   });
 
-  final dynamic semester;
+  final AdminSemester semester;
   final bool registrationOpen;
   final ValueChanged<bool> onRegistrationToggle;
 
   Color get _statusColor {
-    switch (semester.status as String) {
-      case 'ACTIVE':    return AppColors.primaryBlue;
-      case 'UPCOMING':  return AppColors.statusAmber;
-      default:          return AppColors.statusGray;
+    switch (semester.statusLabel) {
+      case 'ACTIVE': return AppColors.primaryBlue;
+      case 'UPCOMING': return AppColors.statusAmber;
+      default: return AppColors.statusGray;
     }
   }
 
   Color get _statusBg {
-    switch (semester.status as String) {
-      case 'ACTIVE':    return AppColors.statusBlueBg;
-      case 'UPCOMING':  return AppColors.statusAmberBg;
-      default:          return AppColors.statusGrayBg;
+    switch (semester.statusLabel) {
+      case 'ACTIVE': return AppColors.statusBlueBg;
+      case 'UPCOMING': return AppColors.statusAmberBg;
+      default: return AppColors.statusGrayBg;
     }
   }
 
-  bool get _isClosed => semester.status == 'CLOSED';
+  IconData get _icon {
+    switch (semester.statusLabel) {
+      case 'ACTIVE': return Icons.calendar_today_outlined;
+      case 'UPCOMING': return Icons.access_time_outlined;
+      default: return Icons.history_outlined;
+    }
+  }
+
+  bool get _isClosed => semester.statusLabel == 'CLOSED';
 
   @override
   Widget build(BuildContext context) {
@@ -211,27 +211,29 @@ class _SemesterCard extends StatelessWidget {
                 Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(
-                    color: (semester.iconBg as Color),
+                    color: _statusBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(semester.icon as IconData,
-                      color: semester.iconColor as Color, size: 22),
+                  child: Icon(_icon, color: _statusColor, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(semester.name as String, style: AppTextStyles.bodyMedium),
+                      Text(semester.name, style: AppTextStyles.bodyMedium),
                       const SizedBox(height: 2),
                       Row(
                         children: [
                           const Icon(Icons.calendar_month_outlined,
                               size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
-                          Text(
-                            '${semester.startDate} — ${semester.endDate}',
-                            style: AppTextStyles.caption.copyWith(fontSize: 11),
+                          Expanded(
+                            child: Text(
+                              '${semester.fmtStart} – ${semester.fmtEnd}',
+                              style: AppTextStyles.caption.copyWith(fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
@@ -239,12 +241,14 @@ class _SemesterCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: _statusBg,
-                    borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.tagRadius),
                   ),
-                  child: Text(semester.status as String,
+                  child: Text(semester.statusLabel,
                       style: AppTextStyles.label.copyWith(
                           color: _statusColor, fontSize: 9, letterSpacing: 0.5)),
                 ),
@@ -260,7 +264,9 @@ class _SemesterCard extends StatelessWidget {
                   children: [
                     Text('Registration',
                         style: AppTextStyles.caption.copyWith(
-                            color: _isClosed ? AppColors.textLabel : AppColors.textSecondary)),
+                            color: _isClosed
+                                ? AppColors.textLabel
+                                : AppColors.textSecondary)),
                     const SizedBox(width: 8),
                     Switch(
                       value: registrationOpen,
@@ -270,11 +276,8 @@ class _SemesterCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () {},
-                  child: const Icon(Icons.more_vert,
-                      size: 18, color: AppColors.textSecondary),
-                ),
+                const Icon(Icons.more_vert,
+                    size: 18, color: AppColors.textSecondary),
               ],
             ),
           ],

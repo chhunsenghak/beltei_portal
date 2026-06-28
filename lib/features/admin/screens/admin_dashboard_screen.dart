@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kStats = [
-  (icon: Icons.school_outlined,               label: 'Total Students',    value: '45,210', sub: '↑ 2.3% this year',   color: AppColors.primaryBlue),
-  (icon: Icons.person_outlined,               label: 'Faculty',           value: '1,840',  sub: 'Active: 114',         color: AppColors.primaryNavy),
-  (icon: Icons.account_balance_outlined,      label: 'Departments',       value: '324',    sub: 'Across 6 Faculties',  color: Color(0xFF7C3AED)),
-  (icon: Icons.account_balance_wallet_outlined, label: 'Revenue',         value: '\$2.4M', sub: '↑ 8.9% growth',       color: AppColors.statusGreen),
-  (icon: Icons.event_note_outlined,           label: 'Leave Requests',    value: '142',    sub: 'Pending review',      color: AppColors.statusAmber),
-  (icon: Icons.campaign_outlined,             label: 'Announcements',     value: '02',     sub: 'March 2024',          color: AppColors.statusRed),
-];
+// ── Static data ────────────────────────────────────────────────────────────────
 
 const _kEnrollmentMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
 const _kEnrollmentValues = [0.55, 0.7, 0.65, 0.82, 0.75, 0.90];
@@ -27,40 +21,24 @@ final _kRevenueDepts = [
 ];
 
 final _kQuickManagement = [
-  (icon: Icons.school_outlined,         label: 'Students',  route: '/admin/users'),
-  (icon: Icons.person_outlined,         label: 'Teachers',  route: '/admin/users'),
-  (icon: Icons.menu_book_outlined,      label: 'Courses',   route: '/admin/academic'),
-  (icon: Icons.date_range_outlined,     label: 'Semesters', route: '/admin/academic'),
-  (icon: Icons.payments_outlined,       label: 'Payments',  route: '/admin/finance'),
-  (icon: Icons.bar_chart_outlined,      label: 'Reports',   route: '/admin/finance'),
-];
-
-final _kRecentActivity = [
-  (
-    initials: 'SR', name: 'Sreynich Vong', action: 'Submitted leave request',
-    tag: 'Pending', tagColor: AppColors.statusAmber, tagBg: AppColors.statusAmberBg, time: '10 min ago',
-  ),
-  (
-    initials: 'JW', name: 'Dr. James Wilson', action: 'Added new assessment',
-    tag: 'Approved', tagColor: AppColors.statusGreen, tagBg: AppColors.statusGreenBg, time: '1 hr ago',
-  ),
-  (
-    initials: 'SK', name: 'Sok Khema', action: 'Payment received \$450',
-    tag: 'Paid', tagColor: AppColors.primaryBlue, tagBg: AppColors.statusBlueBg, time: '2 hr ago',
-  ),
-  (
-    initials: 'RP', name: 'Rath Piseth', action: 'Account suspended',
-    tag: 'Alert', tagColor: AppColors.statusRed, tagBg: AppColors.statusRedBg, time: '3 hr ago',
-  ),
+  (icon: Icons.school_outlined,     label: 'Students',  route: '/admin/users'),
+  (icon: Icons.person_outlined,     label: 'Teachers',  route: '/admin/users'),
+  (icon: Icons.menu_book_outlined,  label: 'Courses',   route: '/admin/academic'),
+  (icon: Icons.date_range_outlined, label: 'Semesters', route: '/admin/academic'),
+  (icon: Icons.payments_outlined,   label: 'Payments',  route: '/admin/finance'),
+  (icon: Icons.bar_chart_outlined,  label: 'Reports',   route: '/admin/finance'),
 ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(adminStatsProvider);
+    final leavesAsync = ref.watch(adminLeaveRequestsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
@@ -68,18 +46,52 @@ class AdminDashboardScreen extends StatelessWidget {
         children: [
           Text('Overview', style: AppTextStyles.h1),
           const SizedBox(height: 14),
-          _buildStatsGrid(),
+          statsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => _buildStatsError(ref),
+            data: (stats) => _buildStatsGrid(stats),
+          ),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildEnrollmentTrends(),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAttendanceAndRevenue(),
+          statsAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (stats) => _buildAttendanceAndRevenue(stats),
+          ),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildAcademicPerformance(),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildQuickManagement(context),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildRecentActivity(context),
+          leavesAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (leaves) => _buildRecentLeaves(context, leaves),
+          ),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsError(WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.statusRed),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Could not load stats')),
+          TextButton(
+            onPressed: () => ref.invalidate(adminStatsProvider),
+            child: const Text('Retry'),
+          ),
         ],
       ),
     );
@@ -87,7 +99,15 @@ class AdminDashboardScreen extends StatelessWidget {
 
   // ── Stats grid ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsGrid(AdminStats stats) {
+    final items = [
+      (icon: Icons.school_outlined, label: 'Total\nStudents', value: '${stats.studentCount}', color: AppColors.primaryBlue),
+      (icon: Icons.person_outlined, label: 'Active\nTeachers', value: '${stats.teacherCount}', color: AppColors.primaryNavy),
+      (icon: Icons.menu_book_outlined, label: 'Active\nCourses', value: '${stats.courseCount}', color: Color(0xFF7C3AED)),
+      (icon: Icons.account_balance_wallet_outlined, label: 'Revenue\nCollected', value: stats.fmtCollected, color: AppColors.statusGreen),
+      (icon: Icons.event_note_outlined, label: 'Leave\nPending', value: '${stats.pendingLeaveCount}', color: AppColors.statusAmber),
+      (icon: Icons.calendar_month_outlined, label: 'Current\nSemester', value: stats.currentSemester.split(',').first, color: AppColors.statusRed),
+    ];
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -95,7 +115,7 @@ class AdminDashboardScreen extends StatelessWidget {
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.7,
-      children: _kStats.map((s) => _StatCard(stat: s)).toList(),
+      children: items.map((s) => _StatCard(stat: s)).toList(),
     );
   }
 
@@ -122,8 +142,10 @@ class AdminDashboardScreen extends StatelessWidget {
                       width: 28,
                       height: _kEnrollmentValues[i] * 80,
                       decoration: BoxDecoration(
-                        color: AppColors.primaryBlue.withValues(alpha: 0.15 + _kEnrollmentValues[i] * 0.5),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        color: AppColors.primaryBlue
+                            .withValues(alpha: 0.15 + _kEnrollmentValues[i] * 0.5),
+                        borderRadius:
+                            const BorderRadius.vertical(top: Radius.circular(4)),
                       ),
                     ),
                   ),
@@ -141,13 +163,18 @@ class AdminDashboardScreen extends StatelessWidget {
 
   // ── Attendance + Revenue ───────────────────────────────────────────────────
 
-  Widget _buildAttendanceAndRevenue() {
+  Widget _buildAttendanceAndRevenue(AdminStats stats) {
+    final totalBilled = stats.totalRevenue;
+    final collected = stats.collectedRevenue;
+    final collectedPct = totalBilled > 0 ? collected / totalBilled : 0.0;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: _SectionCard(
-            title: 'Attendance',
+            title: 'Revenue',
+            subtitle: 'Collection Rate',
             child: Column(
               children: [
                 Stack(
@@ -156,22 +183,24 @@ class AdminDashboardScreen extends StatelessWidget {
                     SizedBox(
                       width: 80, height: 80,
                       child: CircularProgressIndicator(
-                        value: 0.88,
+                        value: collectedPct,
                         strokeWidth: 10,
                         backgroundColor: AppColors.statusRedBg,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primaryBlue),
                       ),
                     ),
-                    Text('88%', style: AppTextStyles.bodySemiBold.copyWith(fontSize: 16)),
+                    Text('${(collectedPct * 100).round()}%',
+                        style: AppTextStyles.bodySemiBold.copyWith(fontSize: 16)),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LegendDot(color: AppColors.primaryBlue, label: 'Present'),
+                    _LegendDot(color: AppColors.primaryBlue, label: 'Collected'),
                     const SizedBox(width: 10),
-                    _LegendDot(color: AppColors.statusRedBg, label: 'Absent'),
+                    _LegendDot(color: AppColors.statusRedBg, label: 'Pending'),
                   ],
                 ),
               ],
@@ -189,8 +218,7 @@ class AdminDashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(d.dept,
-                        style: AppTextStyles.label.copyWith(fontSize: 9)),
+                    Text(d.dept, style: AppTextStyles.label.copyWith(fontSize: 9)),
                     const SizedBox(height: 2),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(3),
@@ -235,11 +263,11 @@ class AdminDashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _PerformanceStat(value: '3.42', label: 'Avg GPA', positive: true),
+              _PerformanceStat(value: '3.42', label: 'Avg GPA'),
               const SizedBox(width: 24),
-              _PerformanceStat(value: '94.8%', label: 'Pass Rate', positive: true),
+              _PerformanceStat(value: '94.8%', label: 'Pass Rate'),
               const SizedBox(width: 24),
-              _PerformanceStat(value: '314', label: 'Honors', positive: false),
+              _PerformanceStat(value: '314', label: 'Honors'),
             ],
           ),
         ],
@@ -297,18 +325,21 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  // ── Recent activity ────────────────────────────────────────────────────────
+  // ── Recent leave requests ──────────────────────────────────────────────────
 
-  Widget _buildRecentActivity(BuildContext context) {
+  Widget _buildRecentLeaves(BuildContext context, List<AdminLeaveRequest> all) {
+    final recent = all.take(5).toList();
+    if (recent.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Recent Activity', style: AppTextStyles.h2),
+            Text('Recent Leave Requests', style: AppTextStyles.h2),
             TextButton(
-              onPressed: () {},
+              onPressed: () => context.go('/admin/academic'),
               child: Text('View All', style: AppTextStyles.link),
             ),
           ],
@@ -321,9 +352,24 @@ class AdminDashboardScreen extends StatelessWidget {
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
-            children: _kRecentActivity.asMap().entries.map((e) {
-              final isLast = e.key == _kRecentActivity.length - 1;
-              final a = e.value;
+            children: recent.asMap().entries.map((e) {
+              final isLast = e.key == recent.length - 1;
+              final leave = e.value;
+              final tagColor = switch (leave.status.name) {
+                'approved' => AppColors.statusGreen,
+                'rejected' => AppColors.statusRed,
+                _ => AppColors.statusAmber,
+              };
+              final tagBg = switch (leave.status.name) {
+                'approved' => AppColors.statusGreenBg,
+                'rejected' => AppColors.statusRedBg,
+                _ => AppColors.statusAmberBg,
+              };
+              final tagLabel = switch (leave.status.name) {
+                'approved' => 'Approved',
+                'rejected' => 'Rejected',
+                _ => 'Pending',
+              };
               return Column(
                 children: [
                   Padding(
@@ -333,7 +379,7 @@ class AdminDashboardScreen extends StatelessWidget {
                         CircleAvatar(
                           radius: 18,
                           backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-                          child: Text(a.initials,
+                          child: Text(leave.initials,
                               style: AppTextStyles.caption.copyWith(
                                   color: AppColors.primaryNavy,
                                   fontWeight: FontWeight.w700)),
@@ -343,28 +389,21 @@ class AdminDashboardScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a.name, style: AppTextStyles.bodyMedium),
-                              Text(a.action, style: AppTextStyles.caption),
+                              Text(leave.requesterName, style: AppTextStyles.bodyMedium),
+                              Text('${leave.type} • ${leave.dateRange}',
+                                  style: AppTextStyles.caption),
                             ],
                           ),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: a.tagBg,
-                                borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
-                              ),
-                              child: Text(a.tag,
-                                  style: AppTextStyles.label.copyWith(
-                                      color: a.tagColor, letterSpacing: 0.3)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(a.time,
-                                style: AppTextStyles.label.copyWith(fontSize: 9)),
-                          ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: tagBg,
+                            borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
+                          ),
+                          child: Text(tagLabel,
+                              style: AppTextStyles.label.copyWith(
+                                  color: tagColor, letterSpacing: 0.3)),
                         ),
                       ],
                     ),
@@ -384,7 +423,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
 class _StatCard extends StatelessWidget {
   const _StatCard({required this.stat});
-  final ({IconData icon, String label, String value, String sub, Color color}) stat;
+  final ({IconData icon, String label, String value, Color color}) stat;
 
   @override
   Widget build(BuildContext context) {
@@ -413,15 +452,12 @@ class _StatCard extends StatelessWidget {
               children: [
                 Text(stat.label,
                     style: AppTextStyles.label.copyWith(fontSize: 9),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis),
                 Text(stat.value,
                     style: AppTextStyles.metric.copyWith(
                         color: stat.color,
-                        fontSize: stat.value.length > 5 ? 16 : 20),
-                    maxLines: 1),
-                Text(stat.sub,
-                    style: AppTextStyles.label.copyWith(fontSize: 9, letterSpacing: 0),
+                        fontSize: stat.value.length > 5 ? 15 : 20),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ],
@@ -456,8 +492,7 @@ class _SectionCard extends StatelessWidget {
             children: [
               Text(title, style: AppTextStyles.h3),
               if (subtitle != null)
-                Text(subtitle!,
-                    style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                Text(subtitle!, style: AppTextStyles.caption.copyWith(fontSize: 11)),
             ],
           ),
           const SizedBox(height: 14),
@@ -478,10 +513,7 @@ class _LegendDot extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 8, height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 4),
         Text(label, style: AppTextStyles.label.copyWith(fontSize: 10)),
       ],
@@ -490,21 +522,17 @@ class _LegendDot extends StatelessWidget {
 }
 
 class _PerformanceStat extends StatelessWidget {
-  const _PerformanceStat(
-      {required this.value, required this.label, required this.positive});
+  const _PerformanceStat({required this.value, required this.label});
   final String value;
   final String label;
-  final bool positive;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value,
-            style: AppTextStyles.h2.copyWith(color: Colors.white, fontSize: 20)),
-        Text(label,
-            style: AppTextStyles.captionWhite.copyWith(fontSize: 11)),
+        Text(value, style: AppTextStyles.h2.copyWith(color: Colors.white, fontSize: 20)),
+        Text(label, style: AppTextStyles.captionWhite.copyWith(fontSize: 11)),
       ],
     );
   }

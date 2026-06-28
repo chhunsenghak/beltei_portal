@@ -1,90 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/teacher_providers.dart';
+import '../../../core/services/teacher_service.dart';
+import '../../../core/supabase/database.types.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _kTeacher = (
-  name: 'Dr. James Wilson',
-  department: 'Department: Computer Science',
-  employeeId: 'T-2024-001',
-);
-
-const _kStats = (
-  totalCourses: 4,
-  totalStudents: 120,
-  pendingLeaves: 3,
-  todayClasses: 2,
-);
-
-final _kQuickActions = [
-  (icon: Icons.how_to_reg_outlined,        label: 'Mark\nAttendance', route: '/teacher/courses/CS101/attendance'),
-  (icon: Icons.grade_outlined,             label: 'Grades',           route: '/teacher/courses/CS101/grades'),
-  (icon: Icons.assignment_outlined,        label: 'Assignments',      route: '/teacher/courses/CS101/assessments/create'),
-  (icon: Icons.folder_outlined,            label: 'Materials',        route: '/teacher/courses/CS101/materials'),
-  (icon: Icons.bar_chart_outlined,         label: 'Reports',          route: '/teacher/courses/CS101/attendance/report'),
-  (icon: Icons.campaign_outlined,          label: 'Announcements',    route: '/teacher/alerts/announcement'),
-];
-
-final _kScheduleToday = [
-  (
-    status: 'NOW',
-    statusColor: AppColors.statusGreen,
-    time: '08:30',
-    course: 'CS101 - Introduction to Algorithms',
-    room: 'Room 402',
-    students: 45,
-    isCurrent: true,
-  ),
-  (
-    status: 'NEXT',
-    statusColor: AppColors.primaryNavy,
-    time: '11:00',
-    course: 'CS205 - Web Development Frameworks',
-    room: 'Lab 02',
-    students: 32,
-    isCurrent: false,
-  ),
-];
-
-final _kPendingLeaves = [
-  (initials: 'SK', name: 'Sok Khema',    details: 'Medical Leave • 24 Oct – 26 Oct'),
-  (initials: 'VP', name: 'Vannak Phirun', details: 'Personal Reason • 25 Oct'),
-  (initials: 'LM', name: 'Ly Monica',    details: 'Event Participation • 28 Oct – 30 Oct'),
-];
+String _fmtDateRange(String start, String end) {
+  try {
+    final s = DateFormat('MMM d').format(DateTime.parse(start));
+    final e = DateFormat('MMM d').format(DateTime.parse(end));
+    return s == e ? s : '$s – $e';
+  } catch (_) {
+    return '$start – $end';
+  }
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class TeacherDashboardScreen extends StatelessWidget {
+class TeacherDashboardScreen extends ConsumerWidget {
   const TeacherDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(teacherProfileProvider);
+    final coursesAsync = ref.watch(teacherCoursesProvider);
+    final leavesAsync = ref.watch(teacherStudentLeavesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [
-          _buildTeacherHeader(),
+          // Header
+          profileAsync.when(
+            loading: () => _buildHeaderSkeleton(),
+            error: (_, _) => _buildHeaderPlaceholder(),
+            data: (p) =>
+                p == null ? _buildHeaderPlaceholder() : _buildHeader(p),
+          ),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildStatsGrid(),
+          // Stats
+          Builder(builder: (_) {
+            final courses = coursesAsync.valueOrNull ?? [];
+            final leaves = leavesAsync.valueOrNull ?? [];
+            final isLoading =
+                coursesAsync.isLoading || leavesAsync.isLoading;
+            if (isLoading) return _buildStatsLoading();
+            return _buildStatsGrid(
+              courses.length,
+              courses.fold(0, (s, c) => s + c.studentCount),
+              leaves
+                  .where((l) => l.status == LeaveStatus.pending)
+                  .length,
+              courses.where((c) => c.hasTodayClass()).length,
+            );
+          }),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildQuickActions(context),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildTodaySchedule(context),
+          // Today's schedule
+          coursesAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (courses) => _buildTodaySchedule(context, courses),
+          ),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildPendingLeaves(context),
+          // Pending leaves (view-only)
+          leavesAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (leaves) => _buildPendingLeaves(
+              context,
+              leaves
+                  .where((l) => l.status == LeaveStatus.pending)
+                  .take(3)
+                  .toList(),
+            ),
+          ),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  // ── Teacher header ─────────────────────────────────────────────────────────
+  // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildTeacherHeader() {
+  Widget _buildHeader(TeacherProfile profile) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -107,14 +114,19 @@ class TeacherDashboardScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_kTeacher.name, style: AppTextStyles.h2White),
+                Text(profile.fullName, style: AppTextStyles.h2White),
                 const SizedBox(height: 2),
-                Text(_kTeacher.department,
-                    style: AppTextStyles.captionWhite.copyWith(fontSize: 12)),
+                Text(
+                  profile.departmentName != null
+                      ? 'Dept: ${profile.departmentName}'
+                      : profile.position ?? 'Teacher',
+                  style:
+                      AppTextStyles.captionWhite.copyWith(fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -125,9 +137,11 @@ class TeacherDashboardScreen extends StatelessWidget {
                       const Icon(Icons.badge_outlined,
                           color: Colors.white, size: 14),
                       const SizedBox(width: 4),
-                      Text('EMPLOYEE ID: ${_kTeacher.employeeId}',
-                          style: AppTextStyles.label
-                              .copyWith(color: Colors.white, letterSpacing: 0.6)),
+                      Text(
+                        'ID: ${profile.employeeCode}',
+                        style: AppTextStyles.label.copyWith(
+                            color: Colors.white, letterSpacing: 0.6),
+                      ),
                     ],
                   ),
                 ),
@@ -139,18 +153,67 @@ class TeacherDashboardScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildHeaderSkeleton() {
+    return Container(
+      height: 100,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.splashDark, AppColors.splashLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildHeaderPlaceholder() {
+    return _buildHeader(const TeacherProfile(
+      id: '',
+      employeeCode: '---',
+      fullName: 'Teacher',
+      email: '',
+    ));
+  }
+
   // ── Stats grid ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsLoading() {
+    return const SizedBox(
+      height: 100,
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildStatsGrid(
+      int courses, int students, int pendingLeaves, int todayClasses) {
     final items = [
-      (icon: Icons.menu_book_outlined, label: 'Total Courses',
-       value: '${_kStats.totalCourses}', color: AppColors.primaryNavy),
-      (icon: Icons.people_outline, label: 'Total Students',
-       value: '${_kStats.totalStudents}', color: AppColors.primaryBlue),
-      (icon: Icons.pending_actions_outlined, label: 'Pending Leaves',
-       value: '${_kStats.pendingLeaves}', color: AppColors.statusAmber),
-      (icon: Icons.today_outlined, label: "Today's Classes",
-       value: '${_kStats.todayClasses}', color: AppColors.statusGreen),
+      (
+        icon: Icons.menu_book_outlined,
+        label: 'Total Courses',
+        value: '$courses',
+        color: AppColors.primaryNavy
+      ),
+      (
+        icon: Icons.people_outline,
+        label: 'Total Students',
+        value: '$students',
+        color: AppColors.primaryBlue
+      ),
+      (
+        icon: Icons.pending_actions_outlined,
+        label: 'Pending Leaves',
+        value: '$pendingLeaves',
+        color: AppColors.statusAmber
+      ),
+      (
+        icon: Icons.today_outlined,
+        label: "Today's Classes",
+        value: '$todayClasses',
+        color: AppColors.statusGreen
+      ),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -173,6 +236,38 @@ class TeacherDashboardScreen extends StatelessWidget {
   // ── Quick actions ──────────────────────────────────────────────────────────
 
   Widget _buildQuickActions(BuildContext context) {
+    final actions = [
+      (
+        icon: Icons.how_to_reg_outlined,
+        label: 'Mark\nAttendance',
+        route: '/teacher/courses'
+      ),
+      (
+        icon: Icons.grade_outlined,
+        label: 'Grades',
+        route: '/teacher/courses'
+      ),
+      (
+        icon: Icons.assignment_outlined,
+        label: 'Assignments',
+        route: '/teacher/courses'
+      ),
+      (
+        icon: Icons.folder_outlined,
+        label: 'Materials',
+        route: '/teacher/courses'
+      ),
+      (
+        icon: Icons.bar_chart_outlined,
+        label: 'Reports',
+        route: '/teacher/courses'
+      ),
+      (
+        icon: Icons.campaign_outlined,
+        label: 'Announcements',
+        route: '/teacher/alerts/announcement'
+      ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -185,13 +280,14 @@ class TeacherDashboardScreen extends StatelessWidget {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
           childAspectRatio: 1.2,
-          children: _kQuickActions.map((a) {
+          children: actions.map((a) {
             return GestureDetector(
               onTap: () => context.push(a.route),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cardRadius),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
@@ -224,7 +320,10 @@ class TeacherDashboardScreen extends StatelessWidget {
 
   // ── Today's schedule ───────────────────────────────────────────────────────
 
-  Widget _buildTodaySchedule(BuildContext context) {
+  Widget _buildTodaySchedule(
+      BuildContext context, List<TeacherCourse> courses) {
+    final todayCourses = courses.where((c) => c.hasTodayClass()).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -239,17 +338,79 @@ class TeacherDashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ..._kScheduleToday.map((s) => Padding(
+        if (todayCourses.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.cardPadding),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_available_outlined,
+                    color: AppColors.textLabel, size: 22),
+                const SizedBox(width: 12),
+                Text('No classes scheduled today',
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          )
+        else
+          ...todayCourses.asMap().entries.map((entry) {
+            final i = entry.key;
+            final c = entry.value;
+            final slot = c.todaySlot();
+            final now = DateTime.now();
+            final startStr = slot?['start'] as String? ?? '';
+            bool isCurrent = false;
+            String statusLabel = i == 0 ? 'NEXT' : 'LATER';
+            Color statusColor = AppColors.primaryNavy;
+
+            if (startStr.isNotEmpty) {
+              try {
+                final parts = startStr.split(':');
+                final slotStart = DateTime(now.year, now.month, now.day,
+                    int.parse(parts[0]), int.parse(parts[1]));
+                final endStr = slot?['end'] as String? ?? '';
+                DateTime? slotEnd;
+                if (endStr.isNotEmpty) {
+                  final ep = endStr.split(':');
+                  slotEnd = DateTime(now.year, now.month, now.day,
+                      int.parse(ep[0]), int.parse(ep[1]));
+                }
+                if (now.isAfter(slotStart) &&
+                    (slotEnd == null || now.isBefore(slotEnd))) {
+                  isCurrent = true;
+                  statusLabel = 'NOW';
+                  statusColor = AppColors.statusGreen;
+                } else if (now.isBefore(slotStart) && i == 0) {
+                  statusLabel = 'NEXT';
+                  statusColor = AppColors.primaryNavy;
+                }
+              } catch (_) {}
+            }
+
+            return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _ScheduleTodayCard(item: s),
-            )),
+              child: _ScheduleTodayCard(
+                course: c,
+                slot: slot,
+                statusLabel: statusLabel,
+                statusColor: statusColor,
+                isCurrent: isCurrent,
+              ),
+            );
+          }),
       ],
     );
   }
 
-  // ── Pending leave requests ─────────────────────────────────────────────────
+  // ── Pending leaves (view-only) ─────────────────────────────────────────────
 
-  Widget _buildPendingLeaves(BuildContext context) {
+  Widget _buildPendingLeaves(
+      BuildContext context, List<StudentLeaveDetail> leaves) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -264,67 +425,87 @@ class TeacherDashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            border: Border.all(color: AppColors.border),
+        if (leaves.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.cardPadding),
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.inbox_outlined,
+                    color: AppColors.textLabel, size: 22),
+                const SizedBox(width: 12),
+                Text('No pending requests',
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: leaves.asMap().entries.map((entry) {
+                final isLast = entry.key == leaves.length - 1;
+                return _buildLeaveRow(
+                    context, entry.value,
+                    showDivider: !isLast);
+              }).toList(),
+            ),
           ),
-          child: Column(
-            children: _kPendingLeaves.asMap().entries.map((e) {
-              final isLast = e.key == _kPendingLeaves.length - 1;
-              return _buildLeaveRow(context, e.value, showDivider: !isLast);
-            }).toList(),
-          ),
-        ),
       ],
     );
   }
 
-  Widget _buildLeaveRow(BuildContext context, dynamic leave,
+  Widget _buildLeaveRow(BuildContext context, StudentLeaveDetail leave,
       {required bool showDivider}) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.12),
-                child: Text(leave.initials as String,
-                    style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primaryNavy,
-                        fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(leave.name as String, style: AppTextStyles.bodyMedium),
-                    Text(leave.details as String,
-                        style: AppTextStyles.caption),
-                  ],
+        InkWell(
+          onTap: () =>
+              context.push('/teacher/students/leave/${leave.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor:
+                      AppColors.primaryNavy.withValues(alpha: 0.12),
+                  child: Text(leave.initials,
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primaryNavy,
+                          fontWeight: FontWeight.w700)),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: AppColors.statusRed, size: 20),
-                onPressed: () {},
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.check, color: AppColors.statusGreen, size: 20),
-                onPressed: () {},
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(leave.studentName,
+                          style: AppTextStyles.bodyMedium),
+                      Text(
+                        '${leave.type} • ${_fmtDateRange(leave.startDate, leave.endDate)}',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 14, color: AppColors.primaryNavy),
+              ],
+            ),
           ),
         ),
-        if (showDivider) const Divider(height: 1, color: AppColors.divider),
+        if (showDivider)
+          const Divider(height: 1, color: AppColors.divider),
       ],
     );
   }
@@ -390,12 +571,25 @@ class _StatCard extends StatelessWidget {
 // ── Today schedule card ────────────────────────────────────────────────────────
 
 class _ScheduleTodayCard extends StatelessWidget {
-  const _ScheduleTodayCard({required this.item});
-  final dynamic item;
+  const _ScheduleTodayCard({
+    required this.course,
+    required this.slot,
+    required this.statusLabel,
+    required this.statusColor,
+    required this.isCurrent,
+  });
+
+  final TeacherCourse course;
+  final Map<String, dynamic>? slot;
+  final String statusLabel;
+  final Color statusColor;
+  final bool isCurrent;
 
   @override
   Widget build(BuildContext context) {
-    final isCurrent = item.isCurrent as bool;
+    final startTime = slot?['start'] as String? ?? '--:--';
+    final room = slot?['room'] as String? ?? course.room ?? '---';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -411,13 +605,14 @@ class _ScheduleTodayCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: item.statusColor as Color,
+              color: statusColor,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              item.status as String,
+              statusLabel,
               style: AppTextStyles.label
                   .copyWith(color: Colors.white, letterSpacing: 0.6),
             ),
@@ -427,26 +622,26 @@ class _ScheduleTodayCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.course as String, style: AppTextStyles.bodyMedium),
+                Text('${course.code} – ${course.name}',
+                    style: AppTextStyles.bodyMedium,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     const Icon(Icons.access_time_outlined,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
-                    Text(item.time as String,
-                        style: AppTextStyles.caption),
+                    Text(startTime, style: AppTextStyles.caption),
                     const SizedBox(width: 10),
                     const Icon(Icons.meeting_room_outlined,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
-                    Text(item.room as String,
-                        style: AppTextStyles.caption),
+                    Text(room, style: AppTextStyles.caption),
                     const SizedBox(width: 10),
                     const Icon(Icons.people_outline,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
-                    Text('${item.students} Students',
+                    Text('${course.studentCount} Students',
                         style: AppTextStyles.caption),
                   ],
                 ),

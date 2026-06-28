@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
 
-class AdminShell extends StatefulWidget {
+class AdminShell extends ConsumerStatefulWidget {
   const AdminShell({super.key, required this.child});
   final Widget child;
 
   @override
-  State<AdminShell> createState() => _AdminShellState();
+  ConsumerState<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell> {
+class _AdminShellState extends ConsumerState<AdminShell> {
   static const _tabs = [
     (label: 'Dashboard', icon: Icons.dashboard_outlined, route: '/admin'),
     (label: 'Users', icon: Icons.people_outline, route: '/admin/users'),
@@ -39,10 +41,11 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final active = _activeIndex(context);
+    final profileAsync = ref.watch(adminProfileProvider);
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context, active),
+          _buildShellHeader(context, active, profileAsync),
           Expanded(child: widget.child),
         ],
       ),
@@ -75,7 +78,12 @@ class _AdminShellState extends State<AdminShell> {
     );
   }
 
-  Widget _buildShellHeader(BuildContext context, int active) {
+  Widget _buildShellHeader(BuildContext context, int active, AsyncValue<dynamic> profileAsync) {
+    final profile = profileAsync.valueOrNull;
+    final displayName = profile?.fullName as String? ?? 'Administrator';
+    final displayEmail = profile?.email as String? ?? '';
+    final initials = profile?.initials as String? ?? 'A';
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -152,7 +160,7 @@ class _AdminShellState extends State<AdminShell> {
                       radius: 17,
                       backgroundColor: AppColors.primaryNavy,
                       child: Text(
-                        'A',
+                        initials,
                         style: AppTextStyles.caption.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -166,13 +174,14 @@ class _AdminShellState extends State<AdminShell> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Super Admin',
+                              displayName,
                               style: AppTextStyles.bodyMedium,
                             ),
-                            Text(
-                              'admin@beltei.edu.kh',
-                              style: AppTextStyles.caption,
-                            ),
+                            if (displayEmail.isNotEmpty)
+                              Text(
+                                displayEmail,
+                                style: AppTextStyles.caption,
+                              ),
                           ],
                         ),
                       ),

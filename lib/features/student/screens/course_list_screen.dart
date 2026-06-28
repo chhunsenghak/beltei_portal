@@ -1,91 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
+import '../../../core/supabase/database.types.dart';
 import '../../../shared/widgets/status_badge.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-enum _CourseStatus { active, completed, enrolled }
-
-class _CourseData {
-  const _CourseData({
-    required this.id,
-    required this.code,
-    required this.title,
-    required this.professor,
-    required this.credits,
-    required this.semester,
-    required this.status,
-    required this.completion,
-  });
-  final String id;
-  final String code;
-  final String title;
-  final String professor;
-  final String credits;
-  final String semester;
-  final _CourseStatus status;
-  final double completion;
-}
-
-const _kCourses = [
-  _CourseData(
-    id: '1',
-    code: 'CS101',
-    title: 'Introduction to Programming',
-    professor: 'Dr. James Wilson',
-    credits: '4.0 Units',
-    semester: 'Fall 2024',
-    status: _CourseStatus.active,
-    completion: 0.75,
-  ),
-  _CourseData(
-    id: '2',
-    code: 'MATH204',
-    title: 'Advanced Calculus II',
-    professor: 'Sarah Jenkins',
-    credits: '3.0 Units',
-    semester: 'Fall 2024',
-    status: _CourseStatus.active,
-    completion: 0.42,
-  ),
-  _CourseData(
-    id: '3',
-    code: 'ENG102',
-    title: 'Academic Writing & Research',
-    professor: 'Robert Chen',
-    credits: '2.0 Units',
-    semester: 'Summer 2024',
-    status: _CourseStatus.completed,
-    completion: 1.0,
-  ),
-  _CourseData(
-    id: '4',
-    code: 'HIS105',
-    title: 'World Civilization',
-    professor: 'Dr. Anita S.',
-    credits: '3.0 Units',
-    semester: 'Next Semester',
-    status: _CourseStatus.enrolled,
-    completion: 0.0,
-  ),
-];
-
-const _kFilters = ['All', 'Semester 1', 'Semester 2', 'Active', 'Completed'];
+const _kFilters = ['All', 'Current', 'Active', 'Completed'];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class CourseListScreen extends StatefulWidget {
+class CourseListScreen extends ConsumerStatefulWidget {
   const CourseListScreen({super.key});
 
   @override
-  State<CourseListScreen> createState() => _CourseListScreenState();
+  ConsumerState<CourseListScreen> createState() => _CourseListScreenState();
 }
 
-class _CourseListScreenState extends State<CourseListScreen> {
+class _CourseListScreenState extends ConsumerState<CourseListScreen> {
   int _filterIndex = 0;
+  String _search = '';
   final _searchController = TextEditingController();
 
   @override
@@ -94,34 +31,81 @@ class _CourseListScreenState extends State<CourseListScreen> {
     super.dispose();
   }
 
-  List<_CourseData> get _filtered {
-    if (_filterIndex == 0) return _kCourses;
-    if (_filterIndex == 3) {
-      return _kCourses.where((c) => c.status == _CourseStatus.active).toList();
+  List<EnrolledCourse> _applyFilter(List<EnrolledCourse> courses) {
+    var result = courses;
+    switch (_filterIndex) {
+      case 1:
+        result = result.where((c) => c.isCurrentSemester).toList();
+      case 2:
+        result = result
+            .where((c) => c.enrollmentStatus == EnrollmentStatus.enrolled)
+            .toList();
+      case 3:
+        result = result
+            .where((c) => c.enrollmentStatus == EnrollmentStatus.completed)
+            .toList();
+      default:
+        break;
     }
-    if (_filterIndex == 4) {
-      return _kCourses.where((c) => c.status == _CourseStatus.completed).toList();
+    if (_search.isNotEmpty) {
+      final q = _search.toLowerCase();
+      result = result
+          .where((c) =>
+              c.name.toLowerCase().contains(q) ||
+              c.code.toLowerCase().contains(q) ||
+              (c.teacherName?.toLowerCase().contains(q) ?? false))
+          .toList();
     }
-    return _kCourses;
+    return result;
   }
-
-  // ── build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final coursesAsync = ref.watch(studentCoursesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: Column(
         children: [
           _buildSearchBar(),
           _buildFilterChips(),
-          Expanded(child: _buildCourseList()),
+          Expanded(
+            child: coursesAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline,
+                        color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Could not load courses',
+                        style: AppTextStyles.bodyMedium),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(studentCoursesProvider),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+              data: (courses) {
+                final filtered = _applyFilter(courses);
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Text('No courses found.',
+                        style: AppTextStyles.caption),
+                  );
+                }
+                return _buildCourseList(filtered);
+              },
+            ),
+          ),
         ],
       ),
     );
   }
-
-  // ── sections ───────────────────────────────────────────────────────────────
 
   Widget _buildSearchBar() {
     return Padding(
@@ -129,6 +113,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
           AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
       child: TextField(
         controller: _searchController,
+        onChanged: (v) => setState(() => _search = v),
         decoration: InputDecoration(
           hintText: 'Search courses, professors, or codes...',
           prefixIcon:
@@ -179,15 +164,14 @@ class _CourseListScreenState extends State<CourseListScreen> {
     );
   }
 
-  Widget _buildCourseList() {
-    final courses = _filtered;
+  Widget _buildCourseList(List<EnrolledCourse> courses) {
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.md),
       itemCount: courses.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, i) => _CourseCard(
         course: courses[i],
-        onTap: () => context.go('/student/courses/${courses[i].id}'),
+        onTap: () => context.go('/student/courses/${courses[i].courseId}'),
       ),
     );
   }
@@ -198,26 +182,35 @@ class _CourseListScreenState extends State<CourseListScreen> {
 class _CourseCard extends StatelessWidget {
   const _CourseCard({required this.course, required this.onTap});
 
-  final _CourseData course;
+  final EnrolledCourse course;
   final VoidCallback onTap;
 
-  BadgeType get _badgeType => switch (course.status) {
-        _CourseStatus.active => BadgeType.active,
-        _CourseStatus.completed => BadgeType.completed,
-        _CourseStatus.enrolled => BadgeType.enrolled,
+  BadgeType get _badgeType => switch (course.enrollmentStatus) {
+        EnrollmentStatus.enrolled => course.isCurrentSemester
+            ? BadgeType.active
+            : BadgeType.enrolled,
+        EnrollmentStatus.completed => BadgeType.completed,
+        EnrollmentStatus.dropped => BadgeType.neutral,
       };
 
-  String get _badgeLabel => switch (course.status) {
-        _CourseStatus.active => 'Active',
-        _CourseStatus.completed => 'Completed',
-        _CourseStatus.enrolled => 'Enrolled',
+  String get _badgeLabel => switch (course.enrollmentStatus) {
+        EnrollmentStatus.enrolled =>
+          course.isCurrentSemester ? 'Active' : 'Enrolled',
+        EnrollmentStatus.completed => 'Completed',
+        EnrollmentStatus.dropped => 'Dropped',
       };
 
-  Color get _progressColor => switch (course.status) {
-        _CourseStatus.active => AppColors.primaryNavy,
-        _CourseStatus.completed => AppColors.statusGreen,
-        _CourseStatus.enrolled => AppColors.statusGray,
+  Color get _progressColor => switch (course.enrollmentStatus) {
+        EnrollmentStatus.completed => AppColors.statusGreen,
+        EnrollmentStatus.dropped => AppColors.statusGray,
+        _ => AppColors.primaryNavy,
       };
+
+  double get _completion {
+    if (course.enrollmentStatus == EnrollmentStatus.completed) return 1.0;
+    if (course.enrollmentStatus == EnrollmentStatus.dropped) return 0.0;
+    return course.attendanceRate ?? 0.0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,7 +228,7 @@ class _CourseCard extends StatelessWidget {
           children: [
             _buildHeader(),
             const SizedBox(height: 8),
-            _buildTitle(),
+            Text(course.name, style: AppTextStyles.h3),
             const SizedBox(height: 12),
             _buildInfoGrid(),
             const SizedBox(height: 12),
@@ -256,20 +249,21 @@ class _CourseCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle() {
-    return Text(course.title, style: AppTextStyles.h3);
-  }
-
   Widget _buildInfoGrid() {
+    final semLabel = [
+      course.semesterName,
+      course.semesterAcademicYear,
+    ].whereType<String>().join(' • ');
+
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildInfoPair('PROFESSOR', course.professor),
+              _infoPair('PROFESSOR', course.teacherName ?? '—'),
               const SizedBox(height: 8),
-              _buildInfoPair('SEMESTER', course.semester),
+              _infoPair('SEMESTER', semLabel.isEmpty ? '—' : semLabel),
             ],
           ),
         ),
@@ -277,7 +271,7 @@ class _CourseCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildInfoPair('CREDITS', course.credits),
+              _infoPair('CREDITS', '${course.credits} Units'),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -293,37 +287,42 @@ class _CourseCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoPair(String label, String value) {
+  Widget _infoPair(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: AppTextStyles.label),
         const SizedBox(height: 2),
-        Text(value, style: AppTextStyles.bodySemiBold),
+        Text(value,
+            style: AppTextStyles.bodySemiBold,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
       ],
     );
   }
 
   Widget _buildProgressRow() {
-    final pct = (course.completion * 100).round();
+    final pct = (_completion * 100).round();
+    final label = course.enrollmentStatus == EnrollmentStatus.completed
+        ? 'Course Completion'
+        : 'Attendance Rate';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Course Completion', style: AppTextStyles.bodyMedium),
-            Text(
-              '$pct%',
-              style: AppTextStyles.bodySemiBold.copyWith(color: _progressColor),
-            ),
+            Text(label, style: AppTextStyles.bodyMedium),
+            Text('$pct%',
+                style: AppTextStyles.bodySemiBold
+                    .copyWith(color: _progressColor)),
           ],
         ),
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: course.completion,
+            value: _completion,
             minHeight: 6,
             backgroundColor: AppColors.border,
             valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
@@ -334,7 +333,7 @@ class _CourseCard extends StatelessWidget {
   }
 }
 
-// ── Code chip widget ───────────────────────────────────────────────────────────
+// ── Code chip ──────────────────────────────────────────────────────────────────
 
 class _CodeChip extends StatelessWidget {
   const _CodeChip({required this.code});
@@ -350,8 +349,8 @@ class _CodeChip extends StatelessWidget {
       ),
       child: Text(
         code,
-        style: AppTextStyles.label.copyWith(
-            color: AppColors.primaryBlue, letterSpacing: 0.5),
+        style: AppTextStyles.label
+            .copyWith(color: AppColors.primaryBlue, letterSpacing: 0.5),
       ),
     );
   }

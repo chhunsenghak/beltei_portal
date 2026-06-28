@@ -1,72 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
+import '../../../core/supabase/database.types.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const _kFinance = (
-  totalFee: '\$12,450.00',
-  totalFeeNum: 12450.0,
-  totalPaid: '\$8,200.00',
-  totalPaidNum: 8200.0,
-  outstanding: '\$4,250.00',
-  outstandingNum: 4250.0,
-  paidPercent: 0.66,
-  dueDate: 'Oct 15, 2023',
-  dueName: 'Fall Semester Installment',
-  academicYear: 'Academic Year 2023-24',
-);
+final _currencyFmt =
+    NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
-final _kInvoices = [
-  (no: 'INV-2023-001', semester: 'Fall 2023', date: 'Sep 05, 2023', amount: '\$3,200', status: 'Paid'),
-  (no: 'INV-2023-002', semester: 'Spring 2023', date: 'Jan 12, 2023', amount: '\$3,200', status: 'Paid'),
-  (no: 'INV-2023-003', semester: 'Summer 2023', date: 'Jun 10, 2023', amount: '\$1,800', status: 'Paid'),
-  (no: 'INV-2023-004', semester: 'Special Lab Fee', date: 'Oct 02, 2023', amount: '\$250', status: 'Pending'),
-];
+String _fmtDate(String iso) {
+  try {
+    return DateFormat('MMM dd, yyyy').format(DateTime.parse(iso));
+  } catch (_) {
+    return iso;
+  }
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class FinanceDashboardScreen extends StatelessWidget {
+class FinanceDashboardScreen extends ConsumerWidget {
   const FinanceDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final financeAsync = ref.watch(studentFinanceProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      floatingActionButton: _buildPayNowFab(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(),
-            const SizedBox(height: AppSpacing.md),
-            _buildSummaryCards(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildPaymentProgressCard(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildPaymentHistory(context),
-            const SizedBox(height: 80),
-          ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/student/finance/payment'),
+        backgroundColor: AppColors.primaryBlue,
+        icon: const Icon(Icons.payment, color: Colors.white),
+        label: Text('PAY NOW',
+            style: AppTextStyles.button.copyWith(fontSize: 13)),
+      ),
+      body: financeAsync.when(
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load finance data',
+                  style: AppTextStyles.bodyMedium),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(studentFinanceProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (fin) => SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTitle(),
+              const SizedBox(height: AppSpacing.md),
+              _buildSummaryCards(fin),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildPaymentProgressCard(fin),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildPaymentHistory(context, fin.invoices),
+              const SizedBox(height: 80),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  // ── FAB ────────────────────────────────────────────────────────────────────
-
-  Widget _buildPayNowFab(BuildContext context) {
-    return FloatingActionButton.extended(
-      onPressed: () => context.go('/student/finance/payment'),
-      backgroundColor: AppColors.primaryBlue,
-      icon: const Icon(Icons.payment, color: Colors.white),
-      label: Text('PAY NOW', style: AppTextStyles.button.copyWith(fontSize: 13)),
-    );
-  }
-
-  // ── Title ──────────────────────────────────────────────────────────────────
 
   Widget _buildTitle() {
     return Column(
@@ -74,48 +87,87 @@ class FinanceDashboardScreen extends StatelessWidget {
       children: [
         Text('Finance Overview', style: AppTextStyles.h1),
         const SizedBox(height: 4),
-        Text('Manage your tuition fees and payment history for the current academic year.',
-            style: AppTextStyles.caption.copyWith(height: 1.4)),
+        Text(
+          'Manage your tuition fees and payment history.',
+          style: AppTextStyles.caption.copyWith(height: 1.4),
+        ),
       ],
     );
   }
 
-  // ── Summary cards ──────────────────────────────────────────────────────────
+  Widget _buildSummaryCards(FinanceSummary fin) {
+    final paidPct = fin.totalFees > 0
+        ? (fin.paidPercent * 100).toStringAsFixed(1)
+        : '0.0';
+    final dueDateLabel = fin.nextDueName ?? 'No pending fees';
 
-  Widget _buildSummaryCards() {
     final items = [
-      (label: 'TOTAL FEE', value: _kFinance.totalFee, sub: _kFinance.academicYear,
-       icon: Icons.receipt_outlined, iconColor: AppColors.primaryNavy,
-       valueColor: AppColors.textPrimary),
-      (label: 'TOTAL PAID', value: _kFinance.totalPaid, sub: '65.8% of total completed',
-       icon: Icons.check_circle_outline, iconColor: AppColors.statusGreen,
-       valueColor: AppColors.statusGreen),
-      (label: 'OUTSTANDING', value: _kFinance.outstanding, sub: 'Immediate action required',
-       icon: Icons.warning_amber_outlined, iconColor: AppColors.statusRed,
-       valueColor: AppColors.statusRed),
-      (label: 'NEXT DUE DATE', value: _kFinance.dueDate, sub: _kFinance.dueName,
-       icon: Icons.event_outlined, iconColor: AppColors.statusAmber,
-       valueColor: AppColors.statusAmber),
+      (
+        label: 'TOTAL FEE',
+        value: _currencyFmt.format(fin.totalFees),
+        sub: 'Total across all invoices',
+        icon: Icons.receipt_outlined,
+        iconColor: AppColors.primaryNavy,
+        valueColor: AppColors.textPrimary,
+      ),
+      (
+        label: 'TOTAL PAID',
+        value: _currencyFmt.format(fin.totalPaid),
+        sub: '$paidPct% of total completed',
+        icon: Icons.check_circle_outline,
+        iconColor: AppColors.statusGreen,
+        valueColor: AppColors.statusGreen,
+      ),
+      (
+        label: 'OUTSTANDING',
+        value: _currencyFmt.format(fin.outstanding),
+        sub: fin.outstanding > 0
+            ? 'Action required'
+            : 'All fees cleared',
+        icon: Icons.warning_amber_outlined,
+        iconColor: fin.outstanding > 0
+            ? AppColors.statusRed
+            : AppColors.statusGreen,
+        valueColor: fin.outstanding > 0
+            ? AppColors.statusRed
+            : AppColors.statusGreen,
+      ),
+      (
+        label: 'NEXT DUE DATE',
+        value: fin.nextDueDate != null
+            ? _fmtDate(fin.nextDueDate!)
+            : '—',
+        sub: dueDateLabel,
+        icon: Icons.event_outlined,
+        iconColor: AppColors.statusAmber,
+        valueColor: AppColors.statusAmber,
+      ),
     ];
 
     return Column(
-      children: items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _SummaryCard(
-              label: item.label,
-              value: item.value,
-              sub: item.sub,
-              icon: item.icon,
-              iconColor: item.iconColor,
-              valueColor: item.valueColor,
-            ),
-          )).toList(),
+      children: items
+          .map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _SummaryCard(
+                  label: item.label,
+                  value: item.value,
+                  sub: item.sub,
+                  icon: item.icon,
+                  iconColor: item.iconColor,
+                  valueColor: item.valueColor,
+                ),
+              ))
+          .toList(),
     );
   }
 
-  // ── Payment progress ───────────────────────────────────────────────────────
+  Widget _buildPaymentProgressCard(FinanceSummary fin) {
+    final statusColor = switch (fin.status) {
+      'PAID' => AppColors.statusGreen,
+      'OVERDUE' => AppColors.statusRed,
+      _ => AppColors.primaryNavy,
+    };
 
-  Widget _buildPaymentProgressCard() {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -126,23 +178,29 @@ class FinanceDashboardScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Payment Progress', style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
+          Text('Payment Progress',
+              style: AppTextStyles.h2
+                  .copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 14),
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryNavy,
-                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                  color: statusColor.withValues(alpha: 0.15),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.chipRadius),
                 ),
-                child: Text('ONGOING',
-                    style: AppTextStyles.label.copyWith(color: Colors.white)),
+                child: Text(fin.status,
+                    style: AppTextStyles.label
+                        .copyWith(color: statusColor)),
               ),
               const Spacer(),
               Text(
-                '${(_kFinance.paidPercent * 100).round()}%',
-                style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.primaryNavy),
+                '${(fin.paidPercent * 100).round()}%',
+                style: AppTextStyles.bodySemiBold
+                    .copyWith(color: AppColors.primaryNavy),
               ),
             ],
           ),
@@ -150,22 +208,25 @@ class FinanceDashboardScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: _kFinance.paidPercent,
+              value: fin.paidPercent,
               minHeight: 10,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryNavy),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryNavy),
             ),
           ),
           const SizedBox(height: 12),
-          _buildLegendRow(AppColors.primaryNavy, 'Paid: ${_kFinance.totalPaid}'),
+          _legendRow(AppColors.primaryNavy,
+              'Paid: ${_currencyFmt.format(fin.totalPaid)}'),
           const SizedBox(height: 6),
-          _buildLegendRow(AppColors.border, 'Remaining: ${_kFinance.outstanding}'),
+          _legendRow(AppColors.border,
+              'Remaining: ${_currencyFmt.format(fin.outstanding)}'),
         ],
       ),
     );
   }
 
-  Widget _buildLegendRow(Color color, String label) {
+  Widget _legendRow(Color color, String label) {
     return Row(
       children: [
         Container(
@@ -183,9 +244,8 @@ class FinanceDashboardScreen extends StatelessWidget {
     );
   }
 
-  // ── Payment history ────────────────────────────────────────────────────────
-
-  Widget _buildPaymentHistory(BuildContext context) {
+  Widget _buildPaymentHistory(
+      BuildContext context, List<InvoiceRow> invoices) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -193,39 +253,40 @@ class FinanceDashboardScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Payment History',
-                style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
-            GestureDetector(
-              onTap: () {},
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('View All', style: AppTextStyles.link),
-                  const Icon(Icons.arrow_forward, color: AppColors.primaryBlue, size: 16),
-                ],
-              ),
-            ),
+                style: AppTextStyles.h2
+                    .copyWith(color: AppColors.primaryNavy)),
           ],
         ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
             color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+            borderRadius:
+                BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             children: [
               _buildTableHeader(),
               const Divider(color: AppColors.border, height: 1),
-              ..._kInvoices.asMap().entries.map((e) {
-                final isLast = e.key == _kInvoices.length - 1;
-                return Column(
-                  children: [
-                    _buildInvoiceRow(e.value, context),
-                    if (!isLast) const Divider(color: AppColors.divider, height: 1),
-                  ],
-                );
-              }),
+              if (invoices.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child:
+                      Center(child: Text('No invoices found.')),
+                )
+              else
+                ...invoices.asMap().entries.map((e) {
+                  final isLast = e.key == invoices.length - 1;
+                  return Column(
+                    children: [
+                      _buildInvoiceRow(context, e.value),
+                      if (!isLast)
+                        const Divider(
+                            color: AppColors.divider, height: 1),
+                    ],
+                  );
+                }),
             ],
           ),
         ),
@@ -237,7 +298,7 @@ class FinanceDashboardScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
-        children: ['INVOICE NO', 'SEMESTER', 'DATE']
+        children: ['DESCRIPTION', 'DUE DATE', 'STATUS']
             .map((h) => Expanded(
                   child: Text(h, style: AppTextStyles.label),
                 ))
@@ -246,20 +307,45 @@ class FinanceDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInvoiceRow(dynamic inv, BuildContext context) {
+  Widget _buildInvoiceRow(BuildContext context, InvoiceRow inv) {
+    final statusColor = switch (inv.status) {
+      InvoiceStatus.paid => AppColors.statusGreen,
+      InvoiceStatus.overdue => AppColors.statusRed,
+      InvoiceStatus.partial => AppColors.statusAmber,
+      InvoiceStatus.unpaid => AppColors.statusAmber,
+    };
+    final statusLabel = switch (inv.status) {
+      InvoiceStatus.paid => 'Paid',
+      InvoiceStatus.overdue => 'Overdue',
+      InvoiceStatus.partial => 'Partial',
+      InvoiceStatus.unpaid => 'Unpaid',
+    };
+
     return GestureDetector(
-      onTap: () => context.go('/student/finance/invoice/${inv.no}'),
+      onTap: () => context.go('/student/finance/invoice/${inv.id}'),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
             Expanded(
-              child: Text(inv.no as String,
-                  style: AppTextStyles.bodySemiBold.copyWith(
-                      color: AppColors.primaryBlue, fontSize: 13)),
+              child: Text(
+                inv.description,
+                style: AppTextStyles.bodySemiBold
+                    .copyWith(color: AppColors.primaryBlue, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            Expanded(child: Text(inv.semester as String, style: AppTextStyles.body)),
-            Expanded(child: Text(inv.date as String, style: AppTextStyles.caption)),
+            Expanded(
+                child: Text(_fmtDate(inv.dueDate),
+                    style: AppTextStyles.caption)),
+            Expanded(
+              child: Text(
+                statusLabel,
+                style: AppTextStyles.caption.copyWith(
+                    color: statusColor, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),

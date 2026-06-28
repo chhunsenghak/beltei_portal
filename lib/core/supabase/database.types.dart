@@ -64,7 +64,7 @@ class ProfileRow {
   factory ProfileRow.fromMap(Map<String, dynamic> m) => ProfileRow(
         id: m['id'] as String,
         email: m['email'] as String,
-        fullName: m['full_name'] as String,
+        fullName: '${m['first_name'] ?? ''} ${m['last_name'] ?? ''}'.trim(),
         role: UserRole.values.byName(m['role'] as String),
         phone: m['phone'] as String?,
         avatarUrl: m['avatar_url'] as String?,
@@ -74,7 +74,8 @@ class ProfileRow {
   Map<String, dynamic> toMap() => {
         'id': id,
         'email': email,
-        'full_name': fullName,
+        'first_name': fullName.split(' ').first,
+        'last_name': fullName.split(' ').skip(1).join(' '),
         'role': role.name,
         if (phone != null) 'phone': phone,
         if (avatarUrl != null) 'avatar_url': avatarUrl,

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
 const _kEnrollmentData = [0.55, 0.62, 0.58, 0.72, 0.68, 0.78, 0.85, 0.80, 0.90, 0.88, 0.95, 0.92];
 const _kMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -21,19 +24,22 @@ const _kGradeData = [
   (grade: 'D (60-69%)',  count: 180, color: AppColors.statusRed),
 ];
 
-class UniversityAnalyticsScreen extends StatefulWidget {
+class UniversityAnalyticsScreen extends ConsumerStatefulWidget {
   const UniversityAnalyticsScreen({super.key});
 
   @override
-  State<UniversityAnalyticsScreen> createState() =>
+  ConsumerState<UniversityAnalyticsScreen> createState() =>
       _UniversityAnalyticsScreenState();
 }
 
-class _UniversityAnalyticsScreenState extends State<UniversityAnalyticsScreen> {
+class _UniversityAnalyticsScreenState
+    extends ConsumerState<UniversityAnalyticsScreen> {
   String _semester = 'Fall Semester 2023 — 2024';
 
   @override
   Widget build(BuildContext context) {
+    final statsAsync = ref.watch(adminStatsProvider);
+    final stats = statsAsync.valueOrNull;
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
@@ -41,7 +47,7 @@ class _UniversityAnalyticsScreenState extends State<UniversityAnalyticsScreen> {
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildKpiCards(),
+          _buildKpiCards(stats),
           const SizedBox(height: 20),
           _buildEnrollmentTrend(),
           const SizedBox(height: 16),
@@ -112,12 +118,12 @@ class _UniversityAnalyticsScreenState extends State<UniversityAnalyticsScreen> {
     );
   }
 
-  Widget _buildKpiCards() {
+  Widget _buildKpiCards(AdminStats? stats) {
     final kpis = [
-      (label: 'Active Students', value: '12,482', sub: '+3.2%', color: AppColors.primaryNavy),
-      (label: 'Avg GPA',         value: '3.42',   sub: '+0.1', color: AppColors.primaryBlue),
-      (label: 'Attendance Rate', value: '94.8%',  sub: '+1.2%', color: AppColors.statusGreen),
-      (label: 'Revenue (Total)', value: '\$2.8M',  sub: '+8.9%', color: AppColors.statusAmber),
+      (label: 'Active Students', value: stats != null ? '${stats.studentCount}' : '—', sub: 'enrolled', color: AppColors.primaryNavy),
+      (label: 'Active Courses',  value: stats != null ? '${stats.courseCount}'  : '—', sub: 'this semester', color: AppColors.primaryBlue),
+      (label: 'Attendance Rate', value: '94.8%',  sub: 'avg rate', color: AppColors.statusGreen),
+      (label: 'Revenue Collected', value: stats?.fmtCollected ?? '—', sub: 'this year', color: AppColors.statusAmber),
     ];
     return GridView.count(
       crossAxisCount: 2,

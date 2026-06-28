@@ -1,36 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/student_providers.dart';
 
 enum _LeaveType { medical, personal, family, other }
 
-// ── Mock course list ───────────────────────────────────────────────────────────
-
-const _kCourses = [
-  'Introduction to Programming (CS101)',
-  'Advanced Calculus II (MATH204)',
-  'Academic Writing & Research (ENG102)',
-  'World Civilization (HIS105)',
-  'Digital Marketing 101 (MKT301)',
-  'Advanced Mathematics (MATH401)',
-];
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class CreateLeaveRequestScreen extends StatefulWidget {
+class CreateLeaveRequestScreen extends ConsumerStatefulWidget {
   const CreateLeaveRequestScreen({super.key});
 
   @override
-  State<CreateLeaveRequestScreen> createState() => _CreateLeaveRequestScreenState();
+  ConsumerState<CreateLeaveRequestScreen> createState() =>
+      _CreateLeaveRequestScreenState();
 }
 
-class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
-  String? _selectedCourse;
+class _CreateLeaveRequestScreenState
+    extends ConsumerState<CreateLeaveRequestScreen> {
   _LeaveType? _leaveType;
   final _reasonController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
+  bool _isSubmitting = false;
   bool _submitted = false;
 
   @override
@@ -47,7 +41,6 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   }
 
   bool get _isValid =>
-      _selectedCourse != null &&
       _leaveType != null &&
       _startDate != null &&
       _endDate != null &&
@@ -56,36 +49,24 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   String _formatDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  String _isoDate(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  void _pickCourse() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _CoursePickerSheet(
-        courses: _kCourses,
-        selected: _selectedCourse,
-        onSelect: (course) {
-          setState(() => _selectedCourse = course);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
+  // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _pickDate(bool isStart) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart ? (_startDate ?? now) : (_endDate ?? _startDate ?? now),
+      initialDate: isStart
+          ? (_startDate ?? now)
+          : (_endDate ?? _startDate ?? now),
       firstDate: now,
       lastDate: DateTime(now.year + 1),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.primaryNavy),
+          colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryNavy),
         ),
         child: child!,
       ),
@@ -94,37 +75,60 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     setState(() {
       if (isStart) {
         _startDate = picked;
-        if (_endDate != null && _endDate!.isBefore(picked)) _endDate = picked;
+        if (_endDate != null && _endDate!.isBefore(picked)) {
+          _endDate = picked;
+        }
       } else {
         _endDate = picked;
       }
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_isValid) {
-      _showValidationSnackBar();
+      _showSnackBar('Please fill in all required fields.',
+          isError: true);
       return;
     }
-    setState(() => _submitted = true);
+
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user == null) {
+      _showSnackBar('Session expired. Please log in again.',
+          isError: true);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(studentServiceProvider).createLeaveRequest(
+            studentId: user.id,
+            type: _leaveType!.name.capitalize,
+            reason: _reasonController.text.trim(),
+            startDate: _isoDate(_startDate!),
+            endDate: _isoDate(_endDate!),
+          );
+      ref.invalidate(studentLeaveRequestsProvider);
+      if (mounted) setState(() => _submitted = true);
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar('Failed to submit request. Please try again.',
+            isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
-  void _showValidationSnackBar() {
-    String message = 'Please fill in: ';
-    final missing = <String>[];
-    if (_selectedCourse == null) missing.add('course');
-    if (_leaveType == null) missing.add('leave type');
-    if (_startDate == null) missing.add('start date');
-    if (_endDate == null) missing.add('end date');
-    if (_reasonController.text.trim().isEmpty) missing.add('reason');
-    message += missing.join(', ');
-
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: AppTextStyles.body.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.statusRed,
+        content: Text(message,
+            style: AppTextStyles.body.copyWith(color: Colors.white)),
+        backgroundColor:
+            isError ? AppColors.statusRed : AppColors.statusGreen,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -144,8 +148,6 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildPolicyBanner(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildCourseField(),
             const SizedBox(height: AppSpacing.sectionGap),
             _buildLeaveTypeGrid(),
             const SizedBox(height: AppSpacing.sectionGap),
@@ -167,8 +169,6 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     );
   }
 
-  // ── App bar ────────────────────────────────────────────────────────────────
-
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
@@ -179,14 +179,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text('New Leave Request', style: AppTextStyles.h3),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-      ],
     );
   }
-
-  // ── Policy banner ──────────────────────────────────────────────────────────
 
   Widget _buildPolicyBanner() {
     return Container(
@@ -207,7 +201,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                 Text('Academic Policy', style: AppTextStyles.h3White),
                 const SizedBox(height: 4),
                 Text(
-                  'Please submit leave requests at least 24 hours in advance, except for medical emergencies.',
+                  'Submit leave requests at least 24 hours in advance, except for medical emergencies.',
                   style: AppTextStyles.bodyWhite.copyWith(height: 1.4),
                 ),
               ],
@@ -218,61 +212,12 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     );
   }
 
-  // ── Course picker ──────────────────────────────────────────────────────────
-
-  Widget _buildCourseField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('SELECT COURSE', style: AppTextStyles.label),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _pickCourse,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              border: Border.all(
-                color: _selectedCourse != null ? AppColors.primaryNavy : AppColors.border,
-                width: _selectedCourse != null ? 1.5 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _selectedCourse ?? 'Choose a course',
-                    style: AppTextStyles.body.copyWith(
-                      color: _selectedCourse != null
-                          ? AppColors.textPrimary
-                          : AppColors.textLabel,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  color: _selectedCourse != null
-                      ? AppColors.primaryNavy
-                      : AppColors.textLabel,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Leave type grid ────────────────────────────────────────────────────────
-
   Widget _buildLeaveTypeGrid() {
     final types = [
-      (type: _LeaveType.medical, icon: Icons.local_hospital_outlined, label: 'Medical'),
-      (type: _LeaveType.personal, icon: Icons.person_outline, label: 'Personal'),
-      (type: _LeaveType.family, icon: Icons.family_restroom_outlined, label: 'Family'),
-      (type: _LeaveType.other, icon: Icons.more_horiz, label: 'Other'),
+      (type: _LeaveType.medical,  icon: Icons.local_hospital_outlined,   label: 'Medical'),
+      (type: _LeaveType.personal, icon: Icons.person_outline,            label: 'Personal'),
+      (type: _LeaveType.family,   icon: Icons.family_restroom_outlined,  label: 'Family'),
+      (type: _LeaveType.other,    icon: Icons.more_horiz,                label: 'Other'),
     ];
 
     return Column(
@@ -297,9 +242,12 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   color: isSelected
                       ? AppColors.primaryNavy.withValues(alpha: 0.08)
                       : AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cardRadius),
                   border: Border.all(
-                    color: isSelected ? AppColors.primaryNavy : AppColors.border,
+                    color: isSelected
+                        ? AppColors.primaryNavy
+                        : AppColors.border,
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
@@ -330,8 +278,6 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     );
   }
 
-  // ── Date fields ────────────────────────────────────────────────────────────
-
   Widget _buildDateFields() {
     return Column(
       children: [
@@ -353,12 +299,16 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderRadius:
+                  BorderRadius.circular(AppSpacing.inputRadius),
               border: Border.all(
-                color: hasValue ? AppColors.primaryNavy : AppColors.border,
+                color: hasValue
+                    ? AppColors.primaryNavy
+                    : AppColors.border,
                 width: hasValue ? 1.5 : 1,
               ),
             ),
@@ -368,15 +318,17 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   child: Text(
                     date != null ? _formatDate(date) : 'dd/mm/yyyy',
                     style: AppTextStyles.body.copyWith(
-                      color: hasValue ? AppColors.textPrimary : AppColors.textLabel,
+                      color: hasValue
+                          ? AppColors.textPrimary
+                          : AppColors.textLabel,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.calendar_today_outlined,
-                  color: hasValue ? AppColors.primaryNavy : AppColors.textLabel,
-                  size: 18,
-                ),
+                Icon(Icons.calendar_today_outlined,
+                    color: hasValue
+                        ? AppColors.primaryNavy
+                        : AppColors.textLabel,
+                    size: 18),
               ],
             ),
           ),
@@ -387,7 +339,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
   Widget _buildDurationChip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.statusBlueBg,
         borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
@@ -395,19 +348,19 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.schedule, color: AppColors.primaryBlue, size: 14),
+          const Icon(Icons.schedule,
+              color: AppColors.primaryBlue, size: 14),
           const SizedBox(width: 6),
           Text(
             'Duration: $_totalDays day${_totalDays == 1 ? '' : 's'}',
-            style: AppTextStyles.caption
-                .copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600),
+            style: AppTextStyles.caption.copyWith(
+                color: AppColors.primaryBlue,
+                fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
-
-  // ── Reason field ───────────────────────────────────────────────────────────
 
   Widget _buildReasonField() {
     return Column(
@@ -420,23 +373,20 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
           maxLines: 5,
           onChanged: (_) => setState(() {}),
           decoration: const InputDecoration(
-            hintText: 'Briefly describe why you are requesting leave...',
+            hintText:
+                'Briefly describe why you are requesting leave...',
             alignLabelWithHint: true,
           ),
         ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
-          child: Text(
-            '${_reasonController.text.length} chars',
-            style: AppTextStyles.caption,
-          ),
+          child: Text('${_reasonController.text.length} chars',
+              style: AppTextStyles.caption),
         ),
       ],
     );
   }
-
-  // ── Attachment area ────────────────────────────────────────────────────────
 
   Widget _buildAttachmentArea() {
     return Column(
@@ -444,43 +394,33 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       children: [
         Text('ATTACHMENTS (OPTIONAL)', style: AppTextStyles.label),
         const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('File picker would open here (requires file_picker package)',
-                    style: AppTextStyles.caption.copyWith(color: Colors.white)),
-                backgroundColor: AppColors.primaryNavy,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 28),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius:
+                BorderRadius.circular(AppSpacing.cardRadius),
+            border:
+                Border.all(color: AppColors.border, width: 1.5),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.cloud_upload_outlined,
+                  color: AppColors.textLabel, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                'Tap to upload medical certificates or letters',
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
               ),
-            );
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 28),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-              border: Border.all(color: AppColors.border, width: 1.5),
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.cloud_upload_outlined,
-                    color: AppColors.textLabel, size: 32),
-                const SizedBox(height: 8),
-                Text('Tap to upload medical certificates or letters',
-                    style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-                    textAlign: TextAlign.center),
-              ],
-            ),
+            ],
           ),
         ),
       ],
     );
   }
-
-  // ── Submit button ──────────────────────────────────────────────────────────
 
   Widget _buildSubmitButton() {
     return AnimatedOpacity(
@@ -490,9 +430,18 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.send_outlined, size: 18),
-          label: Text('Submit Request', style: AppTextStyles.button),
+          onPressed: _isSubmitting ? null : _submit,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.send_outlined, size: 18),
+          label: Text(
+              _isSubmitting ? 'Submitting...' : 'Submit Request',
+              style: AppTextStyles.button),
         ),
       ),
     );
@@ -521,10 +470,12 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
-              Text('Request Submitted!', style: AppTextStyles.h1, textAlign: TextAlign.center),
+              Text('Request Submitted!',
+                  style: AppTextStyles.h1,
+                  textAlign: TextAlign.center),
               const SizedBox(height: 12),
               Text(
-                'Your $leaveLabel leave request has been submitted successfully and is pending review.',
+                'Your $leaveLabel leave request has been submitted and is pending review.',
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.6),
                 textAlign: TextAlign.center,
@@ -537,7 +488,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                 height: AppSpacing.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Back to Leave Requests', style: AppTextStyles.button),
+                  child: Text('Back to Leave Requests',
+                      style: AppTextStyles.button),
                 ),
               ),
             ],
@@ -557,26 +509,27 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Course', _selectedCourse?.split('(').first.trim() ?? ''),
+          _summaryRow('Type', '$leaveLabel Leave'),
           const Divider(color: AppColors.divider, height: 20),
-          _buildSummaryRow('Type', '$leaveLabel Leave'),
-          const Divider(color: AppColors.divider, height: 20),
-          _buildSummaryRow('Period',
+          _summaryRow('Period',
               '${_formatDate(_startDate!)} → ${_formatDate(_endDate!)}'),
           const Divider(color: AppColors.divider, height: 20),
-          _buildSummaryRow('Duration', '$_totalDays day${_totalDays == 1 ? '' : 's'}'),
+          _summaryRow('Duration',
+              '$_totalDays day${_totalDays == 1 ? '' : 's'}'),
           const Divider(color: AppColors.divider, height: 20),
-          _buildSummaryRow('Status', 'Pending Review'),
+          _summaryRow('Status', 'Pending Review'),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
+  Widget _summaryRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+        Text(label,
+            style: AppTextStyles.body
+                .copyWith(color: AppColors.textSecondary)),
         Flexible(
           child: Text(value,
               style: AppTextStyles.bodyMedium,
@@ -588,60 +541,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   }
 }
 
-// ── Course picker bottom sheet ─────────────────────────────────────────────────
-
-class _CoursePickerSheet extends StatelessWidget {
-  const _CoursePickerSheet({
-    required this.courses,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  final List<String> courses;
-  final String? selected;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.border,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('Select Course', style: AppTextStyles.h2),
-        ),
-        const SizedBox(height: 8),
-        const Divider(color: AppColors.border),
-        ...courses.map((course) {
-          final isSelected = course == selected;
-          return ListTile(
-            title: Text(course,
-                style: AppTextStyles.body.copyWith(
-                    color: isSelected ? AppColors.primaryNavy : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
-            trailing: isSelected
-                ? const Icon(Icons.check, color: AppColors.primaryNavy, size: 20)
-                : null,
-            onTap: () => onSelect(course),
-          );
-        }),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-}
-
-// ── String helper ──────────────────────────────────────────────────────────────
+// ── Extension ──────────────────────────────────────────────────────────────────
 
 extension _StringExt on String {
   String get capitalize =>

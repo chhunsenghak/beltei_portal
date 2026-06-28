@@ -1,66 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
+import '../../../core/supabase/database.types.dart';
 import '../../../core/router/app_router.dart';
 import '../../../shared/widgets/section_header.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kStats = (
-  totalDays: 128,
-  present: 112,
-  absent: 8,
-  leave: 6,
-  late: 2,
-  rate: 0.88,
-);
-
-final _kCourseBreakdown = [
-  (name: 'Advanced Mathematics', rate: 0.94),
-  (name: 'Global Economics', rate: 0.82),
-  (name: 'Information Tech', rate: 0.75),
-];
-
-final _kRecentLogs = [
-  (date: 'Feb 19, 2024', course: 'Advanced Mathematics', time: '08:00 AM', status: 'Present'),
-  (date: 'Feb 18, 2024', course: 'Global Economics', time: '10:30 AM', status: 'Present'),
-  (date: 'Feb 15, 2024', course: 'Information Tech', time: '01:45 PM', status: 'Absent'),
-  (date: 'Feb 12, 2024', course: 'English Literature', time: '08:00 AM', status: 'Leave'),
-];
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class AttendanceDashboardScreen extends StatelessWidget {
+class AttendanceDashboardScreen extends ConsumerWidget {
   const AttendanceDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attendanceAsync = ref.watch(studentAttendanceProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(),
-            const SizedBox(height: AppSpacing.md),
-            _buildStatCards(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildAttendanceRateCard(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildCourseBreakdown(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildRecentLogs(context),
-          ],
+      body: attendanceAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load attendance',
+                  style: AppTextStyles.bodyMedium),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(studentAttendanceProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (att) => SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTitle(),
+              const SizedBox(height: AppSpacing.md),
+              _buildStatCards(att),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildAttendanceRateCard(att),
+              const SizedBox(height: AppSpacing.sectionGap),
+              if (att.courseBreakdown.isNotEmpty)
+                _buildCourseBreakdown(att.courseBreakdown),
+              if (att.courseBreakdown.isNotEmpty)
+                const SizedBox(height: AppSpacing.sectionGap),
+              _buildRecentLogs(context, att.recentRecords),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  // ── Title ──────────────────────────────────────────────────────────────────
 
   Widget _buildTitle() {
     return Column(
@@ -68,21 +72,19 @@ class AttendanceDashboardScreen extends StatelessWidget {
       children: [
         Text('Attendance Overview', style: AppTextStyles.h1),
         const SizedBox(height: 4),
-        Text('Academic Year 2023-2024 • Semester 2',
+        Text('All recorded attendance across your enrolled courses',
             style: AppTextStyles.caption),
       ],
     );
   }
 
-  // ── Stat cards grid ────────────────────────────────────────────────────────
-
-  Widget _buildStatCards() {
+  Widget _buildStatCards(AttendanceSummary att) {
     final items = [
-      (label: 'TOTAL DAYS', value: '${_kStats.totalDays}', color: AppColors.textPrimary),
-      (label: 'PRESENT', value: '${_kStats.present}', color: AppColors.textPrimary),
-      (label: 'ABSENT', value: '${_kStats.absent}', color: AppColors.statusRed),
-      (label: 'LEAVE', value: '${_kStats.leave}', color: AppColors.statusAmber),
-      (label: 'LATE', value: '${_kStats.late}', color: AppColors.statusAmber),
+      (label: 'TOTAL DAYS', value: '${att.totalDays}', color: AppColors.textPrimary),
+      (label: 'PRESENT', value: '${att.present}', color: AppColors.textPrimary),
+      (label: 'ABSENT', value: '${att.absent}', color: AppColors.statusRed),
+      (label: 'LEAVE', value: '${att.excused}', color: AppColors.statusAmber),
+      (label: 'LATE', value: '${att.late}', color: AppColors.statusAmber),
     ];
 
     return GridView.count(
@@ -92,17 +94,24 @@ class AttendanceDashboardScreen extends StatelessWidget {
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.8,
-      children: items.map((item) => _StatCard(
-        label: item.label,
-        value: item.value,
-        valueColor: item.color,
-      )).toList(),
+      children: items
+          .map((item) => _StatCard(
+                label: item.label,
+                value: item.value,
+                valueColor: item.color,
+              ))
+          .toList(),
     );
   }
 
-  // ── Circular rate card ─────────────────────────────────────────────────────
+  Widget _buildAttendanceRateCard(AttendanceSummary att) {
+    final rate = att.overallRate;
+    final color = rate >= 0.85
+        ? AppColors.statusGreen
+        : rate >= 0.70
+            ? AppColors.statusAmber
+            : AppColors.statusRed;
 
-  Widget _buildAttendanceRateCard() {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,48 +122,71 @@ class AttendanceDashboardScreen extends StatelessWidget {
             child: CircularPercentIndicator(
               radius: 80,
               lineWidth: 10,
-              percent: _kStats.rate,
+              percent: rate,
               center: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${(_kStats.rate * 100).round()}%',
-                    style: AppTextStyles.metric.copyWith(color: AppColors.statusRed),
+                    '${(rate * 100).toStringAsFixed(1)}%',
+                    style:
+                        AppTextStyles.metric.copyWith(color: color),
                   ),
                   Text('Current Rate', style: AppTextStyles.caption),
                 ],
               ),
-              progressColor: AppColors.statusRed,
+              progressColor: color,
               backgroundColor: AppColors.border,
               circularStrokeCap: CircularStrokeCap.round,
             ),
           ),
+          if (rate < 0.75) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.statusRedBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_outlined,
+                      color: AppColors.statusRed, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Attendance below 75%. Risk of academic penalty.',
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.statusRed),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  // ── Course breakdown bars ──────────────────────────────────────────────────
-
-  Widget _buildCourseBreakdown() {
+  Widget _buildCourseBreakdown(List<CourseAttendance> courses) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Course Breakdown', style: AppTextStyles.h2),
           const SizedBox(height: 16),
-          ..._kCourseBreakdown.map((c) => Padding(
+          ...courses.map((c) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _CourseBar(name: c.name, rate: c.rate),
+                child: _CourseBar(name: c.courseName, rate: c.rate),
               )),
         ],
       ),
     );
   }
 
-  // ── Recent logs table ──────────────────────────────────────────────────────
-
-  Widget _buildRecentLogs(BuildContext context) {
+  Widget _buildRecentLogs(
+      BuildContext context, List<AttendanceRecord> records) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,7 +201,13 @@ class AttendanceDashboardScreen extends StatelessWidget {
             children: [
               _buildLogTableHeader(),
               const Divider(color: AppColors.border, height: 16),
-              ..._kRecentLogs.map((log) => _buildLogRow(log)),
+              if (records.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: Text('No attendance records yet.')),
+                )
+              else
+                ...records.map((log) => _buildLogRow(log)),
             ],
           ),
         ),
@@ -179,46 +217,62 @@ class AttendanceDashboardScreen extends StatelessWidget {
 
   Widget _buildLogTableHeader() {
     return Row(
-      children: ['DATE', 'COURSE', 'TIME', 'STATUS']
-          .map((h) => Expanded(
-                child: Text(h, style: AppTextStyles.label),
-              ))
+      children: ['DATE', 'COURSE', 'STATUS']
+          .map((h) => Expanded(child: Text(h, style: AppTextStyles.label)))
           .toList(),
     );
   }
 
-  Widget _buildLogRow(dynamic log) {
-    Color statusColor;
-    Color statusBg;
-    if (log.status == 'Present') {
-      statusColor = AppColors.statusGreen;
-      statusBg = AppColors.statusGreenBg;
-    } else if (log.status == 'Absent') {
-      statusColor = AppColors.statusRed;
-      statusBg = AppColors.statusRedBg;
-    } else {
-      statusColor = AppColors.statusAmber;
-      statusBg = AppColors.statusAmberBg;
+  Widget _buildLogRow(AttendanceRecord log) {
+    final Color statusColor;
+    final Color statusBg;
+    final String statusLabel;
+
+    switch (log.status) {
+      case AttendanceStatus.present:
+        statusColor = AppColors.statusGreen;
+        statusBg = AppColors.statusGreenBg;
+        statusLabel = 'Present';
+      case AttendanceStatus.absent:
+        statusColor = AppColors.statusRed;
+        statusBg = AppColors.statusRedBg;
+        statusLabel = 'Absent';
+      case AttendanceStatus.late:
+        statusColor = AppColors.statusAmber;
+        statusBg = AppColors.statusAmberBg;
+        statusLabel = 'Late';
+      case AttendanceStatus.excused:
+        statusColor = AppColors.statusAmber;
+        statusBg = AppColors.statusAmberBg;
+        statusLabel = 'Excused';
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(log.date as String, style: AppTextStyles.caption)),
-          Expanded(child: Text(log.course as String, style: AppTextStyles.caption)),
-          Expanded(child: Text(log.time as String, style: AppTextStyles.caption)),
+          Expanded(
+              child: Text(log.date, style: AppTextStyles.caption)),
+          Expanded(
+              child: Text(log.courseName,
+                  style: AppTextStyles.caption,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: statusBg,
-                borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.chipRadius),
               ),
               child: Text(
-                log.status as String,
+                statusLabel,
                 style: AppTextStyles.caption.copyWith(
-                    color: statusColor, fontWeight: FontWeight.w600, fontSize: 11),
+                    color: statusColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11),
               ),
             ),
           ),
@@ -231,7 +285,10 @@ class AttendanceDashboardScreen extends StatelessWidget {
 // ── Reusable widgets ───────────────────────────────────────────────────────────
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.valueColor});
+  const _StatCard(
+      {required this.label,
+      required this.value,
+      required this.valueColor});
   final String label;
   final String value;
   final Color valueColor;
@@ -251,7 +308,9 @@ class _StatCard extends StatelessWidget {
         children: [
           Text(label, style: AppTextStyles.label),
           const SizedBox(height: 4),
-          Text(value, style: AppTextStyles.metricSmall.copyWith(color: valueColor, fontSize: 22)),
+          Text(value,
+              style: AppTextStyles.metricSmall
+                  .copyWith(color: valueColor, fontSize: 22)),
         ],
       ),
     );
@@ -265,15 +324,26 @@ class _CourseBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = rate >= 0.85
+        ? AppColors.primaryNavy
+        : rate >= 0.70
+            ? AppColors.statusAmber
+            : AppColors.statusRed;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(name, style: AppTextStyles.bodyMedium),
+            Expanded(
+              child: Text(name,
+                  style: AppTextStyles.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ),
             Text('${(rate * 100).round()}%',
-                style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.primaryNavy)),
+                style: AppTextStyles.bodySemiBold
+                    .copyWith(color: color)),
           ],
         ),
         const SizedBox(height: 6),
@@ -283,7 +353,7 @@ class _CourseBar extends StatelessWidget {
             value: rate,
             minHeight: 6,
             backgroundColor: AppColors.border,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryNavy),
+            valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
       ],
