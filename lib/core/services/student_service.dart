@@ -19,6 +19,7 @@ class StudentProfile {
   final String? dateOfBirth;
   final String? gender;
   final String? address;
+  final String? nationality;
   final String? emergencyContact;
 
   const StudentProfile({
@@ -36,6 +37,7 @@ class StudentProfile {
     this.dateOfBirth,
     this.gender,
     this.address,
+    this.nationality,
     this.emergencyContact,
   });
 }
@@ -218,7 +220,7 @@ class StudentService {
           .from('students')
           .select(
               'student_code, year_level, enrollment_year, status, '
-              'date_of_birth, gender, address, emergency_contact, '
+              'date_of_birth, gender, nationality, address, emergency_contact, '
               'faculty_id, major_id')
           .eq('id', userId)
           .maybeSingle();
@@ -263,6 +265,7 @@ class StudentService {
         dateOfBirth: student['date_of_birth'] as String?,
         gender: student['gender'] as String?,
         address: student['address'] as String?,
+        nationality: student['nationality'] as String?,
         emergencyContact: student['emergency_contact'] as String?,
       );
     } catch (e, st) {
