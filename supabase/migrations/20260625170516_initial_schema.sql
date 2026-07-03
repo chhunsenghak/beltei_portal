@@ -1,5 +1,5 @@
 -- ============================================================
--- BELTEI Campus Portal — Supabase Schema
+-- BELTEI Portal — Supabase Schema
 -- Run this in: Supabase Dashboard → SQL Editor → New query
 -- ============================================================
 
@@ -10,7 +10,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE profiles (
   id          UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email       TEXT NOT NULL,
-  full_name   TEXT NOT NULL,
+  first_name   TEXT NOT NULL,
+  last_name   TEXT NOT NULL,
   role        TEXT NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
   phone       TEXT,
   avatar_url  TEXT,
@@ -246,28 +247,52 @@ ALTER TABLE notifications    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_materials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements    ENABLE ROW LEVEL SECURITY;
 
--- Helper: check if current user is admin
+-- ── RLS helper functions (SECURITY DEFINER bypasses RLS to break policy cycles) ──
+
+-- Is current user admin?
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin');
-$$ LANGUAGE sql SECURITY DEFINER;
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- Is current user (student) enrolled in the given course?
+CREATE OR REPLACE FUNCTION is_enrolled_in(p_course_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.enrollments
+    WHERE course_id = p_course_id AND student_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- Is current user (teacher) the teacher of the given course?
+CREATE OR REPLACE FUNCTION teacher_owns_course(p_course_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.courses
+    WHERE id = p_course_id AND teacher_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- Does current user (teacher) teach any course the given student is enrolled in?
+CREATE OR REPLACE FUNCTION teacher_teaches_student(p_student_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.enrollments e
+    JOIN public.courses c ON c.id = e.course_id
+    WHERE e.student_id = p_student_id AND c.teacher_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- ── Profiles ─────────────────────────────────────────────────────────────────
-CREATE POLICY "Own profile readable"   ON profiles FOR SELECT USING (auth.uid() = id OR is_admin());
-CREATE POLICY "Own profile updatable"  ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admin full access"      ON profiles FOR ALL    USING (is_admin());
+CREATE POLICY "Own profile readable"          ON profiles FOR SELECT USING (auth.uid() = id OR is_admin());
+CREATE POLICY "Teacher views student profiles" ON profiles FOR SELECT USING (teacher_teaches_student(profiles.id));
+CREATE POLICY "Own profile updatable"         ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Admin full access"             ON profiles FOR ALL    USING (is_admin());
 
 -- ── Students ─────────────────────────────────────────────────────────────────
 CREATE POLICY "Student views own record" ON students FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Teacher views enrolled"   ON students FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM enrollments e
-    JOIN courses c ON c.id = e.course_id
-    WHERE e.student_id = students.id
-      AND c.teacher_id = auth.uid()
-  )
-);
-CREATE POLICY "Admin manages students" ON students FOR ALL USING (is_admin());
+CREATE POLICY "Teacher views enrolled"   ON students FOR SELECT USING (teacher_teaches_student(students.id));
+CREATE POLICY "Admin manages students"   ON students FOR ALL    USING (is_admin());
 
 -- ── Teachers ─────────────────────────────────────────────────────────────────
 CREATE POLICY "Teacher views own record" ON teachers FOR SELECT USING (auth.uid() = id);
@@ -275,37 +300,32 @@ CREATE POLICY "Admin manages teachers"   ON teachers FOR ALL   USING (is_admin()
 
 -- ── Courses ──────────────────────────────────────────────────────────────────
 CREATE POLICY "Enrolled students view courses" ON courses FOR SELECT USING (
-  EXISTS (SELECT 1 FROM enrollments WHERE course_id = courses.id AND student_id = auth.uid())
-  OR teacher_id = auth.uid()
-  OR is_admin()
+  is_enrolled_in(courses.id) OR teacher_id = auth.uid() OR is_admin()
 );
 CREATE POLICY "Teacher manages own courses" ON courses FOR UPDATE USING (teacher_id = auth.uid());
 CREATE POLICY "Admin manages courses"       ON courses FOR ALL    USING (is_admin());
 
 -- ── Enrollments ──────────────────────────────────────────────────────────────
-CREATE POLICY "Student views own enrollments" ON enrollments FOR SELECT USING (student_id = auth.uid());
-CREATE POLICY "Teacher views course enrollments" ON enrollments FOR SELECT USING (
-  EXISTS (SELECT 1 FROM courses WHERE id = enrollments.course_id AND teacher_id = auth.uid())
-);
-CREATE POLICY "Admin manages enrollments" ON enrollments FOR ALL USING (is_admin());
+CREATE POLICY "Student views own enrollments"    ON enrollments FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Teacher views course enrollments" ON enrollments FOR SELECT USING (teacher_owns_course(enrollments.course_id));
+CREATE POLICY "Admin manages enrollments"        ON enrollments FOR ALL    USING (is_admin());
 
 -- ── Grades ───────────────────────────────────────────────────────────────────
-CREATE POLICY "Student views own grades" ON grades FOR SELECT USING (student_id = auth.uid());
-CREATE POLICY "Teacher manages course grades" ON grades FOR ALL USING (
-  EXISTS (SELECT 1 FROM courses WHERE id = grades.course_id AND teacher_id = auth.uid())
-);
-CREATE POLICY "Admin manages grades" ON grades FOR ALL USING (is_admin());
+CREATE POLICY "Student views own grades"     ON grades FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Teacher manages course grades" ON grades FOR ALL   USING (teacher_owns_course(grades.course_id));
+CREATE POLICY "Admin manages grades"         ON grades FOR ALL    USING (is_admin());
 
 -- ── Attendance ───────────────────────────────────────────────────────────────
-CREATE POLICY "Student views own attendance" ON attendance FOR SELECT USING (student_id = auth.uid());
-CREATE POLICY "Teacher manages course attendance" ON attendance FOR ALL USING (
-  EXISTS (SELECT 1 FROM courses WHERE id = attendance.course_id AND teacher_id = auth.uid())
-);
-CREATE POLICY "Admin manages attendance" ON attendance FOR ALL USING (is_admin());
+CREATE POLICY "Student views own attendance"      ON attendance FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Teacher manages course attendance" ON attendance FOR ALL    USING (teacher_owns_course(attendance.course_id));
+CREATE POLICY "Admin manages attendance"          ON attendance FOR ALL    USING (is_admin());
 
 -- ── Leave Requests ───────────────────────────────────────────────────────────
-CREATE POLICY "User views own requests"   ON leave_requests FOR SELECT USING (requester_id = auth.uid());
-CREATE POLICY "User creates own request"  ON leave_requests FOR INSERT WITH CHECK (requester_id = auth.uid());
+CREATE POLICY "User views own requests"       ON leave_requests FOR SELECT USING (requester_id = auth.uid());
+CREATE POLICY "User creates own request"      ON leave_requests FOR INSERT WITH CHECK (requester_id = auth.uid());
+CREATE POLICY "Teacher views student requests" ON leave_requests FOR SELECT USING (
+  requester_type = 'student' AND teacher_teaches_student(leave_requests.requester_id)
+);
 CREATE POLICY "Admin manages all requests" ON leave_requests FOR ALL USING (is_admin());
 
 -- ── Invoices ─────────────────────────────────────────────────────────────────
@@ -322,17 +342,13 @@ CREATE POLICY "User updates own notifications" ON notifications FOR UPDATE USING
 
 -- ── Course Materials ─────────────────────────────────────────────────────────
 CREATE POLICY "Enrolled student views materials" ON course_materials FOR SELECT USING (
-  EXISTS (SELECT 1 FROM enrollments WHERE course_id = course_materials.course_id AND student_id = auth.uid())
-  OR teacher_id = auth.uid()
-  OR is_admin()
+  is_enrolled_in(course_materials.course_id) OR teacher_id = auth.uid() OR is_admin()
 );
 CREATE POLICY "Teacher manages own materials" ON course_materials FOR ALL USING (teacher_id = auth.uid());
 
 -- ── Announcements ────────────────────────────────────────────────────────────
 CREATE POLICY "Enrolled student views announcements" ON announcements FOR SELECT USING (
-  EXISTS (SELECT 1 FROM enrollments WHERE course_id = announcements.course_id AND student_id = auth.uid())
-  OR teacher_id = auth.uid()
-  OR is_admin()
+  is_enrolled_in(announcements.course_id) OR teacher_id = auth.uid() OR is_admin()
 );
 CREATE POLICY "Teacher manages own announcements" ON announcements FOR ALL USING (teacher_id = auth.uid());
 
@@ -343,17 +359,30 @@ CREATE POLICY "Teacher manages own announcements" ON announcements FOR ALL USING
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, email, full_name, role)
+  INSERT INTO public.profiles (id, email, first_name, last_name, role)
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'first_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'role', 'student')
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ============================================================
+-- GRANTS
+-- ============================================================
+
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO service_role;

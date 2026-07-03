@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/teacher_providers.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class CreateAnnouncementScreen extends StatefulWidget {
+class CreateAnnouncementScreen extends ConsumerStatefulWidget {
   const CreateAnnouncementScreen({super.key});
 
   @override
-  State<CreateAnnouncementScreen> createState() =>
+  ConsumerState<CreateAnnouncementScreen> createState() =>
       _CreateAnnouncementScreenState();
 }
 
-class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
-  final _titleController   = TextEditingController();
+class _CreateAnnouncementScreenState
+    extends ConsumerState<CreateAnnouncementScreen> {
+  final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   bool _allStudents = true;
   bool _sendEmail = true;
   bool _pushNotif = true;
   bool _posted = false;
+  bool _posting = false;
+  String? _postedTitle;
 
   @override
   void dispose() {
@@ -32,7 +38,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       _titleController.text.trim().isNotEmpty &&
       _contentController.text.trim().isNotEmpty;
 
-  void _post() {
+  Future<void> _post() async {
     if (!_isValid) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Please fill in the title and content.',
@@ -43,7 +49,35 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       ));
       return;
     }
-    setState(() => _posted = true);
+    setState(() => _posting = true);
+    try {
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+      await ref.read(teacherServiceProvider).createAnnouncement(
+            teacherId: user.id,
+            title: _titleController.text.trim(),
+            body: _contentController.text.trim(),
+          );
+      if (mounted) {
+        setState(() {
+          _postedTitle = _titleController.text.trim();
+          _posted = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to post announcement.',
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
   }
 
   void _saveDraft() {
@@ -101,7 +135,8 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       ),
       title: Row(
         children: [
-          Image.asset('assets/images/beltei_logo.png', height: 48, fit: BoxFit.contain),
+          Image.asset('assets/images/beltei_logo.png',
+              height: 48, fit: BoxFit.contain),
           const SizedBox(width: 10),
           Text('BELTEI Portal', style: AppTextStyles.h3),
         ],
@@ -119,8 +154,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Create Announcement',
-            style: AppTextStyles.h1),
+        Text('Create Announcement', style: AppTextStyles.h1),
         Text('Broadcast information to students and faculty members.',
             style: AppTextStyles.caption.copyWith(height: 1.4)),
       ],
@@ -176,7 +210,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
             children: [
               TextButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.attach_file,
+                icon: Icon(Icons.attach_file,
                     size: 16, color: AppColors.primaryNavy),
                 label: Text('Attach Files',
                     style: AppTextStyles.link.copyWith(fontSize: 13)),
@@ -184,7 +218,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
               const SizedBox(width: 16),
               TextButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.schedule_outlined,
+                icon: Icon(Icons.schedule_outlined,
                     size: 16, color: AppColors.primaryNavy),
                 label: Text('Schedule',
                     style: AppTextStyles.link.copyWith(fontSize: 13)),
@@ -197,7 +231,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
   }
 
   Widget _buildFormattingToolbar() {
-    final icons = [
+    const icons = [
       Icons.format_bold,
       Icons.format_italic,
       Icons.format_underlined,
@@ -244,24 +278,17 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Publication Settings',
-              style: AppTextStyles.h2
-                  .copyWith(color: AppColors.primaryNavy)),
+              style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 14),
           Text('RECIPIENT SCOPE', style: AppTextStyles.label),
           const SizedBox(height: 10),
           _buildScopeButtons(),
           const SizedBox(height: 14),
-          _buildToggleRow(
-            'Send Email Notification',
-            _sendEmail,
-            (val) => setState(() => _sendEmail = val),
-          ),
+          _buildToggleRow('Send Email Notification', _sendEmail,
+              (val) => setState(() => _sendEmail = val)),
           const SizedBox(height: 10),
-          _buildToggleRow(
-            'Push Notification (App)',
-            _pushNotif,
-            (val) => setState(() => _pushNotif = val),
-          ),
+          _buildToggleRow('Push Notification (App)', _pushNotif,
+              (val) => setState(() => _pushNotif = val)),
         ],
       ),
     );
@@ -314,7 +341,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       ),
       child: Column(
         children: [
-          const Icon(Icons.visibility_outlined,
+          Icon(Icons.visibility_outlined,
               color: AppColors.textSecondary, size: 28),
           const SizedBox(height: 8),
           Text('Live Preview', style: AppTextStyles.h2),
@@ -330,8 +357,8 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
             child: OutlinedButton(
               onPressed: () {},
               child: Text('Preview as Student',
-                  style: AppTextStyles.button.copyWith(
-                      color: AppColors.primaryNavy)),
+                  style: AppTextStyles.button
+                      .copyWith(color: AppColors.primaryNavy)),
             ),
           ),
         ],
@@ -349,8 +376,15 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _post,
-          icon: const Icon(Icons.send_outlined, size: 18),
+          onPressed: _posting ? null : _post,
+          icon: _posting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.send_outlined, size: 18),
           label: Text('Post Announcement', style: AppTextStyles.button),
         ),
       ),
@@ -363,8 +397,8 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       child: TextButton(
         onPressed: _saveDraft,
         child: Text('Save as Draft',
-            style: AppTextStyles.body
-                .copyWith(color: AppColors.textSecondary)),
+            style:
+                AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
       ),
     );
   }
@@ -383,11 +417,11 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreenBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_outline,
+                child: Icon(Icons.check_circle_outline,
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
@@ -395,7 +429,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                   style: AppTextStyles.h1, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                '"${_titleController.text}" has been broadcast to ${_allStudents ? 'all students' : 'your course'}.',
+                '"${_postedTitle ?? ''}" has been posted successfully.',
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,

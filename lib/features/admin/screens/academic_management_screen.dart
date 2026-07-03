@@ -4,8 +4,10 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import 'course_management_screen.dart';
 import 'faculty_department_screen.dart';
+import 'academic_year_management_screen.dart';
 import 'semester_management_screen.dart';
 import 'enrollment_management_screen.dart';
+import 'class_management_screen.dart';
 import 'attendance_management_screen.dart';
 import 'global_leave_requests_screen.dart';
 
@@ -21,18 +23,22 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
   int _selectedIndex = 0;
 
   static const _tabs = [
-    (label: 'Courses',    icon: Icons.menu_book_outlined),
     (label: 'Faculty',    icon: Icons.account_balance_outlined),
+    (label: 'Academic Years', icon: Icons.calendar_today_outlined),
     (label: 'Semesters',  icon: Icons.date_range_outlined),
+    (label: 'Courses',    icon: Icons.menu_book_outlined),
+    (label: 'Classes',    icon: Icons.class_outlined),
     (label: 'Enrollment', icon: Icons.how_to_reg_outlined),
     (label: 'Attendance', icon: Icons.fact_check_outlined),
     (label: 'Leave',      icon: Icons.event_busy_outlined),
   ];
 
   static const _bodies = [
-    CourseManagementScreen(),
     FacultyDepartmentScreen(),
+    AcademicYearManagementScreen(),
     SemesterManagementScreen(),
+    CourseManagementScreen(),
+    ClassManagementScreen(),
     EnrollmentManagementScreen(),
     AttendanceManagementScreen(),
     GlobalLeaveRequestsScreen(),
@@ -107,7 +113,7 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
               },
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
         ],
       ),
     );

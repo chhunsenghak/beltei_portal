@@ -28,12 +28,12 @@ class BelteiAppBar extends StatelessWidget implements PreferredSizeWidget {
         [
           if (showSearch)
             IconButton(
-              icon: const Icon(Icons.search, color: AppColors.textPrimary),
+              icon: Icon(Icons.search, color: AppColors.textPrimary),
               onPressed: () {},
             ),
           if (showNotification)
             IconButton(
-              icon: const Icon(Icons.notifications_outlined,
+              icon: Icon(Icons.notifications_outlined,
                   color: AppColors.textPrimary),
               onPressed: () {},
             ),
@@ -52,7 +52,7 @@ class BelteiAppBar extends StatelessWidget implements PreferredSizeWidget {
               height: 48, fit: BoxFit.contain),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('BELTEI Campus',
+            child: Text('BELTEI Portal',
                 style: AppTextStyles.h3
                     .copyWith(color: AppColors.primaryNavy),
                 overflow: TextOverflow.ellipsis),

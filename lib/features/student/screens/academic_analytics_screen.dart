@@ -1,60 +1,126 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kCGPA = '3.84';
-const _kCGPADelta = '+0.12 vs last sem';
-
-final _kGpaTrend = [
-  FlSpot(1, 3.2),
-  FlSpot(2, 3.1),
-  FlSpot(3, 3.4),
-  FlSpot(4, 3.3),
-  FlSpot(5, 3.6),
-  FlSpot(6, 3.84),
-];
-
-final _kBarData = [0.6, 0.55, 0.65, 0.7, 0.75, 0.82];
-const _kBarLabels = ['FALL\n21', 'SPR\n22', 'FALL\n22', 'SPR\n23', 'FALL\n23', 'SPR\n24'];
-
-final _kCourses = [
-  (icon: Icons.device_hub_outlined, name: 'Data Structures & Algos', code: 'CS301'),
-  (icon: Icons.calculate_outlined, name: 'Discrete Mathematics', code: 'MATH202'),
-  (icon: Icons.storage_outlined, name: 'Database Systems', code: 'CS305'),
-];
+import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class AcademicAnalyticsScreen extends StatelessWidget {
+class AcademicAnalyticsScreen extends ConsumerWidget {
   const AcademicAnalyticsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncGrades = ref.watch(studentGradesProvider);
+    final asyncProfile = ref.watch(studentProfileProvider);
+    final asyncCourses = ref.watch(studentCoursesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(),
-            const SizedBox(height: AppSpacing.md),
-            _buildCGPACard(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildDegreeProgress(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildGPATrend(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildSemesterComparison(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildCoursePerformance(),
-            const SizedBox(height: 24),
-          ],
+      body: asyncGrades.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load grades', style: AppTextStyles.body),
+              TextButton(
+                onPressed: () => ref.invalidate(studentGradesProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
+        data: (semesters) {
+          final profile = asyncProfile.valueOrNull;
+          final courses = asyncCourses.valueOrNull ?? [];
+
+          // Sort semesters chronologically
+          final sorted = [...semesters]
+            ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
+          // CGPA & total earned credits across all semesters
+          double totalPoints = 0;
+          int totalWeightedCredits = 0;
+          int totalEarned = 0;
+          for (final s in sorted) {
+            for (final c in s.courses) {
+              if (c.credits <= 0) continue;
+              if (c.gpaPoints != null) {
+                totalPoints += c.gpaPoints! * c.credits;
+                totalWeightedCredits += c.credits;
+              }
+              if (c.letterGrade != null && c.letterGrade != 'F') {
+                totalEarned += c.credits;
+              }
+            }
+          }
+          final cgpa = totalWeightedCredits > 0
+              ? totalPoints / totalWeightedCredits
+              : 0.0;
+
+          // GPA delta vs previous semester
+          final validSems =
+              sorted.where((s) => s.semesterGpa > 0).toList();
+          final currentGpa =
+              validSems.isNotEmpty ? validSems.last.semesterGpa : 0.0;
+          final prevGpa = validSems.length > 1
+              ? validSems[validSems.length - 2].semesterGpa
+              : currentGpa;
+          final delta = currentGpa - prevGpa;
+
+          // GPA trend spots (indexed 1-based)
+          final trendSpots = validSems
+              .asMap()
+              .entries
+              .map((e) =>
+                  FlSpot(e.key.toDouble() + 1, e.value.semesterGpa))
+              .toList();
+
+          // Degree progress
+          const totalRequired = 120;
+          final progressPct =
+              (totalEarned / totalRequired).clamp(0.0, 1.0);
+          final degreeName =
+              profile?.majorName ?? 'Degree Program';
+
+          // Current semester courses for performance table
+          final currentCourses =
+              courses.where((c) => c.isCurrentSemester).toList();
+
+          return SingleChildScrollView(
+            padding:
+                const EdgeInsets.all(AppSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTitle(),
+                const SizedBox(height: AppSpacing.md),
+                _buildCGPACard(cgpa, delta, trendSpots),
+                const SizedBox(height: AppSpacing.sectionGap),
+                _buildDegreeProgress(
+                    progressPct, totalEarned, totalRequired, degreeName),
+                if (trendSpots.length >= 2) ...[
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  _buildGPATrend(trendSpots, validSems),
+                ],
+                if (sorted.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sectionGap),
+                  _buildSemesterComparison(sorted),
+                ],
+                const SizedBox(height: AppSpacing.sectionGap),
+                _buildCoursePerformance(currentCourses),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -66,7 +132,7 @@ class AcademicAnalyticsScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Academic Performance', style: AppTextStyles.h1),
-        Text('Insights and progress tracking for Academic Year 2023-24',
+        Text('Insights and progress tracking',
             style: AppTextStyles.caption),
       ],
     );
@@ -74,7 +140,10 @@ class AcademicAnalyticsScreen extends StatelessWidget {
 
   // ── CGPA card ──────────────────────────────────────────────────────────────
 
-  Widget _buildCGPACard() {
+  Widget _buildCGPACard(
+      double cgpa, double delta, List<FlSpot> trendSpots) {
+    final hasData = trendSpots.isNotEmpty;
+    final positive = delta >= 0;
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,47 +152,70 @@ class AcademicAnalyticsScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Text(_kCGPA,
-                  style: AppTextStyles.metric.copyWith(
-                      color: AppColors.primaryNavy, fontSize: 36)),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.statusGreenBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.trending_up, color: AppColors.statusGreen, size: 14),
-                    const SizedBox(width: 4),
-                    Text(_kCGPADelta,
-                        style: AppTextStyles.caption.copyWith(
-                            color: AppColors.statusGreen, fontWeight: FontWeight.w600)),
-                  ],
-                ),
+              Text(
+                cgpa > 0 ? cgpa.toStringAsFixed(2) : 'N/A',
+                style: AppTextStyles.metric.copyWith(
+                    color: AppColors.primaryNavy, fontSize: 36),
               ),
+              if (cgpa > 0 && delta.abs() > 0.001) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: positive
+                        ? AppColors.statusGreenBg
+                        : AppColors.statusRedBg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        positive
+                            ? Icons.trending_up
+                            : Icons.trending_down,
+                        color: positive
+                            ? AppColors.statusGreen
+                            : AppColors.statusRed,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${positive ? '+' : ''}${delta.toStringAsFixed(2)} vs last sem',
+                        style: AppTextStyles.caption.copyWith(
+                          color: positive
+                              ? AppColors.statusGreen
+                              : AppColors.statusRed,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 80,
-            child: LineChart(_buildMiniChart()),
-          ),
+          if (hasData) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 80,
+              child: LineChart(_buildMiniChart(trendSpots)),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  LineChartData _buildMiniChart() {
+  LineChartData _buildMiniChart(List<FlSpot> spots) {
     return LineChartData(
       gridData: const FlGridData(show: false),
       titlesData: const FlTitlesData(show: false),
       borderData: FlBorderData(show: false),
       lineBarsData: [
         LineChartBarData(
-          spots: _kGpaTrend,
+          spots: spots,
           isCurved: true,
           color: AppColors.primaryNavy,
           barWidth: 2.5,
@@ -139,7 +231,20 @@ class AcademicAnalyticsScreen extends StatelessWidget {
 
   // ── Degree progress ────────────────────────────────────────────────────────
 
-  Widget _buildDegreeProgress() {
+  Widget _buildDegreeProgress(
+      double pct, int earned, int required, String degreeName) {
+    final remaining = (required - earned).clamp(0, required);
+    final statusLabel = pct >= 1.0
+        ? 'Completed'
+        : pct >= 0.5
+            ? 'On Track'
+            : 'In Progress';
+    final statusColor = pct >= 1.0
+        ? AppColors.statusGreen
+        : pct >= 0.5
+            ? AppColors.statusGreen
+            : AppColors.statusAmber;
+
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,29 +253,35 @@ class AcademicAnalyticsScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Degree Progress', style: AppTextStyles.h2),
-              Text('78%',
-                  style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
+              Text(
+                '${(pct * 100).round()}%',
+                style: AppTextStyles.h3
+                    .copyWith(color: AppColors.primaryNavy),
+              ),
             ],
           ),
-          Text('B.Sc. Computer Science & Engineering', style: AppTextStyles.caption),
+          Text(degreeName, style: AppTextStyles.caption),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: const LinearProgressIndicator(
-              value: 0.78,
+            child: LinearProgressIndicator(
+              value: pct,
               minHeight: 10,
               backgroundColor: AppColors.border,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.statusAmber),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.statusAmber),
             ),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildProgressStat('Earned', '94 / 120', AppColors.primaryBlue),
+              _buildProgressStat(
+                  'Earned', '$earned / $required', AppColors.primaryBlue),
               const SizedBox(width: 24),
-              _buildProgressStat('Required', '26 Credits', AppColors.textPrimary),
+              _buildProgressStat(
+                  'Required', '$remaining Credits', AppColors.textPrimary),
               const SizedBox(width: 24),
-              _buildProgressStat('Status', 'On Track', AppColors.statusGreen),
+              _buildProgressStat('Status', statusLabel, statusColor),
             ],
           ),
         ],
@@ -191,7 +302,10 @@ class AcademicAnalyticsScreen extends StatelessWidget {
 
   // ── GPA Trend chart ────────────────────────────────────────────────────────
 
-  Widget _buildGPATrend() {
+  Widget _buildGPATrend(
+      List<FlSpot> spots, List<SemesterGrades> semesters) {
+    final cgpaSpots =
+        spots.map((s) => FlSpot(s.x, (s.y - 0.1).clamp(0.0, 4.0))).toList();
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +322,7 @@ class AcademicAnalyticsScreen extends StatelessWidget {
           const SizedBox(height: 20),
           SizedBox(
             height: 160,
-            child: LineChart(_buildTrendChart()),
+            child: LineChart(_buildTrendChart(spots, cgpaSpots, semesters)),
           ),
         ],
       ),
@@ -219,57 +333,68 @@ class AcademicAnalyticsScreen extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+                color: color, shape: BoxShape.circle)),
         const SizedBox(width: 4),
         Text(label, style: AppTextStyles.caption),
       ],
     );
   }
 
-  LineChartData _buildTrendChart() {
-    final cgpa = _kGpaTrend.map((s) => FlSpot(s.x, s.y - 0.1)).toList();
+  LineChartData _buildTrendChart(List<FlSpot> termSpots,
+      List<FlSpot> cgpaSpots, List<SemesterGrades> semesters) {
+    final labels = semesters.map((s) => s.semesterName).toList();
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
         getDrawingHorizontalLine: (_) =>
-            const FlLine(color: AppColors.border, strokeWidth: 1),
+            FlLine(color: AppColors.border, strokeWidth: 1),
       ),
       titlesData: FlTitlesData(
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 36,
-            getTitlesWidget: (v, _) =>
-                Text(v.toStringAsFixed(1), style: AppTextStyles.caption.copyWith(fontSize: 10)),
+            getTitlesWidget: (v, _) => Text(v.toStringAsFixed(1),
+                style: AppTextStyles.caption.copyWith(fontSize: 10)),
           ),
         ),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
             getTitlesWidget: (v, _) {
-              final labels = ['Sem1', 'Sem2', 'Sem3', 'Sem4', 'Sem5', 'Sem6'];
               final i = v.toInt() - 1;
-              if (i < 0 || i >= labels.length) return const SizedBox.shrink();
-              return Text(labels[i],
-                  style: AppTextStyles.caption.copyWith(fontSize: 10));
+              if (i < 0 || i >= labels.length) {
+                return const SizedBox.shrink();
+              }
+              return Text(labels[i].length > 4
+                  ? labels[i].substring(0, 4)
+                  : labels[i],
+                  style:
+                      AppTextStyles.caption.copyWith(fontSize: 10));
             },
           ),
         ),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false)),
       ),
       borderData: FlBorderData(show: false),
       lineBarsData: [
         LineChartBarData(
-          spots: _kGpaTrend,
+          spots: termSpots,
           isCurved: true,
           color: AppColors.primaryNavy,
           barWidth: 2.5,
           dotData: const FlDotData(show: false),
         ),
         LineChartBarData(
-          spots: cgpa,
+          spots: cgpaSpots,
           isCurved: true,
           color: AppColors.primaryBlue,
           barWidth: 2,
@@ -282,53 +407,37 @@ class AcademicAnalyticsScreen extends StatelessWidget {
 
   // ── Semester comparison bar chart ──────────────────────────────────────────
 
-  Widget _buildSemesterComparison() {
+  Widget _buildSemesterComparison(List<SemesterGrades> semesters) {
+    final labels = semesters.map((s) {
+      final name = s.semesterName;
+      final year = s.academicYear.length >= 4
+          ? s.academicYear.substring(2, 4)
+          : s.academicYear;
+      return '${name.length > 4 ? name.substring(0, 4) : name}\n$year';
+    }).toList();
+    final gpas = semesters.map((s) => s.semesterGpa).toList();
+
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Semester Comparison', style: AppTextStyles.h2),
-                    Text('Average score distribution per semester',
-                        style: AppTextStyles.caption),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.statusGrayBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.filter_list, size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Text('All Years', style: AppTextStyles.caption),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          Text('Semester Comparison', style: AppTextStyles.h2),
+          Text('GPA per semester',
+              style: AppTextStyles.caption),
           const SizedBox(height: 20),
           SizedBox(
             height: 140,
-            child: BarChart(_buildBarChart()),
+            child: BarChart(_buildBarChart(gpas, labels)),
           ),
         ],
       ),
     );
   }
 
-  BarChartData _buildBarChart() {
+  BarChartData _buildBarChart(List<double> gpas, List<String> labels) {
     return BarChartData(
       alignment: BarChartAlignment.spaceAround,
+      maxY: 4.0,
       barTouchData: BarTouchData(enabled: false),
       titlesData: FlTitlesData(
         bottomTitles: AxisTitles(
@@ -336,79 +445,106 @@ class AcademicAnalyticsScreen extends StatelessWidget {
             showTitles: true,
             getTitlesWidget: (v, _) {
               final i = v.toInt();
-              if (i < 0 || i >= _kBarLabels.length) return const SizedBox.shrink();
+              if (i < 0 || i >= labels.length) {
+                return const SizedBox.shrink();
+              }
               return Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(_kBarLabels[i],
+                child: Text(labels[i],
                     textAlign: TextAlign.center,
                     style: AppTextStyles.caption.copyWith(fontSize: 9)),
               );
             },
           ),
         ),
-        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false)),
+        topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false)),
       ),
       gridData: const FlGridData(show: false),
       borderData: FlBorderData(show: false),
-      barGroups: List.generate(_kBarData.length, (i) => BarChartGroupData(
-            x: i,
-            barRods: [
-              BarChartRodData(
-                toY: _kBarData[i] * 4,
-                color: i == _kBarData.length - 1
-                    ? AppColors.primaryNavy
-                    : AppColors.primaryNavy.withValues(alpha: 0.3),
-                width: 28,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-              ),
-            ],
-          )),
+      barGroups: List.generate(
+          gpas.length,
+          (i) => BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: gpas[i],
+                    color: i == gpas.length - 1
+                        ? AppColors.primaryNavy
+                        : AppColors.primaryNavy.withValues(alpha: 0.3),
+                    width: 28,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(4)),
+                  ),
+                ],
+              )),
     );
   }
 
   // ── Course performance table ───────────────────────────────────────────────
 
-  Widget _buildCoursePerformance() {
+  Widget _buildCoursePerformance(List<EnrolledCourse> courses) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Detailed Course Performance', style: AppTextStyles.h2),
+          Text('Current Semester Courses', style: AppTextStyles.h2),
           const SizedBox(height: 4),
-          Row(
-            children: ['COURSE NAME', 'CODE']
-                .map((h) => Expanded(child: Text(h, style: AppTextStyles.label)))
-                .toList(),
-          ),
-          const Divider(color: AppColors.border, height: 20),
-          ..._kCourses.map((c) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.statusGrayBg,
-                        borderRadius: BorderRadius.circular(8),
+          if (courses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text('No courses enrolled this semester.',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textSecondary)),
+            )
+          else ...[
+            Row(
+              children: ['COURSE NAME', 'CODE']
+                  .map((h) => Expanded(
+                      child: Text(h, style: AppTextStyles.label)))
+                  .toList(),
+            ),
+            Divider(color: AppColors.border, height: 20),
+            ...courses.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.statusGrayBg,
+                          borderRadius:
+                              BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                            Icons.menu_book_outlined,
+                            size: 18,
+                            color: AppColors.primaryNavy),
                       ),
-                      child: Icon(c.icon, size: 18, color: AppColors.primaryNavy),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(c.name, style: AppTextStyles.bodyMedium)),
-                    Text(c.code,
-                        style: AppTextStyles.caption.copyWith(
-                            color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              )),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(c.name,
+                              style: AppTextStyles.bodyMedium)),
+                      Text(c.code,
+                          style: AppTextStyles.caption.copyWith(
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                )),
+          ],
         ],
       ),
     );
   }
 }
+
+// ── Shared card ────────────────────────────────────────────────────────────────
 
 class _Card extends StatelessWidget {
   const _Card({required this.child});

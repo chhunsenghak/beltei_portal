@@ -1,32 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
-class AdminShell extends StatefulWidget {
+class AdminShell extends ConsumerStatefulWidget {
   const AdminShell({super.key, required this.child});
   final Widget child;
 
   @override
-  State<AdminShell> createState() => _AdminShellState();
+  ConsumerState<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell> {
+class _AdminShellState extends ConsumerState<AdminShell> {
   static const _tabs = [
-    (label: 'Dashboard', icon: Icons.dashboard_outlined, route: '/admin'),
-    (label: 'Users', icon: Icons.people_outline, route: '/admin/users'),
-    (label: 'Academic', icon: Icons.school_outlined, route: '/admin/academic'),
-    (
-      label: 'Finance',
-      icon: Icons.account_balance_wallet_outlined,
-      route: '/admin/finance',
-    ),
-    (
-      label: 'Settings',
-      icon: Icons.settings_outlined,
-      route: '/admin/settings',
-    ),
+    (icon: Icons.dashboard_outlined, route: '/admin'),
+    (icon: Icons.people_outline, route: '/admin/users'),
+    (icon: Icons.school_outlined, route: '/admin/academic'),
+    (icon: Icons.account_balance_wallet_outlined, route: '/admin/finance'),
+    (icon: Icons.settings_outlined, route: '/admin/settings'),
   ];
+
+  List<String> _tabLabels(AppLocalizations l) =>
+      [l.navDashboard, l.navUsers, l.navAcademic, l.navFinance, l.navSettings];
 
   int _activeIndex(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
@@ -39,10 +37,12 @@ class _AdminShellState extends State<AdminShell> {
   @override
   Widget build(BuildContext context) {
     final active = _activeIndex(context);
+    final profileAsync = ref.watch(adminProfileProvider);
+    final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context, active),
+          _buildShellHeader(context, active, profileAsync, logoUrl),
           Expanded(child: widget.child),
         ],
       ),
@@ -51,16 +51,17 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   void _confirmLogout(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text(l.logoutTitle),
+        content: Text(l.logoutConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.statusRed),
@@ -68,16 +69,23 @@ class _AdminShellState extends State<AdminShell> {
               Navigator.pop(ctx);
               context.go('/login');
             },
-            child: const Text('Logout'),
+            child: Text(l.logoutTitle),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildShellHeader(BuildContext context, int active) {
+  Widget _buildShellHeader(BuildContext context, int active,
+      AsyncValue<dynamic> profileAsync, String? logoUrl) {
+    final l = AppLocalizations.of(context)!;
+    final profile = profileAsync.valueOrNull;
+    final displayName = profile?.fullName as String? ?? 'Administrator';
+    final displayEmail = profile?.email as String? ?? '';
+    final initials = profile?.initials as String? ?? 'A';
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -95,16 +103,18 @@ class _AdminShellState extends State<AdminShell> {
                   ClipRect(
                     child: Transform.translate(
                       offset: const Offset(-10, 0),
-                      child: Image.asset(
-                        'assets/images/beltei_logo.png',
-                        height: 40,
-                        fit: BoxFit.contain,
-                      ),
+                      child: logoUrl != null
+                          ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
+                          : Image.asset(
+                              'assets/images/beltei_logo.png',
+                              height: 40,
+                              fit: BoxFit.contain,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'BELTEI Admin',
+                    l.adminAppBarTitle,
                     style: AppTextStyles.h3.copyWith(
                       color: AppColors.primaryNavy,
                     ),
@@ -114,7 +124,7 @@ class _AdminShellState extends State<AdminShell> {
                     clipBehavior: Clip.none,
                     children: [
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.notifications_outlined,
                           color: AppColors.textSecondary,
                         ),
@@ -126,7 +136,7 @@ class _AdminShellState extends State<AdminShell> {
                         child: Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: AppColors.statusRed,
                             shape: BoxShape.circle,
                           ),
@@ -152,7 +162,7 @@ class _AdminShellState extends State<AdminShell> {
                       radius: 17,
                       backgroundColor: AppColors.primaryNavy,
                       child: Text(
-                        'A',
+                        initials,
                         style: AppTextStyles.caption.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -166,18 +176,19 @@ class _AdminShellState extends State<AdminShell> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Super Admin',
+                              displayName,
                               style: AppTextStyles.bodyMedium,
                             ),
-                            Text(
-                              'admin@beltei.edu.kh',
-                              style: AppTextStyles.caption,
-                            ),
+                            if (displayEmail.isNotEmpty)
+                              Text(
+                                displayEmail,
+                                style: AppTextStyles.caption,
+                              ),
                           ],
                         ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'logout',
                         child: Row(
                           children: [
@@ -186,9 +197,9 @@ class _AdminShellState extends State<AdminShell> {
                               size: 18,
                               color: AppColors.statusRed,
                             ),
-                            SizedBox(width: 10),
+                            const SizedBox(width: 10),
                             Text(
-                              'Logout',
+                              l.logoutTitle,
                               style: TextStyle(color: AppColors.statusRed),
                             ),
                           ],
@@ -210,9 +221,10 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   Widget _buildBottomNav(BuildContext context, int active) {
+    final labels = _tabLabels(AppLocalizations.of(context)!);
     return Container(
       height: 64,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -248,7 +260,7 @@ class _AdminShellState extends State<AdminShell> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _tabs[i].label,
+                    labels[i],
                     style: AppTextStyles.caption.copyWith(
                       fontSize: 10,
                       color: isActive

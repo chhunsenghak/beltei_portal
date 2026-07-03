@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../l10n/app_localizations.dart';
 import '../models/app_user.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -20,13 +21,12 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnim;
   late Animation<double> _progressAnim;
 
-  // ── mock status messages ──────────────────────────────────────────────────
-  final List<String> _statusMessages = [
-    'INITIALIZING ACADEMIC PORTAL...',
-    'LOADING STUDENT DATA...',
-    'READY',
-  ];
   int _messageIndex = 0;
+
+  List<String> _statusMessages(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return [l.splashInitializing, l.splashLoadingData, l.splashReady];
+  }
 
   @override
   void initState() {
@@ -145,7 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
     return FadeTransition(
       opacity: _fadeAnim,
       child: Text(
-        'BELTEI Campus',
+        AppLocalizations.of(context)!.appTitle,
         style: AppTextStyles.h1White.copyWith(fontSize: 22, letterSpacing: 0.5),
       ),
     );
@@ -155,7 +155,7 @@ class _SplashScreenState extends State<SplashScreen>
     return FadeTransition(
       opacity: _fadeAnim,
       child: Text(
-        'QUALITY · EFFICIENCY · EXCELLENCE · MORALITY · VIRTUE',
+        AppLocalizations.of(context)!.splashTagline,
         textAlign: TextAlign.center,
         style: AppTextStyles.caption.copyWith(
           color: AppColors.accentGold,
@@ -179,14 +179,14 @@ class _SplashScreenState extends State<SplashScreen>
               child: LinearProgressIndicator(
                 value: _progressAnim.value,
                 backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
                 minHeight: 3,
               ),
             ),
           ),
           const SizedBox(height: 10),
           Text(
-            _statusMessages[_messageIndex],
+            _statusMessages(context)[_messageIndex],
             style: AppTextStyles.caption.copyWith(
               color: Colors.white.withValues(alpha: 0.6),
               letterSpacing: 1.0,

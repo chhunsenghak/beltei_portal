@@ -1,63 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../core/services/admin_service.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-final _kMonthlyEnrollment = [
-  (month: 'Jan', count: 95),
-  (month: 'Feb', count: 110),
-  (month: 'Mar', count: 88),
-  (month: 'Apr', count: 130),
-  (month: 'May', count: 142),
-  (month: 'Jun', count: 120),
-  (month: 'Jul', count: 105),
-  (month: 'Aug', count: 160),
-  (month: 'Sep', count: 175),
-  (month: 'Oct', count: 155),
-  (month: 'Nov', count: 140),
-  (month: 'Dec', count: 120),
-];
-
-final _kFinanceSummary = [
-  (label: 'Total Revenue',      value: '\$1,250,400', icon: Icons.trending_up_outlined,      color: AppColors.statusGreen),
-  (label: 'Outstanding Fees',   value: '\$48,200',    icon: Icons.pending_actions_outlined,   color: AppColors.statusAmber),
-  (label: 'Refunds Issued',     value: '\$12,500',    icon: Icons.undo_outlined,              color: AppColors.statusRed),
-  (label: 'Scholarships Given', value: '\$35,000',    icon: Icons.card_giftcard_outlined,     color: AppColors.primaryBlue),
-];
-
-final _kTopCourses = [
-  (code: 'BA201', title: 'Financial Accounting', enrolled: 55, capacity: 60, pct: 0.92),
-  (code: 'CS101', title: 'Intro to Algorithms',  enrolled: 45, capacity: 50, pct: 0.90),
-  (code: 'BA305', title: 'Marketing Strategy',   enrolled: 40, capacity: 50, pct: 0.80),
-  (code: 'ENG202',title: 'Structural Engineering',enrolled:30, capacity: 40, pct: 0.75),
-  (code: 'CS205', title: 'Web Dev Frameworks',   enrolled: 32, capacity: 45, pct: 0.71),
-];
-
-final _kAttendanceStats = [
-  (dept: 'Computer Science', rate: 0.87, label: '87%'),
-  (dept: 'Business Admin',   rate: 0.81, label: '81%'),
-  (dept: 'Engineering',      rate: 0.79, label: '79%'),
-  (dept: 'Law & Politics',   rate: 0.74, label: '74%'),
-  (dept: 'Education',        rate: 0.91, label: '91%'),
-];
-
-final _kExportOptions = [
-  (icon: Icons.description_outlined,   label: 'Enrollment Report',  subtitle: 'PDF / Excel'),
-  (icon: Icons.account_balance_outlined,label: 'Finance Report',     subtitle: 'PDF / Excel'),
-  (icon: Icons.how_to_reg_outlined,     label: 'Attendance Report',  subtitle: 'PDF / Excel'),
-  (icon: Icons.grade_outlined,          label: 'Academic Report',    subtitle: 'PDF / Excel'),
+const _kExportOptions = [
+  (
+    icon: Icons.description_outlined,
+    label: 'Enrollment Report',
+    subtitle: 'PDF / Excel'
+  ),
+  (
+    icon: Icons.account_balance_outlined,
+    label: 'Finance Report',
+    subtitle: 'PDF / Excel'
+  ),
+  (
+    icon: Icons.how_to_reg_outlined,
+    label: 'Attendance Report',
+    subtitle: 'PDF / Excel'
+  ),
+  (
+    icon: Icons.grade_outlined,
+    label: 'Academic Report',
+    subtitle: 'PDF / Excel'
+  ),
 ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class AdminReportsScreen extends StatelessWidget {
+class AdminReportsScreen extends ConsumerWidget {
   const AdminReportsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(adminStatsProvider).valueOrNull;
+    final analytics = ref.watch(adminAnalyticsProvider).valueOrNull;
+    final courses = ref.watch(adminCoursesProvider).valueOrNull;
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
@@ -79,13 +62,13 @@ class AdminReportsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildFinanceCards(),
+            _buildFinanceCards(stats),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildEnrollmentChart(),
+            _buildEnrollmentChart(analytics),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildTopCourses(),
+            _buildTopCourses(courses),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildAttendanceRates(),
+            _buildAttendanceRates(analytics),
             const SizedBox(height: AppSpacing.sectionGap),
             _buildExportSection(),
             const SizedBox(height: 24),
@@ -97,7 +80,34 @@ class AdminReportsScreen extends StatelessWidget {
 
   // ── Finance cards ──────────────────────────────────────────────────────────
 
-  Widget _buildFinanceCards() {
+  Widget _buildFinanceCards(AdminStats? stats) {
+    final cards = [
+      (
+        label: 'Total Revenue',
+        value: stats?.fmtRevenue ?? '—',
+        icon: Icons.trending_up_outlined,
+        color: AppColors.statusGreen
+      ),
+      (
+        label: 'Collected',
+        value: stats?.fmtCollected ?? '—',
+        icon: Icons.check_circle_outline,
+        color: AppColors.primaryBlue
+      ),
+      (
+        label: 'Outstanding',
+        value: stats?.fmtOutstanding ?? '—',
+        icon: Icons.pending_actions_outlined,
+        color: AppColors.statusAmber
+      ),
+      (
+        label: 'At-Risk Students',
+        value: stats != null ? '${stats.pendingLeaveCount} leaves' : '—',
+        icon: Icons.warning_amber_outlined,
+        color: AppColors.statusRed
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -110,7 +120,7 @@ class AdminReportsScreen extends StatelessWidget {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
           childAspectRatio: 1.7,
-          children: _kFinanceSummary.map((f) {
+          children: cards.map((f) {
             return Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -131,8 +141,7 @@ class AdminReportsScreen extends StatelessWidget {
                           color: f.color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child:
-                            Icon(f.icon, color: f.color, size: 16),
+                        child: Icon(f.icon, color: f.color, size: 16),
                       ),
                       const Spacer(),
                       Icon(Icons.arrow_upward,
@@ -161,15 +170,17 @@ class AdminReportsScreen extends StatelessWidget {
     );
   }
 
-  // ── Enrollment chart (bar chart via sized boxes) ────────────────────────────
+  // ── Enrollment chart ───────────────────────────────────────────────────────
 
-  Widget _buildEnrollmentChart() {
+  Widget _buildEnrollmentChart(AdminAnalyticsData? analytics) {
+    final data = analytics?.monthlyEnrollments ?? [];
     final maxCount =
-        _kMonthlyEnrollment.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+        data.fold<int>(1, (m, e) => e.count > m ? e.count : m);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Monthly Enrollment — 2024', style: AppTextStyles.h2),
+        Text('Monthly Enrollment', style: AppTextStyles.h2),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
@@ -178,55 +189,70 @@ class AdminReportsScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 120,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: _kMonthlyEnrollment.map((e) {
-                    final barH = (e.count / maxCount) * 110;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Tooltip(
-                          message: '${e.count}',
-                          child: Container(
-                            height: barH,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryNavy
-                                  .withValues(alpha: 0.75),
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(3)),
+          child: data.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ))
+              : Column(
+                  children: [
+                    SizedBox(
+                      height: 120,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: data.map((e) {
+                          final barH =
+                              (e.count / maxCount * 110).clamp(2.0, 110.0);
+                          return Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: Tooltip(
+                                message: '${e.count}',
+                                child: Container(
+                                  height: barH,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryNavy
+                                        .withValues(alpha: 0.75),
+                                    borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(3)),
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: data.map((e) {
+                        return Expanded(
+                          child: Text(e.month,
+                              style: AppTextStyles.caption
+                                  .copyWith(fontSize: 9),
+                              textAlign: TextAlign.center),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: _kMonthlyEnrollment.map((e) {
-                  return Expanded(
-                    child: Text(e.month,
-                        style:
-                            AppTextStyles.caption.copyWith(fontSize: 9),
-                        textAlign: TextAlign.center),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
         ),
       ],
     );
   }
 
-  // ── Top courses ────────────────────────────────────────────────────────────
+  // ── Top enrolled courses ───────────────────────────────────────────────────
 
-  Widget _buildTopCourses() {
+  Widget _buildTopCourses(List<AdminCourse>? courses) {
+    final top = courses != null
+        ? ([...courses]
+          ..sort((a, b) => b.enrolledCount.compareTo(a.enrolledCount)))
+            .take(5)
+            .toList()
+        : <AdminCourse>[];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -239,68 +265,79 @@ class AdminReportsScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            children: _kTopCourses.asMap().entries.map((entry) {
-              final i = entry.key;
-              final c = entry.value;
-              return Padding(
-                padding: EdgeInsets.only(
-                    bottom: i < _kTopCourses.length - 1 ? 12 : 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: i == 0
-                                ? AppColors.accentGold.withValues(alpha: 0.15)
-                                : AppColors.bgInput,
-                            shape: BoxShape.circle,
+          child: top.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ))
+              : Column(
+                  children: top.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final c = entry.value;
+                    final pct = c.maxStudents > 0
+                        ? c.enrolledCount / c.maxStudents
+                        : 0.0;
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          bottom: i < top.length - 1 ? 12 : 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: i == 0
+                                      ? AppColors.accentGold
+                                          .withValues(alpha: 0.15)
+                                      : AppColors.bgInput,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text('${i + 1}',
+                                      style: AppTextStyles.label.copyWith(
+                                          color: i == 0
+                                              ? AppColors.accentGold
+                                              : AppColors.textSecondary,
+                                          letterSpacing: 0)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(c.name,
+                                    style: AppTextStyles.bodyMedium
+                                        .copyWith(fontSize: 13)),
+                              ),
+                              Text(
+                                  '${c.enrolledCount}/${c.maxStudents}',
+                                  style: AppTextStyles.caption
+                                      .copyWith(fontSize: 11)),
+                            ],
                           ),
-                          child: Center(
-                            child: Text('${i + 1}',
-                                style: AppTextStyles.label.copyWith(
-                                    color: i == 0
-                                        ? AppColors.accentGold
-                                        : AppColors.textSecondary,
-                                    letterSpacing: 0)),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: pct,
+                              minHeight: 5,
+                              backgroundColor: AppColors.border,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                pct >= 0.9
+                                    ? AppColors.statusGreen
+                                    : pct >= 0.75
+                                        ? AppColors.primaryBlue
+                                        : AppColors.statusAmber,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(c.title,
-                              style: AppTextStyles.bodyMedium
-                                  .copyWith(fontSize: 13)),
-                        ),
-                        Text('${c.enrolled}/${c.capacity}',
-                            style: AppTextStyles.caption
-                                .copyWith(fontSize: 11)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: c.pct,
-                        minHeight: 5,
-                        backgroundColor: AppColors.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          c.pct >= 0.9
-                              ? AppColors.statusGreen
-                              : c.pct >= 0.75
-                                  ? AppColors.primaryBlue
-                                  : AppColors.statusAmber,
-                        ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
         ),
       ],
     );
@@ -308,7 +345,9 @@ class AdminReportsScreen extends StatelessWidget {
 
   // ── Attendance rates ───────────────────────────────────────────────────────
 
-  Widget _buildAttendanceRates() {
+  Widget _buildAttendanceRates(AdminAnalyticsData? analytics) {
+    final depts = analytics?.facultyAttendance ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -321,50 +360,58 @@ class AdminReportsScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
-            children: _kAttendanceStats.map((a) {
-              final color = a.rate >= 0.85
-                  ? AppColors.statusGreen
-                  : a.rate >= 0.75
-                      ? AppColors.statusAmber
-                      : AppColors.statusRed;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 130,
-                      child: Text(a.dept,
-                          style: AppTextStyles.caption,
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: a.rate,
-                          minHeight: 8,
-                          backgroundColor: AppColors.border,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(color),
-                        ),
+          child: depts.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ))
+              : Column(
+                  children: depts.map((a) {
+                    final rate = a.attendancePct;
+                    final color = rate >= 0.85
+                        ? AppColors.statusGreen
+                        : rate >= 0.75
+                            ? AppColors.statusAmber
+                            : AppColors.statusRed;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 130,
+                            child: Text(a.name,
+                                style: AppTextStyles.caption,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: rate,
+                                minHeight: 8,
+                                backgroundColor: AppColors.border,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(color),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 34,
+                            child: Text(
+                                '${(rate * 100).toInt()}%',
+                                style: AppTextStyles.caption.copyWith(
+                                    color: color,
+                                    fontWeight: FontWeight.w600),
+                                textAlign: TextAlign.right),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 34,
-                      child: Text(a.label,
-                          style: AppTextStyles.caption.copyWith(
-                              color: color,
-                              fontWeight: FontWeight.w600),
-                          textAlign: TextAlign.right),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
         ),
       ],
     );
@@ -405,14 +452,12 @@ class AdminReportsScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(opt.label,
-                              style: AppTextStyles.bodyMedium),
-                          Text(opt.subtitle,
-                              style: AppTextStyles.caption),
+                          Text(opt.label, style: AppTextStyles.bodyMedium),
+                          Text(opt.subtitle, style: AppTextStyles.caption),
                         ],
                       ),
                     ),
-                    const Icon(Icons.download_outlined,
+                    Icon(Icons.download_outlined,
                         color: AppColors.primaryBlue, size: 20),
                   ],
                 ),

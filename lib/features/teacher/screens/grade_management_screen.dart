@@ -1,200 +1,255 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/teacher_providers.dart';
+import '../../../core/services/teacher_service.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+const _kTabs = ['Midterm', 'Assignment', 'Participation', 'Final Exam'];
 
-const _kCourses = [
-  'Business Communication - Sec A',
-  'Introduction to Computer Science (CS101)',
-  'Data Structures & Algorithms (CS301)',
-];
-
-class _GradeEntry {
-  _GradeEntry({required this.id, required this.name, required this.studentId,
-      required this.score, required this.graded});
-  final String id, name, studentId;
-  String score;
-  bool graded;
-}
-
-final _kEntries = [
-  _GradeEntry(id: 'g1', name: 'Alex Rivera',    studentId: 'ID: BEL-2023-0142', score: '85', graded: true),
-  _GradeEntry(id: 'g2', name: 'Sarah Mitchell', studentId: 'ID: BEL-2023-0891', score: '92', graded: true),
-  _GradeEntry(id: 'g3', name: 'Daniel Chen',    studentId: 'ID: BEL-2023-1102', score: '--', graded: false),
-  _GradeEntry(id: 'g4', name: 'Maya Thompson',  studentId: 'ID: BEL-2023-0456', score: '78', graded: true),
-  _GradeEntry(id: 'g5', name: 'James Walker',   studentId: 'ID: BEL-2023-0233', score: '90', graded: true),
-];
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-class GradeManagementScreen extends StatefulWidget {
+class GradeManagementScreen extends ConsumerStatefulWidget {
   const GradeManagementScreen({super.key, required this.courseId});
   final String courseId;
 
   @override
-  State<GradeManagementScreen> createState() => _GradeManagementScreenState();
+  ConsumerState<GradeManagementScreen> createState() =>
+      _GradeManagementScreenState();
 }
 
-class _GradeManagementScreenState extends State<GradeManagementScreen> {
-  String _selectedCourse = _kCourses[0];
-  int _selectedTab = 0; // 0=Assignment, 1=Quiz, 2=Lab, 3=Project
-  bool _published = false;
+class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
+  int _selectedTab = 0;
+  bool _saving = false;
 
-  final _tabs = ['Assignment', 'Quiz', 'Lab', 'Project'];
+  // studentId → tab index → TextEditingController
+  final Map<String, List<TextEditingController>> _controllers = {};
 
-  late final List<_GradeEntry> _entries = _kEntries
-      .map((e) => _GradeEntry(
-            id: e.id,
-            name: e.name,
-            studentId: e.studentId,
-            score: e.score,
-            graded: e.graded,
-          ))
-      .toList();
+  bool _initialized = false;
 
-  late final Map<String, TextEditingController> _controllers = {
-    for (final e in _entries)
-      e.id: TextEditingController(text: e.score == '--' ? '' : e.score),
-  };
+  void _initControllers(
+    List<CourseStudent> students,
+    List<CourseGradeData> grades,
+  ) {
+    if (_initialized) return;
+    _initialized = true;
+
+    final gradeMap = {for (final g in grades) g.studentId: g};
+
+    for (final student in students) {
+      final g = gradeMap[student.studentId];
+      _controllers[student.studentId] = [
+        TextEditingController(
+            text: _fmt(g?.midterm)),       // tab 0 = midterm
+        TextEditingController(
+            text: _fmt(g?.assignment)),    // tab 1 = assignment
+        TextEditingController(
+            text: _fmt(g?.participation)), // tab 2 = participation
+        TextEditingController(
+            text: _fmt(g?.finalExam)),     // tab 3 = final_exam
+      ];
+    }
+  }
+
+  String _fmt(double? v) => v == null ? '' : v.toStringAsFixed(0);
 
   @override
   void dispose() {
-    for (final c in _controllers.values) {
-      c.dispose();
+    for (final list in _controllers.values) {
+      for (final c in list) {
+        c.dispose();
+      }
     }
     super.dispose();
   }
 
-  void _publishGrades() {
-    setState(() => _published = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Grades published successfully.',
-            style: AppTextStyles.body.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.statusGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
+  Future<void> _saveGrades(String semesterId, List<CourseStudent> students) async {
+    setState(() => _saving = true);
+    try {
+      final gradesToSave = <CourseGradeData>[];
+      for (final student in students) {
+        final ctrls = _controllers[student.studentId];
+        if (ctrls == null) continue;
+
+        final midterm = double.tryParse(ctrls[0].text.trim());
+        final assignment = double.tryParse(ctrls[1].text.trim());
+        final participation = double.tryParse(ctrls[2].text.trim());
+        final finalExam = double.tryParse(ctrls[3].text.trim());
+
+        if (midterm == null &&
+            assignment == null &&
+            participation == null &&
+            finalExam == null) {
+          continue;
+        }
+
+        gradesToSave.add(CourseGradeData(
+          studentId: student.studentId,
+          midterm: midterm,
+          assignment: assignment,
+          participation: participation,
+          finalExam: finalExam,
+        ));
+      }
+
+      await ref.read(teacherServiceProvider).saveGrades(
+            courseId: widget.courseId,
+            semesterId: semesterId,
+            grades: gradesToSave,
+          );
+
+      ref.invalidate(courseGradesProvider(widget.courseId));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Grades saved successfully.',
+                style: AppTextStyles.body.copyWith(color: Colors.white)),
+            backgroundColor: AppColors.statusGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save grades: $e',
+                style: AppTextStyles.body.copyWith(color: Colors.white)),
+            backgroundColor: AppColors.statusRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final asyncCourse = ref.watch(courseInfoProvider(widget.courseId));
+    final asyncStudents = ref.watch(courseStudentsProvider(widget.courseId));
+    final asyncGrades = ref.watch(courseGradesProvider(widget.courseId));
+
+    final semesterId = asyncCourse.whenData((c) => c?.semesterId).value;
+    final courseName = asyncCourse.whenData((c) => c?.name).value;
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitle(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildCourseDropdown(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildTypeTabs(),
-                  const SizedBox(height: 12),
-                  _buildToolbar(),
-                  const SizedBox(height: 8),
-                  Text('${_entries.length} Students Enrolled',
-                      style: AppTextStyles.caption),
-                  const SizedBox(height: 12),
-                  ..._entries.map((e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _GradeCard(
-                          entry: e,
-                          controller: _controllers[e.id]!,
-                          onChanged: (val) => setState(() {
-                            e.score = val.isEmpty ? '--' : val;
-                            e.graded = val.isNotEmpty;
-                          }),
-                          published: _published,
-                        ),
-                      )),
-                  const SizedBox(height: 16),
-                ],
+            child: asyncStudents.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline,
+                        color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text('Could not load students',
+                        style: AppTextStyles.bodyMedium),
+                    TextButton(
+                      onPressed: () => ref
+                          .invalidate(courseStudentsProvider(widget.courseId)),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
+              data: (students) {
+                return asyncGrades.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.error_outline,
+                            color: AppColors.statusRed, size: 40),
+                        const SizedBox(height: 8),
+                        Text('Could not load grades',
+                            style: AppTextStyles.bodyMedium),
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                              courseGradesProvider(widget.courseId)),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  data: (grades) {
+                    _initControllers(students, grades);
+                    return SingleChildScrollView(
+                      padding:
+                          const EdgeInsets.all(AppSpacing.screenPadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitle(courseName),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildTypeTabs(),
+                          const SizedBox(height: 12),
+                          Text(
+                              '${students.length} Student${students.length == 1 ? '' : 's'} Enrolled',
+                              style: AppTextStyles.caption),
+                          const SizedBox(height: 12),
+                          if (students.isEmpty)
+                            _buildEmpty()
+                          else
+                            ...students.map((s) {
+                              final ctrls = _controllers[s.studentId]!;
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 10),
+                                child: _GradeCard(
+                                  student: s,
+                                  controller: ctrls[_selectedTab],
+                                  tabLabel: _kTabs[_selectedTab],
+                                ),
+                              );
+                            }),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
-          _buildPublishButton(),
+          _buildSaveButton(semesterId,
+              asyncStudents.whenData((s) => s).value ?? []),
         ],
       ),
     );
   }
 
-  // ── Title ──────────────────────────────────────────────────────────────────
-
-  Widget _buildTitle() {
+  Widget _buildTitle(String? courseName) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Grade Management', style: AppTextStyles.h1),
-        Text('Manage and publish student performance metrics.',
-            style: AppTextStyles.caption),
+        Text(
+          courseName ?? 'Loading course...',
+          style: AppTextStyles.caption,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     );
   }
-
-  // ── Course dropdown ────────────────────────────────────────────────────────
-
-  Widget _buildCourseDropdown() {
-    return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        backgroundColor: AppColors.bgCard,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (_) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            ..._kCourses.map((c) => ListTile(
-                  title: Text(c, style: AppTextStyles.body),
-                  trailing: c == _selectedCourse
-                      ? const Icon(Icons.check, color: AppColors.primaryNavy)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedCourse = c);
-                    Navigator.pop(context);
-                  },
-                )),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(_selectedCourse,
-                  style: AppTextStyles.body,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            const Icon(Icons.keyboard_arrow_down,
-                color: AppColors.textLabel),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Type tabs ──────────────────────────────────────────────────────────────
 
   Widget _buildTypeTabs() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(_tabs.length, (i) {
+        children: List.generate(_kTabs.length, (i) {
           final isActive = i == _selectedTab;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -202,8 +257,8 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
               onTap: () => setState(() => _selectedTab = i),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 18, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: isActive ? AppColors.primaryNavy : AppColors.bgCard,
                   borderRadius:
@@ -214,13 +269,17 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
                         : AppColors.border,
                   ),
                 ),
-                child: Text(_tabs[i],
-                    style: AppTextStyles.caption.copyWith(
-                      color: isActive ? Colors.white : AppColors.textSecondary,
-                      fontWeight: isActive
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                    )),
+                child: Text(
+                  _kTabs[i],
+                  style: AppTextStyles.caption.copyWith(
+                    color: isActive
+                        ? Colors.white
+                        : AppColors.textSecondary,
+                    fontWeight: isActive
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
               ),
             ),
           );
@@ -229,37 +288,19 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
     );
   }
 
-  // ── Toolbar ────────────────────────────────────────────────────────────────
-
-  Widget _buildToolbar() {
-    return Row(
-      children: [
-        OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.upload_file_outlined, size: 15),
-          label: const Text('Import CSV'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: AppTextStyles.caption,
-          ),
-        ),
-        const SizedBox(width: 10),
-        OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.download_outlined, size: 15),
-          label: const Text('Export'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: AppTextStyles.caption,
-          ),
-        ),
-      ],
+  Widget _buildEmpty() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      alignment: Alignment.center,
+      child: Text('No students enrolled in this course.',
+          style: AppTextStyles.body
+              .copyWith(color: AppColors.textSecondary)),
     );
   }
 
-  // ── Publish button ─────────────────────────────────────────────────────────
-
-  Widget _buildPublishButton() {
+  Widget _buildSaveButton(
+      String? semesterId, List<CourseStudent> students) {
+    final canSave = semesterId != null && !_saving;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       color: AppColors.bgCard,
@@ -267,14 +308,20 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _publishGrades,
-          icon: const Icon(Icons.publish_outlined, size: 18),
+          onPressed: canSave
+              ? () => _saveGrades(semesterId, students)
+              : null,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.save_outlined, size: 18),
           label: Text(
-            _published ? 'Published' : 'Publish Grades',
+            _saving ? 'Saving…' : 'Save Grades',
             style: AppTextStyles.button,
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _published ? AppColors.statusGreen : null,
           ),
         ),
       ),
@@ -286,16 +333,14 @@ class _GradeManagementScreenState extends State<GradeManagementScreen> {
 
 class _GradeCard extends StatelessWidget {
   const _GradeCard({
-    required this.entry,
+    required this.student,
     required this.controller,
-    required this.onChanged,
-    required this.published,
+    required this.tabLabel,
   });
 
-  final _GradeEntry entry;
+  final CourseStudent student;
   final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final bool published;
+  final String tabLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -310,18 +355,21 @@ class _GradeCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-            child: Text(entry.name[0],
-                style: AppTextStyles.h3
-                    .copyWith(color: AppColors.primaryNavy)),
+            backgroundColor:
+                AppColors.primaryNavy.withValues(alpha: 0.1),
+            child: Text(
+              student.fullName.isNotEmpty ? student.fullName[0] : '?',
+              style: AppTextStyles.h3
+                  .copyWith(color: AppColors.primaryNavy),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.name, style: AppTextStyles.bodyMedium),
-                Text(entry.studentId, style: AppTextStyles.caption),
+                Text(student.fullName, style: AppTextStyles.bodyMedium),
+                Text(student.studentCode, style: AppTextStyles.caption),
               ],
             ),
           ),
@@ -331,18 +379,22 @@ class _GradeCard extends StatelessWidget {
             child: TextField(
               controller: controller,
               textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              onChanged: onChanged,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               style: AppTextStyles.metric.copyWith(
-                  fontSize: 18,
-                  color: entry.graded ? AppColors.textPrimary : AppColors.textLabel),
+                fontSize: 18,
+                color: controller.text.isEmpty
+                    ? AppColors.textLabel
+                    : AppColors.textPrimary,
+              ),
               decoration: InputDecoration(
                 hintText: '--',
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 8, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide:
+                      BorderSide(color: AppColors.border),
                 ),
               ),
             ),
@@ -352,45 +404,60 @@ class _GradeCard extends StatelessWidget {
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textSecondary)),
           const SizedBox(width: 10),
-          _GradeBadge(
-              graded: entry.graded, published: published),
+          _ScoreLabel(tabLabel: tabLabel, controller: controller),
         ],
       ),
     );
   }
 }
 
-class _GradeBadge extends StatelessWidget {
-  const _GradeBadge({required this.graded, required this.published});
-  final bool graded, published;
+class _ScoreLabel extends StatefulWidget {
+  const _ScoreLabel(
+      {required this.tabLabel, required this.controller});
+  final String tabLabel;
+  final TextEditingController controller;
+
+  @override
+  State<_ScoreLabel> createState() => _ScoreLabelState();
+}
+
+class _ScoreLabelState extends State<_ScoreLabel> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  void _onChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
-    final label = !graded
-        ? 'Pending'
-        : published
-            ? 'Published'
-            : 'Graded';
-    final color = !graded
-        ? AppColors.statusRed
-        : published
-            ? AppColors.statusGreen
-            : AppColors.primaryBlue;
-    final bg = !graded
-        ? AppColors.statusRedBg
-        : published
-            ? AppColors.statusGreenBg
-            : AppColors.statusBlueBg;
-
+    final hasScore = widget.controller.text.trim().isNotEmpty;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+        color: hasScore
+            ? AppColors.statusBlueBg
+            : AppColors.statusAmberBg,
+        borderRadius:
+            BorderRadius.circular(AppSpacing.chipRadius),
       ),
-      child: Text(label,
-          style: AppTextStyles.caption
-              .copyWith(color: color, fontWeight: FontWeight.w600)),
+      child: Text(
+        hasScore ? widget.tabLabel : 'Pending',
+        style: AppTextStyles.caption.copyWith(
+          color: hasScore
+              ? AppColors.primaryBlue
+              : AppColors.statusAmber,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

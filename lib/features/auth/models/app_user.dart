@@ -21,7 +21,7 @@ class AppUser {
     return AppUser(
       id: map['id'] as String,
       email: map['email'] as String? ?? '',
-      fullName: map['full_name'] as String? ?? '',
+      fullName: '${map['first_name'] ?? ''} ${map['last_name'] ?? ''}'.trim(),
       role: UserRole.values.byName(map['role'] as String? ?? 'student'),
       avatarUrl: map['avatar_url'] as String?,
       phone: map['phone'] as String?,

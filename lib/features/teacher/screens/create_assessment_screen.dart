@@ -46,7 +46,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
             colorScheme:
-                const ColorScheme.light(primary: AppColors.primaryNavy)),
+                ColorScheme.light(primary: AppColors.primaryNavy)),
         child: child!,
       ),
     );
@@ -119,10 +119,10 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
     return Row(
       children: [
         Text('Courses', style: AppTextStyles.caption),
-        const Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
+        Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
         Text('Advanced Mathematics',
             style: AppTextStyles.caption),
-        const Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
+        Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
         Text('New Assessment',
             style: AppTextStyles.caption
                 .copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
@@ -192,7 +192,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
                       ),
                     ),
                   ),
-                  const Icon(Icons.calendar_today_outlined,
+                  Icon(Icons.calendar_today_outlined,
                       size: 18, color: AppColors.textLabel),
                 ],
               ),
@@ -252,7 +252,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             ..._types.map((t) => ListTile(
                   title: Text(t, style: AppTextStyles.body),
                   trailing: t == _selectedType
-                      ? const Icon(Icons.check, color: AppColors.primaryNavy)
+                      ? Icon(Icons.check, color: AppColors.primaryNavy)
                       : null,
                   onTap: () {
                     setState(() => _selectedType = t);
@@ -282,7 +282,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
                 ),
               ),
             ),
-            const Icon(Icons.keyboard_arrow_down, color: AppColors.textLabel),
+            Icon(Icons.keyboard_arrow_down, color: AppColors.textLabel),
           ],
         ),
       ),
@@ -301,7 +301,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
         ),
         child: Column(
           children: [
-            const Icon(Icons.cloud_upload_outlined,
+            Icon(Icons.cloud_upload_outlined,
                 color: AppColors.textLabel, size: 32),
             const SizedBox(height: 8),
             Text('Click or drag and drop to upload files',
@@ -331,7 +331,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline,
+          Icon(Icons.lightbulb_outline,
               color: AppColors.primaryBlue, size: 20),
           const SizedBox(width: 10),
           Expanded(
@@ -367,7 +367,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.visibility_outlined,
+          Icon(Icons.visibility_outlined,
               color: AppColors.textSecondary, size: 20),
           const SizedBox(width: 10),
           Expanded(
@@ -401,11 +401,11 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreenBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_outline,
+                child: Icon(Icons.check_circle_outline,
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),

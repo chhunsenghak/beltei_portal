@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/models/app_user.dart';
 
@@ -25,7 +26,8 @@ class AuthService {
       return (user: profile, error: null);
     } on AuthException catch (e) {
       return (user: null, error: e.message);
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('signIn error: $e\n$st');
       return (user: null, error: 'An unexpected error occurred');
     }
   }

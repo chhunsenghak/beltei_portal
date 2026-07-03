@@ -1,24 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
-class TeacherShell extends StatefulWidget {
+class TeacherShell extends ConsumerStatefulWidget {
   const TeacherShell({super.key, required this.child});
   final Widget child;
 
   @override
-  State<TeacherShell> createState() => _TeacherShellState();
+  ConsumerState<TeacherShell> createState() => _TeacherShellState();
 }
 
-class _TeacherShellState extends State<TeacherShell> {
+class _TeacherShellState extends ConsumerState<TeacherShell> {
   static const _tabs = [
-    (label: 'Home',     icon: Icons.home_outlined,     route: '/teacher'),
-    (label: 'Courses',  icon: Icons.menu_book_outlined, route: '/teacher/courses'),
-    (label: 'Students', icon: Icons.people_outline,     route: '/teacher/students'),
-    (label: 'Alerts',   icon: Icons.notifications_outlined, route: '/teacher/alerts'),
-    (label: 'Profile',  icon: Icons.person_outline,     route: '/teacher/profile'),
+    (icon: Icons.home_outlined, route: '/teacher'),
+    (icon: Icons.menu_book_outlined, route: '/teacher/courses'),
+    (icon: Icons.people_outline, route: '/teacher/students'),
+    (icon: Icons.notifications_outlined, route: '/teacher/alerts'),
+    (icon: Icons.person_outline, route: '/teacher/profile'),
   ];
+
+  List<String> _tabLabels(AppLocalizations l) =>
+      [l.navHome, l.navCourses, l.navStudents, l.navAlerts, l.navProfile];
 
   int _activeIndex(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
@@ -43,8 +49,10 @@ class _TeacherShellState extends State<TeacherShell> {
   }
 
   Widget _buildShellHeader(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgPage,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -62,23 +70,25 @@ class _TeacherShellState extends State<TeacherShell> {
                   ClipRect(
                     child: Transform.translate(
                       offset: const Offset(-10, 0),
-                      child: Image.asset(
-                        'assets/images/beltei_logo.png',
-                        height: 40,
-                        fit: BoxFit.contain,
-                      ),
+                      child: logoUrl != null
+                          ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
+                          : Image.asset(
+                              'assets/images/beltei_logo.png',
+                              height: 40,
+                              fit: BoxFit.contain,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'BELTEI Campus',
+                    l.appTitle,
                     style: AppTextStyles.h3.copyWith(
                       color: AppColors.primaryNavy,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.notifications_outlined,
                       color: AppColors.textSecondary,
                     ),
@@ -94,9 +104,10 @@ class _TeacherShellState extends State<TeacherShell> {
   }
 
   Widget _buildBottomNav(BuildContext context, int active) {
+    final labels = _tabLabels(AppLocalizations.of(context)!);
     return Container(
       height: 64,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -127,7 +138,7 @@ class _TeacherShellState extends State<TeacherShell> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _tabs[i].label,
+                    labels[i],
                     style: AppTextStyles.caption.copyWith(
                       fontSize: 10,
                       color: isActive ? AppColors.primaryNavy : AppColors.textLabel,

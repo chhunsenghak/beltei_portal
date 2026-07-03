@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/admin_providers.dart';
 import '../../../core/router/app_router.dart';
+import '../../../l10n/app_localizations.dart';
 
-class StudentShell extends StatelessWidget {
+class StudentShell extends ConsumerWidget {
   const StudentShell({super.key, required this.child});
 
   final Widget child;
@@ -17,9 +20,11 @@ class StudentShell extends StatelessWidget {
     return 0;
   }
 
-  Widget _buildShellHeader(BuildContext context) {
+  Widget _buildShellHeader(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
+    final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgPage,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -37,23 +42,25 @@ class StudentShell extends StatelessWidget {
                   ClipRect(
                     child: Transform.translate(
                       offset: const Offset(-10, 0),
-                      child: Image.asset(
-                        'assets/images/beltei_logo.png',
-                        height: 40,
-                        fit: BoxFit.contain,
-                      ),
+                      child: logoUrl != null
+                          ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
+                          : Image.asset(
+                              'assets/images/beltei_logo.png',
+                              height: 40,
+                              fit: BoxFit.contain,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'BELTEI Campus',
+                    l.appTitle,
                     style: AppTextStyles.h3.copyWith(
                       color: AppColors.primaryNavy,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.notifications_outlined,
                       color: AppColors.textSecondary,
                     ),
@@ -69,14 +76,14 @@ class StudentShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
 
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context),
+          _buildShellHeader(context, ref),
           Expanded(child: child),
         ],
       ),
@@ -91,11 +98,11 @@ class _BottomNav extends StatelessWidget {
   final int currentIndex;
 
   static const _items = [
-    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
-    _NavItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book, label: 'Courses'),
-    _NavItem(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today, label: 'Schedule'),
-    _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications, label: 'Alerts'),
-    _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home),
+    _NavItem(icon: Icons.menu_book_outlined, activeIcon: Icons.menu_book),
+    _NavItem(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today),
+    _NavItem(icon: Icons.notifications_outlined, activeIcon: Icons.notifications),
+    _NavItem(icon: Icons.person_outline, activeIcon: Icons.person),
   ];
 
   static const _routes = [
@@ -108,8 +115,10 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    final labels = [l.navHome, l.navCourses, l.navSchedule, l.navAlerts, l.navProfile];
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
@@ -143,7 +152,7 @@ class _BottomNav extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        item.label,
+                        labels[i],
                         style: AppTextStyles.caption.copyWith(
                           color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
                           fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
@@ -163,8 +172,7 @@ class _BottomNav extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem({required this.icon, required this.activeIcon, required this.label});
+  const _NavItem({required this.icon, required this.activeIcon});
   final IconData icon;
   final IconData activeIcon;
-  final String label;
 }

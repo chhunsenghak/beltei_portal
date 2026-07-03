@@ -1,108 +1,197 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/teacher_providers.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// Maps DB status values ↔ display abbreviations
+const _kStatusToLabel = {
+  'present':  'P',
+  'late':     'L',
+  'absent':   'A',
+  'excused':  'E',
+};
 
-class _EditStudent {
-  _EditStudent({required this.id, required this.name, required this.studentId,
-      required this.status, this.changed = false});
-  final String id, name, studentId;
-  String status; // 'P', 'L', 'A'
-  bool changed;
-}
-
-final _kEditStudents = [
-  _EditStudent(id: 'e1', name: 'Sok Cheat',   studentId: 'ID: BEL-001', status: 'P'),
-  _EditStudent(id: 'e2', name: 'Keo Phalla',  studentId: 'ID: BEL-002', status: 'A', changed: true),
-  _EditStudent(id: 'e3', name: 'Neth Ravy',   studentId: 'ID: BEL-003', status: 'P'),
-  _EditStudent(id: 'e4', name: 'Vann Sy',     studentId: 'ID: BEL-004', status: 'L'),
-  _EditStudent(id: 'e5', name: 'Chan Bopha',  studentId: 'ID: BEL-005', status: 'P'),
+final _kOpts = [
+  (value: 'P', color: AppColors.statusGreen),
+  (value: 'L', color: AppColors.statusAmber),
+  (value: 'A', color: AppColors.statusRed),
+  (value: 'E', color: AppColors.primaryBlue),
 ];
-
-const _kEditSession = (
-  course: 'G12-B Advanced English',
-  session: 4,
-  room: 'Room 402',
-  date: 'Today, 08:30 AM',
-);
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class EditAttendanceScreen extends StatefulWidget {
-  const EditAttendanceScreen({super.key, required this.courseId});
+class EditAttendanceScreen extends ConsumerStatefulWidget {
+  const EditAttendanceScreen({
+    super.key,
+    required this.courseId,
+    this.date,
+  });
   final String courseId;
 
+  /// ISO date string 'yyyy-MM-dd'; defaults to today when null
+  final String? date;
+
   @override
-  State<EditAttendanceScreen> createState() => _EditAttendanceScreenState();
+  ConsumerState<EditAttendanceScreen> createState() =>
+      _EditAttendanceScreenState();
 }
 
-class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
-  late final List<_EditStudent> _students =
-      _kEditStudents.map((s) => _EditStudent(
-            id: s.id,
-            name: s.name,
-            studentId: s.studentId,
-            status: s.status,
-            changed: s.changed,
-          )).toList();
+class _EditAttendanceScreenState
+    extends ConsumerState<EditAttendanceScreen> {
+  late final String _date;
 
-  // ── Computed ───────────────────────────────────────────────────────────────
+  /// studentId → current label ('P'/'L'/'A'/'E')
+  final Map<String, String> _statuses = {};
 
-  int get _present  => _students.where((s) => s.status == 'P').length;
-  int get _late     => _students.where((s) => s.status == 'L').length;
-  int get _absent   => _students.where((s) => s.status == 'A').length;
+  /// studentIds that were changed from their loaded value
+  final Set<String> _changed = {};
 
-  void _setStatus(int index, String newStatus) {
+  bool _saving = false;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _date = widget.date ??
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  void _initStatuses(List<dynamic> students, Map<String, String> existing) {
+    if (_initialized) return;
+    _initialized = true;
+    for (final s in students) {
+      final dbStatus = existing[s.studentId as String] ?? 'present';
+      _statuses[s.studentId as String] = _kStatusToLabel[dbStatus] ?? 'P';
+    }
+    _changed.clear();
+  }
+
+  void _setStatus(String studentId, String label) {
     setState(() {
-      _students[index].status = newStatus;
-      _students[index].changed = true;
+      _statuses[studentId] = label;
+      _changed.add(studentId);
     });
   }
 
-  void _update() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Attendance updated successfully.',
-            style: AppTextStyles.body.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.statusGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-    Navigator.of(context).pop();
+  Future<void> _save(List<dynamic> students) async {
+    setState(() => _saving = true);
+    try {
+      final user = await ref.read(currentUserProvider.future);
+      if (user == null) throw Exception('Not authenticated');
+
+      await ref.read(teacherServiceProvider).saveAttendance(
+            teacherId: user.id,
+            courseId: widget.courseId,
+            date: _date,
+            statuses: Map.fromEntries(students.map((s) =>
+                MapEntry(s.studentId as String, _statuses[s.studentId] ?? 'P'))),
+          );
+
+      ref.invalidate(attendanceSummaryProvider(widget.courseId));
+      ref.invalidate(attendanceForDateProvider(
+          (courseId: widget.courseId, date: _date)));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Attendance updated.',
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ));
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Save failed: $e',
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
+
+  int _count(String label) =>
+      _statuses.values.where((v) => v == label).length;
 
   @override
   Widget build(BuildContext context) {
+    final courseAsync = ref.watch(courseInfoProvider(widget.courseId));
+    final studentsAsync = ref.watch(courseStudentsProvider(widget.courseId));
+    final existingAsync = ref.watch(
+        attendanceForDateProvider((courseId: widget.courseId, date: _date)));
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
-      body: Column(
-        children: [
-          _buildSessionCard(),
-          _buildStatsRow(),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              itemCount: _students.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => _EditStudentCard(
-                student: _students[i],
-                onStatus: (val) => _setStatus(i, val),
+      appBar: _buildAppBar(),
+      body: studentsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load students', style: AppTextStyles.body),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(courseStudentsProvider(widget.courseId)),
+                child: const Text('Retry'),
               ),
-            ),
+            ],
           ),
-          _buildUpdateButton(),
-        ],
+        ),
+        data: (students) {
+          final existing = existingAsync.valueOrNull ?? {};
+          if (!_initialized && students.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => setState(() => _initStatuses(students, existing)));
+          }
+          return Column(
+            children: [
+              _buildSessionCard(courseAsync.valueOrNull),
+              _buildStatsRow(students.length),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                  itemCount: students.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final s = students[i];
+                    final label = _statuses[s.studentId] ?? 'P';
+                    return _EditStudentCard(
+                      name: s.fullName,
+                      code: s.studentCode,
+                      status: label,
+                      changed: _changed.contains(s.studentId),
+                      onStatus: (v) => _setStatus(s.studentId, v),
+                    );
+                  },
+                ),
+              ),
+              _buildUpdateButton(students),
+            ],
+          );
+        },
       ),
     );
   }
 
   // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -112,20 +201,22 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text('Edit Attendance', style: AppTextStyles.h3),
-      actions: [
-        IconButton(icon: const Icon(Icons.history), onPressed: () {}),
-        IconButton(
-            icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-      ],
     );
   }
 
   // ── Session card ───────────────────────────────────────────────────────────
 
-  Widget _buildSessionCard() {
+  Widget _buildSessionCard(dynamic course) {
+    final courseName = course?.name as String? ?? 'Loading…';
+    final room = course?.room as String? ?? '';
+    final parts = _date.split('-');
+    final dateLabel = parts.length == 3
+        ? '${parts[2]}/${parts[1]}/${parts[0]}'
+        : _date;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -135,25 +226,27 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_kEditSession.course,
+                Text(courseName,
                     style: AppTextStyles.h2
                         .copyWith(color: AppColors.primaryNavy)),
                 const SizedBox(height: 4),
-                Text('${_kEditSession.room} • ${_kEditSession.date}',
-                    style: AppTextStyles.caption),
+                Text(
+                  [if (room.isNotEmpty) room, dateLabel].join(' • '),
+                  style: AppTextStyles.caption,
+                ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.primaryNavy,
               borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
             ),
-            child: Text('SESSION\n${_kEditSession.session.toString().padLeft(2, '0')}',
-                style: AppTextStyles.label.copyWith(
-                    color: Colors.white, fontSize: 11),
-                textAlign: TextAlign.center),
+            child: Text(_date,
+                style: AppTextStyles.label
+                    .copyWith(color: Colors.white, fontSize: 10)),
           ),
         ],
       ),
@@ -162,21 +255,20 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
 
   // ── Stats row ──────────────────────────────────────────────────────────────
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(int total) {
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenPadding, vertical: 10),
       color: AppColors.bgCard,
       child: Row(
         children: [
-          _StatBadge('Total', '${_students.length}',
-              AppColors.textPrimary),
+          _StatBadge('Total', '$total', AppColors.textPrimary),
           const SizedBox(width: 20),
-          _StatBadge('Present', '$_present', AppColors.statusGreen),
+          _StatBadge('Present', '${_count('P')}', AppColors.statusGreen),
           const SizedBox(width: 20),
-          _StatBadge('Late', '$_late', AppColors.statusAmber),
+          _StatBadge('Late', '${_count('L')}', AppColors.statusAmber),
           const SizedBox(width: 20),
-          _StatBadge('Absent', '$_absent', AppColors.statusRed),
+          _StatBadge('Absent', '${_count('A')}', AppColors.statusRed),
         ],
       ),
     );
@@ -184,7 +276,7 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
 
   // ── Update button ──────────────────────────────────────────────────────────
 
-  Widget _buildUpdateButton() {
+  Widget _buildUpdateButton(List<dynamic> students) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       color: AppColors.bgCard,
@@ -192,8 +284,14 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _update,
-          icon: const Icon(Icons.save_outlined, size: 18),
+          onPressed: _saving ? null : () => _save(students),
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.save_outlined, size: 18),
           label: Text('Update Attendance', style: AppTextStyles.button),
         ),
       ),
@@ -204,15 +302,16 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
 // ── Edit student card ──────────────────────────────────────────────────────────
 
 class _EditStudentCard extends StatelessWidget {
-  const _EditStudentCard({required this.student, required this.onStatus});
-  final _EditStudent student;
+  const _EditStudentCard({
+    required this.name,
+    required this.code,
+    required this.status,
+    required this.changed,
+    required this.onStatus,
+  });
+  final String name, code, status;
+  final bool changed;
   final ValueChanged<String> onStatus;
-
-  static const _opts = [
-    (value: 'P', label: 'P', color: AppColors.statusGreen),
-    (value: 'L', label: 'L', color: AppColors.statusAmber),
-    (value: 'A', label: 'A', color: AppColors.statusRed),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -224,16 +323,18 @@ class _EditStudentCard extends StatelessWidget {
             color: AppColors.bgCard,
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
             border: Border.all(
-              color: student.changed ? AppColors.statusAmber : AppColors.border,
-              width: student.changed ? 1.5 : 1,
+              color: changed ? AppColors.statusAmber : AppColors.border,
+              width: changed ? 1.5 : 1,
             ),
           ),
           child: Row(
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-                child: Text(student.name[0],
+                backgroundColor:
+                    AppColors.primaryNavy.withValues(alpha: 0.1),
+                child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: AppTextStyles.h3
                         .copyWith(color: AppColors.primaryNavy)),
               ),
@@ -242,14 +343,14 @@ class _EditStudentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(student.name, style: AppTextStyles.bodyMedium),
-                    Text(student.studentId, style: AppTextStyles.caption),
+                    Text(name, style: AppTextStyles.bodyMedium),
+                    Text(code, style: AppTextStyles.caption),
                   ],
                 ),
               ),
               Row(
-                children: _opts.map((opt) {
-                  final selected = student.status == opt.value;
+                children: _kOpts.map((opt) {
+                  final selected = status == opt.value;
                   return Padding(
                     padding: const EdgeInsets.only(left: 6),
                     child: GestureDetector(
@@ -269,9 +370,11 @@ class _EditStudentCard extends StatelessWidget {
                           ),
                         ),
                         child: Center(
-                          child: Text(opt.label,
+                          child: Text(opt.value,
                               style: AppTextStyles.bodyMedium.copyWith(
-                                color: selected ? opt.color : AppColors.textLabel,
+                                color: selected
+                                    ? opt.color
+                                    : AppColors.textLabel,
                                 fontSize: 13,
                               )),
                         ),
@@ -283,19 +386,22 @@ class _EditStudentCard extends StatelessWidget {
             ],
           ),
         ),
-        if (student.changed)
+        if (changed)
           Positioned(
             top: 8,
             left: 8,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: AppColors.statusAmber,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text('CHANGED',
                   style: AppTextStyles.label.copyWith(
-                      color: Colors.white, fontSize: 8, letterSpacing: 0.5)),
+                      color: Colors.white,
+                      fontSize: 8,
+                      letterSpacing: 0.5)),
             ),
           ),
       ],
@@ -316,7 +422,8 @@ class _StatBadge extends StatelessWidget {
       children: [
         Text(label, style: AppTextStyles.label),
         Text(value,
-            style: AppTextStyles.metric.copyWith(color: color, fontSize: 20)),
+            style:
+                AppTextStyles.metric.copyWith(color: color, fontSize: 20)),
       ],
     );
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/screens/splash_screen.dart';
@@ -53,7 +53,10 @@ import '../../features/admin/screens/system_settings_screen.dart';
 class _AuthNotifier extends ChangeNotifier {
   _AuthNotifier() {
     Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      notifyListeners();
+      // Defer to next frame so navigation never interrupts an in-progress build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (hasListeners) notifyListeners();
+      });
     });
   }
 }

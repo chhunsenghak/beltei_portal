@@ -5,6 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../l10n/app_localizations.dart';
 import '../models/app_user.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your email and password.');
+      setState(() => _errorMessage = AppLocalizations.of(context)!.loginMissingFields);
       return;
     }
 
@@ -139,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildTitle() {
     return Text(
-      'Welcome to BELTEI\nCampus',
+      AppLocalizations.of(context)!.loginWelcome,
       textAlign: TextAlign.center,
       style: AppTextStyles.h1.copyWith(
         color: AppColors.primaryNavy,
@@ -149,17 +150,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildEmailField() {
+    final l = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Email', style: AppTextStyles.bodySemiBold),
+        Text(l.loginEmailLabel, style: AppTextStyles.bodySemiBold),
         const SizedBox(height: 6),
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           autocorrect: false,
-          decoration: const InputDecoration(
-            hintText: 'Enter your email',
+          decoration: InputDecoration(
+            hintText: l.loginEmailHint,
             prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppColors.textLabel),
           ),
         ),
@@ -168,17 +170,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildPasswordField() {
+    final l = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Password', style: AppTextStyles.bodySemiBold),
+        Text(l.loginPasswordLabel, style: AppTextStyles.bodySemiBold),
         const SizedBox(height: 6),
         TextField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           decoration: InputDecoration(
             hintText: '••••••••',
-            prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.textLabel),
+            prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppColors.textLabel),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -194,6 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildRememberRow() {
+    final l = AppLocalizations.of(context)!;
     return Row(
       children: [
         SizedBox(
@@ -204,15 +208,15 @@ class _LoginScreenState extends State<LoginScreen> {
             onChanged: (v) => setState(() => _rememberMe = v ?? false),
             activeColor: AppColors.primaryNavy,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            side: const BorderSide(color: AppColors.border, width: 1.5),
+            side: BorderSide(color: AppColors.border, width: 1.5),
           ),
         ),
         const SizedBox(width: 8),
-        Text('Remember Me', style: AppTextStyles.body),
+        Text(l.loginRememberMe, style: AppTextStyles.body),
         const Spacer(),
         GestureDetector(
           onTap: _onForgotPassword,
-          child: Text('Forgot Password?', style: AppTextStyles.link),
+          child: Text(l.loginForgotPassword, style: AppTextStyles.link),
         ),
       ],
     );
@@ -229,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, size: 16, color: AppColors.statusRed),
+          Icon(Icons.error_outline, size: 16, color: AppColors.statusRed),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -243,6 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginButton() {
+    final l = AppLocalizations.of(context)!;
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
@@ -260,12 +265,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.login, size: 20),
-                  SizedBox(width: 8),
-                  Text('Login'),
+                  const Icon(Icons.login, size: 20),
+                  const SizedBox(width: 8),
+                  Text(l.loginButton),
                 ],
               ),
       ),
@@ -273,11 +278,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildSupportRow() {
+    final l = AppLocalizations.of(context)!;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Need help? ', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-        Text('Contact Support', style: AppTextStyles.link),
+        Text(l.loginNeedHelp, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+        Text(l.loginContactSupport, style: AppTextStyles.link),
       ],
     );
   }

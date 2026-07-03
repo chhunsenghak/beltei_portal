@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/supabase/database.types.dart';
 
-class InvoiceDetailScreen extends StatelessWidget {
+class InvoiceDetailScreen extends ConsumerWidget {
   const InvoiceDetailScreen({super.key, required this.invoiceId});
   final String invoiceId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncFinance = ref.watch(studentFinanceProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
@@ -21,23 +27,91 @@ class InvoiceDetailScreen extends StatelessWidget {
         ),
         title: Text('Invoice Detail', style: AppTextStyles.h3),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          children: [
-            _buildInvoiceHeader(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildLineItems(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildTotal(),
-          ],
+      body: asyncFinance.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Failed to load invoice: $e',
+                style: AppTextStyles.body, textAlign: TextAlign.center),
+          ),
         ),
+        data: (finance) {
+          final invoice =
+              finance.invoices.where((i) => i.id == invoiceId).firstOrNull;
+          if (invoice == null) {
+            return const Center(child: Text('Invoice not found.'));
+          }
+          return _InvoiceBody(invoice: invoice);
+        },
+      ),
+    );
+  }
+}
+
+// ── Body ──────────────────────────────────────────────────────────────────────
+
+class _InvoiceBody extends StatelessWidget {
+  const _InvoiceBody({required this.invoice});
+  final InvoiceRow invoice;
+
+  String _fmtDate(String iso) {
+    try {
+      return DateFormat('MMM dd, yyyy').format(DateTime.parse(iso));
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  String _fmtDateTime(DateTime dt) =>
+      DateFormat('MMM dd, yyyy').format(dt);
+
+  String get _shortId {
+    final raw = invoice.id.replaceAll('-', '').toUpperCase();
+    return raw.length > 8 ? raw.substring(0, 8) : raw;
+  }
+
+  String get _statusLabel => switch (invoice.status) {
+        InvoiceStatus.paid    => 'PAID',
+        InvoiceStatus.overdue => 'OVERDUE',
+        InvoiceStatus.partial => 'PARTIAL',
+        InvoiceStatus.unpaid  => 'UNPAID',
+      };
+
+  Color get _statusColor => switch (invoice.status) {
+        InvoiceStatus.paid    => AppColors.statusGreen,
+        InvoiceStatus.overdue => AppColors.statusRed,
+        InvoiceStatus.partial => AppColors.statusAmber,
+        InvoiceStatus.unpaid  => AppColors.statusAmber,
+      };
+
+  Color get _statusBg => switch (invoice.status) {
+        InvoiceStatus.paid    => AppColors.statusGreenBg,
+        InvoiceStatus.overdue => AppColors.statusRedBg,
+        InvoiceStatus.partial => AppColors.statusAmberBg,
+        InvoiceStatus.unpaid  => AppColors.statusAmberBg,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      child: Column(
+        children: [
+          _buildHeader(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildDetails(),
+          const SizedBox(height: AppSpacing.sectionGap),
+          _buildTotal(),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 
-  Widget _buildInvoiceHeader() {
+  Widget _buildHeader() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.primaryNavy,
@@ -49,37 +123,37 @@ class InvoiceDetailScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('INVOICE', style: AppTextStyles.label.copyWith(color: Colors.white70)),
+              Text('INVOICE',
+                  style:
+                      AppTextStyles.label.copyWith(color: Colors.white70)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.statusGreenBg,
-                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                  color: _statusBg,
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.chipRadius),
                 ),
-                child: Text('PAID',
-                    style: AppTextStyles.label.copyWith(color: AppColors.statusGreen)),
+                child: Text(_statusLabel,
+                    style: AppTextStyles.label
+                        .copyWith(color: _statusColor)),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(invoiceId, style: AppTextStyles.h2White),
+          Text('#$_shortId', style: AppTextStyles.h2White),
           const SizedBox(height: 4),
-          Text('Fall Semester 2023', style: AppTextStyles.captionWhite),
-          Text('Issued: Sep 05, 2023', style: AppTextStyles.captionWhite),
+          Text(invoice.description, style: AppTextStyles.captionWhite),
+          Text('Due: ${_fmtDate(invoice.dueDate)}',
+              style: AppTextStyles.captionWhite),
         ],
       ),
     );
   }
 
-  Widget _buildLineItems() {
-    final items = [
-      (name: 'Tuition Fee', amount: '\$2,800.00'),
-      (name: 'Lab & Technology Fee', amount: '\$250.00'),
-      (name: 'Student Activity Fee', amount: '\$100.00'),
-      (name: 'Library Fee', amount: '\$50.00'),
-    ];
-
+  Widget _buildDetails() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
@@ -89,18 +163,28 @@ class InvoiceDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Breakdown', style: AppTextStyles.h3),
+          Text('Payment Details', style: AppTextStyles.h3),
           const SizedBox(height: 12),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(item.name, style: AppTextStyles.body),
-                    Text(item.amount, style: AppTextStyles.bodyMedium),
-                  ],
-                ),
-              )),
+          _row('Description', invoice.description),
+          Divider(color: AppColors.divider, height: 20),
+          _row('Due Date', _fmtDate(invoice.dueDate)),
+          if (invoice.paidAt != null) ...[
+            Divider(color: AppColors.divider, height: 20),
+            _row('Paid On', _fmtDateTime(invoice.paidAt!)),
+          ],
+          if (invoice.status == InvoiceStatus.overdue) ...[
+            Divider(color: AppColors.divider, height: 20),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_outlined,
+                    color: AppColors.statusRed, size: 16),
+                const SizedBox(width: 6),
+                Text('This invoice is past due.',
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.statusRed)),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -117,12 +201,31 @@ class InvoiceDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Total', style: AppTextStyles.h2),
-          Text('\$3,200.00',
-              style: AppTextStyles.metric.copyWith(
-                  color: AppColors.primaryNavy, fontSize: 24)),
+          Text('Total Amount', style: AppTextStyles.h2),
+          Text(
+            '\$${invoice.amount.toStringAsFixed(2)}',
+            style: AppTextStyles.metric
+                .copyWith(color: AppColors.primaryNavy, fontSize: 24),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style:
+                AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(value,
+              style: AppTextStyles.bodyMedium, textAlign: TextAlign.end),
+        ),
+      ],
     );
   }
 }

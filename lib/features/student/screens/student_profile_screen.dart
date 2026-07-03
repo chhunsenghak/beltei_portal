@@ -1,62 +1,131 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/student_service.dart';
+import '../../../core/supabase/database.types.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kProfile = (
-  name: 'Sovannara Chen',
-  id: 'ID: STU-2024-0892',
-  faculty: 'Faculty of Information Technology',
-  fullName: 'Sovannara Chen',
-  dob: 'May 14, 2002',
-  gender: 'Male',
-  nationality: 'Cambodian',
-  degree: 'B.S. in Computer Science',
-  semester: 'Year 4, Semester 1',
-  academicStatus: 'Enrolled',
-  gpa: '3.85 / 4.00',
-  email: 's.chen@campus.edu.kh',
-  phone: '+855 12 345 678',
-  address: 'No. 45, Street 123, Toul Tom Poung, Phnom Penh',
-  guardianName: 'Chanthou Chen',
-  relationship: 'Father',
-  guardianContact: '+855 11 999 888',
-);
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-class StudentProfileScreen extends StatelessWidget {
+class StudentProfileScreen extends ConsumerWidget {
   const StudentProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncProfile = ref.watch(studentProfileProvider);
+    final asyncGrades = ref.watch(studentGradesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: SingleChildScrollView(
+      body: asyncProfile.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Failed to load profile: $e',
+                style: AppTextStyles.body, textAlign: TextAlign.center),
+          ),
+        ),
+        data: (profile) {
+          if (profile == null) {
+            return _buildProfileNotFound(context, ref);
+          }
+          final gpa = asyncGrades
+              .whenData((semesters) => _cumulativeGpa(semesters))
+              .value ??
+              0.0;
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildProfileHeader(profile),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                  child: Column(
+                    children: [
+                      _buildPersonalInfo(profile),
+                      const SizedBox(height: AppSpacing.sectionGap),
+                      _buildAcademicInfo(profile, gpa),
+                      const SizedBox(height: AppSpacing.sectionGap),
+                      _buildContactInfo(profile),
+                      const SizedBox(height: AppSpacing.sectionGap),
+                      _buildEmergencyContact(profile),
+                      const SizedBox(height: AppSpacing.sectionGap),
+                      _buildAccountSettings(context),
+                      const SizedBox(height: AppSpacing.sectionGap),
+                      _buildLogoutButton(context),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfileNotFound(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildProfileHeader(),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              child: Column(
-                children: [
-                  _buildPersonalInfo(),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  _buildAcademicInfo(),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  _buildContactInfo(),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  _buildEmergencyContact(),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  _buildAccountSettings(context),
-                  const SizedBox(height: AppSpacing.sectionGap),
-                  _buildLogoutButton(context),
-                  const SizedBox(height: 24),
-                ],
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.statusRedBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.person_off_outlined,
+                  color: AppColors.statusRed, size: 36),
+            ),
+            const SizedBox(height: 20),
+            Text('Profile Not Found',
+                style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(
+              'Your student record could not be loaded. '
+              'This may be a temporary issue or your account may not be fully set up yet.',
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () => ref.invalidate(studentProfileProvider),
+              icon: const Icon(Icons.refresh, size: 18, color: Colors.white),
+              label: Text('Try Again', style: AppTextStyles.button),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryNavy,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                if (context.mounted) context.go(AppRoutes.login);
+              },
+              icon: Icon(Icons.logout,
+                  size: 18, color: AppColors.statusRed),
+              label: Text('Sign Out',
+                  style: AppTextStyles.button
+                      .copyWith(color: AppColors.statusRed)),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                side: BorderSide(color: AppColors.statusRed),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.buttonRadius)),
               ),
             ),
           ],
@@ -65,9 +134,53 @@ class StudentProfileScreen extends StatelessWidget {
     );
   }
 
+  double _cumulativeGpa(List<SemesterGrades> semesters) {
+    double totalPoints = 0;
+    int totalCredits = 0;
+    for (final s in semesters) {
+      for (final c in s.courses) {
+        if (c.gpaPoints != null && c.credits > 0) {
+          totalPoints += c.gpaPoints! * c.credits;
+          totalCredits += c.credits;
+        }
+      }
+    }
+    return totalCredits > 0 ? totalPoints / totalCredits : 0.0;
+  }
+
+  String _formatDate(String? isoDate) {
+    if (isoDate == null || isoDate.isEmpty) return 'N/A';
+    final dt = DateTime.tryParse(isoDate);
+    if (dt == null) return isoDate;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+  String _statusLabel(StudentStatus status) => switch (status) {
+        StudentStatus.active => 'Active',
+        StudentStatus.inactive => 'Inactive',
+        StudentStatus.graduated => 'Graduated',
+        StudentStatus.suspended => 'Suspended',
+      };
+
+  Color _statusColor(StudentStatus status) => switch (status) {
+        StudentStatus.active => AppColors.statusGreen,
+        StudentStatus.graduated => AppColors.primaryBlue,
+        _ => AppColors.statusRed,
+      };
+
+  Color _statusBgColor(StudentStatus status) => switch (status) {
+        StudentStatus.active => AppColors.statusGreenBg,
+        StudentStatus.graduated => const Color(0xFFDBEAFE),
+        _ => AppColors.statusRedBg,
+      };
+
   // ── Profile header ─────────────────────────────────────────────────────────
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(StudentProfile profile) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -83,11 +196,17 @@ class StudentProfileScreen extends StatelessWidget {
           Stack(
             alignment: Alignment.bottomRight,
             children: [
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                child: const Icon(Icons.person, color: Colors.white, size: 48),
-              ),
+              profile.avatarUrl != null
+                  ? CircleAvatar(
+                      radius: 44,
+                      backgroundImage: NetworkImage(profile.avatarUrl!),
+                    )
+                  : CircleAvatar(
+                      radius: 44,
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      child:
+                          const Icon(Icons.person, color: Colors.white, size: 48),
+                    ),
               Container(
                 width: 24,
                 height: 24,
@@ -96,31 +215,38 @@ class StudentProfileScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
-                child: const Icon(Icons.edit, color: Colors.white, size: 12),
+                child:
+                    const Icon(Icons.edit, color: Colors.white, size: 12),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(_kProfile.name, style: AppTextStyles.h1White),
+          Text(profile.fullName, style: AppTextStyles.h1White),
           const SizedBox(height: 4),
-          Text(_kProfile.id, style: AppTextStyles.captionWhite),
+          Text('ID: ${profile.studentCode}',
+              style: AppTextStyles.captionWhite),
           const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+          if (profile.facultyName != null)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.chipRadius),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.school_outlined,
+                      color: Colors.white70, size: 14),
+                  const SizedBox(width: 4),
+                  Text(profile.facultyName!,
+                      style: AppTextStyles.captionWhite
+                          .copyWith(fontSize: 12)),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.school_outlined, color: Colors.white70, size: 14),
-                const SizedBox(width: 4),
-                Text(_kProfile.faculty,
-                    style: AppTextStyles.captionWhite.copyWith(fontSize: 12)),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -128,85 +254,91 @@ class StudentProfileScreen extends StatelessWidget {
 
   // ── Personal info ──────────────────────────────────────────────────────────
 
-  Widget _buildPersonalInfo() {
+  Widget _buildPersonalInfo(StudentProfile profile) {
     return _SectionCard(
       icon: Icons.person_outline,
       title: 'Personal Information',
       children: [
-        _InfoRow(label: 'FULL NAME', value: _kProfile.fullName),
-        _InfoRow(label: 'DATE OF BIRTH', value: _kProfile.dob),
-        _InfoRow(label: 'GENDER', value: _kProfile.gender),
-        _InfoRow(label: 'NATIONALITY', value: _kProfile.nationality, isLast: true),
+        _InfoRow(label: 'FULL NAME', value: profile.fullName),
+        _InfoRow(
+            label: 'DATE OF BIRTH',
+            value: _formatDate(profile.dateOfBirth)),
+        _InfoRow(label: 'GENDER', value: profile.gender ?? 'N/A'),
+        _InfoRow(
+            label: 'NATIONALITY',
+            value: profile.nationality ?? 'N/A',
+            isLast: true),
       ],
     );
   }
 
   // ── Academic info ──────────────────────────────────────────────────────────
 
-  Widget _buildAcademicInfo() {
+  Widget _buildAcademicInfo(StudentProfile profile, double gpa) {
     return _SectionCard(
       icon: Icons.school_outlined,
       title: 'Academic Information',
       children: [
-        _InfoRow(label: 'DEGREE PROGRAM', value: _kProfile.degree),
-        _InfoRow(label: 'CURRENT SEMESTER', value: _kProfile.semester),
-        _buildAcademicStatusRow(),
-        _buildGPARow(),
-      ],
-    );
-  }
-
-  Widget _buildAcademicStatusRow() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('ACADEMIC STATUS', style: AppTextStyles.label),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.statusGreenBg,
-              borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
-            ),
-            child: Text(_kProfile.academicStatus,
-                style: AppTextStyles.caption.copyWith(
-                    color: AppColors.statusGreen, fontWeight: FontWeight.w600)),
+        _InfoRow(label: 'MAJOR', value: profile.majorName ?? 'N/A'),
+        _InfoRow(
+            label: 'YEAR LEVEL', value: 'Year ${profile.yearLevel}'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ACADEMIC STATUS', style: AppTextStyles.label),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusBgColor(profile.status),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.chipRadius),
+                ),
+                child: Text(
+                  _statusLabel(profile.status),
+                  style: AppTextStyles.caption.copyWith(
+                      color: _statusColor(profile.status),
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGPARow() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('GPA', style: AppTextStyles.label),
-          const SizedBox(height: 4),
-          Text(_kProfile.gpa,
-              style: AppTextStyles.metricSmall.copyWith(
-                  color: AppColors.primaryNavy, fontSize: 20)),
-        ],
-      ),
+        ),
+        Padding(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('GPA', style: AppTextStyles.label),
+              const SizedBox(height: 4),
+              Text(
+                gpa > 0 ? '${gpa.toStringAsFixed(2)} / 4.00' : 'N/A',
+                style: AppTextStyles.metricSmall.copyWith(
+                    color: AppColors.primaryNavy, fontSize: 20),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   // ── Contact info ───────────────────────────────────────────────────────────
 
-  Widget _buildContactInfo() {
+  Widget _buildContactInfo(StudentProfile profile) {
     return _SectionCard(
       icon: Icons.contact_phone_outlined,
       title: 'Contact Information',
       children: [
-        _IconInfoRow(icon: Icons.email_outlined, value: _kProfile.email),
-        _IconInfoRow(icon: Icons.phone_outlined, value: _kProfile.phone),
+        _IconInfoRow(icon: Icons.email_outlined, value: profile.email),
+        _IconInfoRow(
+            icon: Icons.phone_outlined, value: profile.phone ?? 'N/A'),
         _IconInfoRow(
             icon: Icons.location_on_outlined,
-            value: _kProfile.address,
+            value: profile.address ?? 'N/A',
             isLast: true),
       ],
     );
@@ -214,7 +346,7 @@ class StudentProfileScreen extends StatelessWidget {
 
   // ── Emergency contact ──────────────────────────────────────────────────────
 
-  Widget _buildEmergencyContact() {
+  Widget _buildEmergencyContact(StudentProfile profile) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -227,31 +359,31 @@ class StudentProfileScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.emergency_outlined, color: AppColors.statusRed, size: 18),
+              Icon(Icons.emergency_outlined,
+                  color: AppColors.statusRed, size: 18),
               const SizedBox(width: 8),
               Text('Emergency Contact', style: AppTextStyles.h3),
             ],
           ),
           const SizedBox(height: 14),
-          _buildKeyValue('Guardian Name', _kProfile.guardianName),
-          const SizedBox(height: 8),
-          _buildKeyValue('Relationship', _kProfile.relationship),
-          const SizedBox(height: 8),
-          _buildKeyValue('Contact', _kProfile.guardianContact,
-              valueColor: AppColors.primaryBlue),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Contact',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textSecondary)),
+              Flexible(
+                child: Text(
+                  profile.emergencyContact ?? 'N/A',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.primaryBlue),
+                  textAlign: TextAlign.end,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildKeyValue(String key, String value, {Color? valueColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(key, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-        Text(value,
-            style: AppTextStyles.bodyMedium.copyWith(color: valueColor)),
-      ],
     );
   }
 
@@ -259,10 +391,18 @@ class StudentProfileScreen extends StatelessWidget {
 
   Widget _buildAccountSettings(BuildContext context) {
     final items = [
-      (icon: Icons.lock_outline, title: 'Change Password',
-       subtitle: 'Last changed 3 months ago', onTap: () {}),
-      (icon: Icons.notifications_outlined, title: 'Notification Settings',
-       subtitle: 'Manage app alerts and emails', onTap: () {}),
+      (
+        icon: Icons.lock_outline,
+        title: 'Change Password',
+        subtitle: 'Update your account password',
+        onTap: () {}
+      ),
+      (
+        icon: Icons.notifications_outlined,
+        title: 'Notification Settings',
+        subtitle: 'Manage app alerts and emails',
+        onTap: () {}
+      ),
     ];
 
     return Container(
@@ -283,28 +423,40 @@ class StudentProfileScreen extends StatelessWidget {
             return Column(
               children: [
                 ListTile(
-                  leading: Icon(e.value.icon, color: AppColors.primaryNavy, size: 22),
-                  title: Text(e.value.title, style: AppTextStyles.bodyMedium),
-                  subtitle: Text(e.value.subtitle, style: AppTextStyles.caption),
-                  trailing: const Icon(Icons.chevron_right, color: AppColors.textLabel),
+                  leading: Icon(e.value.icon,
+                      color: AppColors.primaryNavy, size: 22),
+                  title:
+                      Text(e.value.title, style: AppTextStyles.bodyMedium),
+                  subtitle:
+                      Text(e.value.subtitle, style: AppTextStyles.caption),
+                  trailing: Icon(Icons.chevron_right,
+                      color: AppColors.textLabel),
                   onTap: e.value.onTap,
                   dense: true,
                 ),
-                if (!isLast) const Divider(color: AppColors.divider, height: 1, indent: 16),
+                if (!isLast)
+                  Divider(
+                      color: AppColors.divider, height: 1, indent: 16),
               ],
             );
           }),
-          const Divider(color: AppColors.border, height: 1, indent: 16),
+          Divider(
+              color: AppColors.border, height: 1, indent: 16),
           ListTile(
-            leading: const Icon(Icons.language_outlined, color: AppColors.primaryNavy, size: 22),
-            title: Text('Language Settings', style: AppTextStyles.bodyMedium),
-            subtitle: Text('Choose your preferred language', style: AppTextStyles.caption),
+            leading: Icon(Icons.language_outlined,
+                color: AppColors.primaryNavy, size: 22),
+            title: Text('Language Settings',
+                style: AppTextStyles.bodyMedium),
+            subtitle: Text('Choose your preferred language',
+                style: AppTextStyles.caption),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('English',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
-                const Icon(Icons.chevron_right, color: AppColors.textLabel),
+                    style: AppTextStyles.bodyMedium
+                        .copyWith(color: AppColors.textSecondary)),
+                Icon(Icons.chevron_right,
+                    color: AppColors.textLabel),
               ],
             ),
             dense: true,
@@ -319,13 +471,17 @@ class StudentProfileScreen extends StatelessWidget {
 
   Widget _buildLogoutButton(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(AppRoutes.login),
+      onTap: () async {
+        await Supabase.instance.client.auth.signOut();
+        if (context.mounted) context.go(AppRoutes.login);
+      },
       child: Row(
         children: [
-          const Icon(Icons.logout, color: AppColors.statusRed, size: 20),
+          Icon(Icons.logout, color: AppColors.statusRed, size: 20),
           const SizedBox(width: 8),
           Text('Logout',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.statusRed)),
+              style:
+                  AppTextStyles.bodyMedium.copyWith(color: AppColors.statusRed)),
         ],
       ),
     );
@@ -373,7 +529,8 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value, this.isLast = false});
+  const _InfoRow(
+      {required this.label, required this.value, this.isLast = false});
   final String label, value;
   final bool isLast;
 
@@ -394,7 +551,8 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _IconInfoRow extends StatelessWidget {
-  const _IconInfoRow({required this.icon, required this.value, this.isLast = false});
+  const _IconInfoRow(
+      {required this.icon, required this.value, this.isLast = false});
   final IconData icon;
   final String value;
   final bool isLast;
