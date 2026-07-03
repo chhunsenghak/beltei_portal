@@ -90,7 +90,7 @@ class _FinanceManagementScreenState extends State<FinanceManagementScreen> {
               },
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
         ],
       ),
     );

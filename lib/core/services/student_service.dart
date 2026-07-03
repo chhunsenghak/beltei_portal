@@ -54,6 +54,7 @@ class EnrolledCourse {
   final bool isCurrentSemester;
   final EnrollmentStatus enrollmentStatus;
   final double? attendanceRate;
+  final List<Map<String, dynamic>> schedule;
 
   const EnrolledCourse({
     required this.courseId,
@@ -67,6 +68,7 @@ class EnrolledCourse {
     this.isCurrentSemester = false,
     required this.enrollmentStatus,
     this.attendanceRate,
+    this.schedule = const [],
   });
 }
 
@@ -288,7 +290,7 @@ class StudentService {
 
       final courseRows = await _db
           .from('courses')
-          .select('id, code, name, credits, teacher_id, semester_id')
+          .select('id, code, name, credits, teacher_id, semester_id, schedule')
           .inFilter('id', courseIds);
 
       final semesterIds = courseRows
@@ -357,6 +359,10 @@ class StudentService {
         final semId = course['semester_id'] as String?;
         final sem = semId != null ? semesterMap[semId] : null;
         final teacherId = course['teacher_id'] as String?;
+        final rawSchedule = course['schedule'];
+        final parsedSchedule = rawSchedule is List
+            ? rawSchedule.whereType<Map<String, dynamic>>().toList()
+            : <Map<String, dynamic>>[];
         return EnrolledCourse(
           courseId: courseId,
           enrollmentId: e['id'] as String,
@@ -371,6 +377,7 @@ class StudentService {
           enrollmentStatus: EnrollmentStatus.values.byName(
               e['status'] as String? ?? 'enrolled'),
           attendanceRate: attendanceRates[courseId],
+          schedule: parsedSchedule,
         );
       }).whereType<EnrolledCourse>().toList();
     } catch (e, st) {
@@ -557,6 +564,82 @@ class StudentService {
     }
   }
 
+  Future<Map<String, AttendanceStatus>> getAttendanceCalendar(
+      String studentId) async {
+    try {
+      final records = await _db
+          .from('attendance')
+          .select('date, status')
+          .eq('student_id', studentId);
+
+      final map = <String, AttendanceStatus>{};
+      for (final r in records) {
+        final date = r['date'] as String;
+        AttendanceStatus status;
+        try {
+          status = AttendanceStatus.values.byName(r['status'] as String);
+        } catch (_) {
+          status = AttendanceStatus.present;
+        }
+        // Per-day worst status: absent > late > excused > present
+        final existing = map[date];
+        if (existing == null ||
+            _statusPriority(status) > _statusPriority(existing)) {
+          map[date] = status;
+        }
+      }
+      return map;
+    } catch (e, st) {
+      debugPrint('getAttendanceCalendar error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  static int _statusPriority(AttendanceStatus s) => switch (s) {
+        AttendanceStatus.absent => 3,
+        AttendanceStatus.late => 2,
+        AttendanceStatus.excused => 1,
+        AttendanceStatus.present => 0,
+      };
+
+  Future<List<AttendanceRecord>> getCourseAttendanceHistory(
+      String studentId, String courseId) async {
+    try {
+      final courseRow = await _db
+          .from('courses')
+          .select('name, code')
+          .eq('id', courseId)
+          .maybeSingle();
+      final courseName = courseRow?['name'] as String? ?? '';
+      final courseCode = courseRow?['code'] as String? ?? '';
+
+      final rows = await _db
+          .from('attendance')
+          .select('date, status')
+          .eq('student_id', studentId)
+          .eq('course_id', courseId)
+          .order('date', ascending: false);
+
+      return rows.map((r) {
+        AttendanceStatus status;
+        try {
+          status = AttendanceStatus.values.byName(r['status'] as String);
+        } catch (_) {
+          status = AttendanceStatus.present;
+        }
+        return AttendanceRecord(
+          date: r['date'] as String,
+          courseName: courseName,
+          courseCode: courseCode,
+          status: status,
+        );
+      }).toList();
+    } catch (e, st) {
+      debugPrint('getCourseAttendanceHistory error: $e\n$st');
+      rethrow;
+    }
+  }
+
   Future<FinanceSummary> getFinanceSummary(String studentId) async {
     try {
       final invoices = await _db
@@ -691,6 +774,14 @@ class StudentService {
       'status': 'pending',
       if (docUrl != null) 'doc_url': docUrl,
     });
+  }
+
+  Future<void> cancelLeaveRequest(String requestId) async {
+    await _db
+        .from('leave_requests')
+        .delete()
+        .eq('id', requestId)
+        .eq('status', 'pending');
   }
 
   Future<void> markNotificationRead(String notificationId) async {

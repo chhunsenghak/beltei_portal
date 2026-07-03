@@ -46,7 +46,7 @@ class GradesDashboardScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load grades',
@@ -121,7 +121,7 @@ class GradesDashboardScreen extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.shield_outlined,
+              Icon(Icons.shield_outlined,
                   color: AppColors.statusAmber, size: 14),
               const SizedBox(width: 4),
               Text(standing,
@@ -197,7 +197,7 @@ class GradesDashboardScreen extends ConsumerWidget {
               value: progress,
               minHeight: 8,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(
+              valueColor: AlwaysStoppedAnimation<Color>(
                   AppColors.primaryNavy),
             ),
           ),
@@ -382,7 +382,7 @@ class _SemesterRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.expand_more, color: AppColors.textLabel),
+            Icon(Icons.expand_more, color: AppColors.textLabel),
           ],
         ),
       ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/database.types.dart';
@@ -31,6 +32,26 @@ class AdminStats {
   String get fmtRevenue => _fmt.format(totalRevenue);
   String get fmtCollected => _fmt.format(collectedRevenue);
   String get fmtOutstanding => _fmt.format(outstandingRevenue);
+}
+
+class AdminAnalyticsData {
+  final List<({String month, int count})> monthlyEnrollments;
+  final List<({String name, double collectedPct})> facultyRevenue;
+  final List<({String grade, int count})> gradeDistribution;
+  final List<({String name, double attendancePct})> facultyAttendance;
+  final int atRiskCount;
+  final double avgGpa;
+  final double passRate;
+
+  const AdminAnalyticsData({
+    required this.monthlyEnrollments,
+    required this.facultyRevenue,
+    required this.gradeDistribution,
+    required this.facultyAttendance,
+    required this.atRiskCount,
+    required this.avgGpa,
+    required this.passRate,
+  });
 }
 
 class AdminStudent {
@@ -79,7 +100,7 @@ class AdminTeacher {
   final String fullName;
   final String email;
   final String statusName;
-  final String? departmentName;
+  final String? facultyName;
   final int courseCount;
 
   const AdminTeacher({
@@ -88,7 +109,7 @@ class AdminTeacher {
     required this.fullName,
     required this.email,
     required this.statusName,
-    this.departmentName,
+    this.facultyName,
     required this.courseCount,
   });
 
@@ -113,8 +134,12 @@ class AdminCourse {
   final String name;
   final int credits;
   final String? teacherName;
-  final String? departmentName;
+  final String? facultyId;
+  final String? facultyName;
+  final String? majorName;
+  final String? semesterId;
   final String? semesterName;
+  final String? semesterAcademicYear;
   final int enrolledCount;
   final int maxStudents;
   final CourseStatus status;
@@ -125,8 +150,12 @@ class AdminCourse {
     required this.name,
     required this.credits,
     this.teacherName,
-    this.departmentName,
+    this.facultyId,
+    this.facultyName,
+    this.majorName,
+    this.semesterId,
     this.semesterName,
+    this.semesterAcademicYear,
     required this.enrolledCount,
     required this.maxStudents,
     required this.status,
@@ -196,6 +225,8 @@ class AdminSemester {
   final String startDate;
   final String endDate;
   final bool isCurrent;
+  final bool registrationOpen;
+  final int classCount;
 
   const AdminSemester({
     required this.id,
@@ -204,6 +235,8 @@ class AdminSemester {
     required this.startDate,
     required this.endDate,
     required this.isCurrent,
+    required this.registrationOpen,
+    this.classCount = 0,
   });
 
   String get statusLabel {
@@ -217,6 +250,30 @@ class AdminSemester {
     } catch (_) {}
     return 'CLOSED';
   }
+
+  String get fmtStart {
+    try { return DateFormat('MMM d, yyyy').format(DateTime.parse(startDate)); } catch (_) { return startDate; }
+  }
+
+  String get fmtEnd {
+    try { return DateFormat('MMM d, yyyy').format(DateTime.parse(endDate)); } catch (_) { return endDate; }
+  }
+}
+
+class AdminAcademicYear {
+  final String id;
+  final String name;
+  final String startDate;
+  final String endDate;
+  final bool isCurrent;
+
+  const AdminAcademicYear({
+    required this.id,
+    required this.name,
+    required this.startDate,
+    required this.endDate,
+    required this.isCurrent,
+  });
 
   String get fmtStart {
     try { return DateFormat('MMM d, yyyy').format(DateTime.parse(startDate)); } catch (_) { return startDate; }
@@ -425,8 +482,8 @@ class AdminTeacherDetail {
   final String? phone;
   final String? position;
   final String statusName;
-  final String? departmentId;
-  final String? departmentName;
+  final String? facultyId;
+  final String? facultyName;
   final List<String> assignedCourses;
   final int totalStudents;
 
@@ -439,8 +496,8 @@ class AdminTeacherDetail {
     this.phone,
     this.position,
     required this.statusName,
-    this.departmentId,
-    this.departmentName,
+    this.facultyId,
+    this.facultyName,
     required this.assignedCourses,
     required this.totalStudents,
   });
@@ -466,10 +523,15 @@ class AdminCourseDetail {
   final String? teacherName;
   final String? semesterId;
   final String? semesterName;
+  final String? majorId;
+  final String? majorName;
   final String? departmentId;
   final String? departmentName;
+  final String? facultyId;
+  final String? facultyName;
   final int maxStudents;
   final int enrolledCount;
+  final List<Map<String, dynamic>> schedule;
 
   const AdminCourseDetail({
     required this.id,
@@ -482,33 +544,154 @@ class AdminCourseDetail {
     this.teacherName,
     this.semesterId,
     this.semesterName,
+    this.majorId,
+    this.majorName,
     this.departmentId,
     this.departmentName,
+    this.facultyId,
+    this.facultyName,
     required this.maxStudents,
     required this.enrolledCount,
+    this.schedule = const [],
   });
 
   double get enrollmentPct => maxStudents > 0 ? enrolledCount / maxStudents : 0.0;
 }
 
-class AdminEnrollmentRecord {
+class AdminClass {
+  final String id;
   final String courseId;
   final String courseCode;
   final String courseName;
+  final String? semesterId;
+  final String? semesterName;
+  final String? teacherId;
   final String? teacherName;
+  final String programType;   // 'national' | 'international'
+  final String scheduleType;  // 'weekday'  | 'weekend'
+  final String shift;         // 'morning'  | 'afternoon' | 'evening'
+  final String classCode;
+  final String? room;
+  final int maxStudents;
+  final int enrolledCount;
+  final String status;
+
+  const AdminClass({
+    required this.id,
+    required this.courseId,
+    required this.courseCode,
+    required this.courseName,
+    this.semesterId,
+    this.semesterName,
+    this.teacherId,
+    this.teacherName,
+    required this.programType,
+    required this.scheduleType,
+    required this.shift,
+    required this.classCode,
+    this.room,
+    required this.maxStudents,
+    required this.enrolledCount,
+    required this.status,
+  });
+
+  double get pct => maxStudents > 0 ? enrolledCount / maxStudents : 0.0;
+
+  String get shiftLabel {
+    switch (shift) {
+      case 'morning':   return 'Morning';
+      case 'afternoon': return 'Afternoon';
+      case 'evening':   return 'Evening';
+      default:          return shift;
+    }
+  }
+
+  String get programLabel =>
+      programType == 'international' ? 'International' : 'National';
+
+  String get scheduleLabel =>
+      scheduleType == 'weekend' ? 'Weekend' : 'Weekday';
+}
+
+class AdminEnrollmentRecord {
+  final String classId;
+  final String courseId;
+  final String? semesterId;
+  final String courseCode;
+  final String courseName;
+  final String? teacherId;
+  final String? teacherName;
+  final String programType;   // 'national' | 'international'
+  final String scheduleType;  // 'weekday'  | 'weekend'
+  final String shift;
+  final String classCode;
+  final String? room;
+  final String? semesterName;
+  final String? facultyId;
+  final String? facultyName;
   final int enrolled;
   final int maxStudents;
 
   const AdminEnrollmentRecord({
+    required this.classId,
     required this.courseId,
+    this.semesterId,
     required this.courseCode,
     required this.courseName,
+    this.teacherId,
     this.teacherName,
+    required this.programType,
+    required this.scheduleType,
+    required this.shift,
+    required this.classCode,
+    this.room,
+    this.semesterName,
+    this.facultyId,
+    this.facultyName,
     required this.enrolled,
     required this.maxStudents,
   });
 
   double get pct => maxStudents > 0 ? enrolled / maxStudents : 0.0;
+
+  String get shiftLabel {
+    switch (shift) {
+      case 'morning':   return 'Morning';
+      case 'afternoon': return 'Afternoon';
+      case 'evening':   return 'Evening';
+      default:          return shift;
+    }
+  }
+
+  String get programLabel =>
+      programType == 'international' ? 'International' : 'National';
+
+  String get scheduleLabel =>
+      scheduleType == 'weekend' ? 'Weekend' : 'Weekday';
+}
+
+class CourseEnrollmentEntry {
+  final String enrollmentId;
+  final String studentId;
+  final String studentCode;
+  final String studentName;
+  final String status;
+  final DateTime? enrolledAt;
+
+  const CourseEnrollmentEntry({
+    required this.enrollmentId,
+    required this.studentId,
+    required this.studentCode,
+    required this.studentName,
+    required this.status,
+    this.enrolledAt,
+  });
+
+  String get initials {
+    final parts = studentName.trim().split(' ');
+    if (parts.length >= 2) return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    return studentName.isNotEmpty ? studentName[0].toUpperCase() : '?';
+  }
 }
 
 class AdminAttendanceRecord {
@@ -516,8 +699,16 @@ class AdminAttendanceRecord {
   final String studentId;
   final String studentName;
   final String studentCode;
+  final int? yearLevel;
+  final String? majorId;
+  final String? majorName;
+  final String? facultyId;
+  final String? facultyName;
   final String courseId;
   final String courseName;
+  final String? semesterId;
+  final String? semesterName;
+  final String? academicYear;
   final String date;
   final String status;
 
@@ -526,8 +717,16 @@ class AdminAttendanceRecord {
     required this.studentId,
     required this.studentName,
     required this.studentCode,
+    this.yearLevel,
+    this.majorId,
+    this.majorName,
+    this.facultyId,
+    this.facultyName,
     required this.courseId,
     required this.courseName,
+    this.semesterId,
+    this.semesterName,
+    this.academicYear,
     required this.date,
     required this.status,
   });
@@ -556,6 +755,9 @@ class AdminAttendanceRecord {
       return date;
     }
   }
+
+  String get yearLevelLabel =>
+      yearLevel != null ? 'Year $yearLevel' : '';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -564,6 +766,26 @@ String _joinName(Map<String, dynamic> profile) =>
     '${profile['first_name'] ?? ''} ${profile['last_name'] ?? ''}'.trim();
 
 // ── Service ───────────────────────────────────────────────────────────────────
+
+class AdminAppSettings {
+  final String id;
+  final String universityName;
+  final String contactEmail;
+  final String? logoUrl;
+  final String semesterFormat; // 'semester' | 'trimester'
+  final bool pushNotificationsEnabled;
+  final bool emailDigestsEnabled;
+
+  const AdminAppSettings({
+    required this.id,
+    required this.universityName,
+    required this.contactEmail,
+    this.logoUrl,
+    required this.semesterFormat,
+    required this.pushNotificationsEnabled,
+    required this.emailDigestsEnabled,
+  });
+}
 
 class AdminService {
   SupabaseClient get _db => Supabase.instance.client;
@@ -587,6 +809,49 @@ class AdminService {
       email: p['email'] as String,
       phone: p['phone'] as String?,
     );
+  }
+
+  Future<AdminAppSettings> getAppSettings() async {
+    final s = await _db.from('app_settings').select().limit(1).single();
+    return AdminAppSettings(
+      id: s['id'] as String,
+      universityName: s['university_name'] as String,
+      contactEmail: s['contact_email'] as String,
+      logoUrl: s['logo_url'] as String?,
+      semesterFormat: s['semester_format'] as String? ?? 'semester',
+      pushNotificationsEnabled: s['push_notifications_enabled'] as bool? ?? true,
+      emailDigestsEnabled: s['email_digests_enabled'] as bool? ?? false,
+    );
+  }
+
+  Future<void> updateAppSettings({
+    required String id,
+    required String universityName,
+    required String contactEmail,
+    String? logoUrl,
+    required String semesterFormat,
+    required bool pushNotificationsEnabled,
+    required bool emailDigestsEnabled,
+  }) async {
+    await _db.from('app_settings').update({
+      'university_name': universityName.trim(),
+      'contact_email': contactEmail.trim(),
+      if (logoUrl != null) 'logo_url': logoUrl,
+      'semester_format': semesterFormat,
+      'push_notifications_enabled': pushNotificationsEnabled,
+      'email_digests_enabled': emailDigestsEnabled,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  Future<String> uploadLogo(Uint8List bytes, String fileExt) async {
+    final path = 'logo-${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+    await _db.storage.from('app-assets').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: 'image/$fileExt', upsert: true),
+        );
+    return _db.storage.from('app-assets').getPublicUrl(path);
   }
 
   Future<AdminStats> getAdminStats() async {
@@ -666,18 +931,20 @@ class AdminService {
 
   Future<List<AdminTeacher>> getTeachers({String? query}) async {
     final data = await _db.from('teachers')
-        .select('id, employee_code, department_id, status')
+        .select('id, employee_code, faculty_id, status')
         .order('employee_code');
     if (data.isEmpty) return [];
 
     final ids = data.map((t) => t['id'] as String).toList();
     final profiles = await _db.from('profiles').select('id, first_name, last_name, email').inFilter('id', ids);
 
-    final deptIds = data.map((t) => t['department_id'] as String?).whereType<String>().toSet().toList();
-    final Map<String, String> deptNames = {};
-    if (deptIds.isNotEmpty) {
-      final depts = await _db.from('departments').select('id, name').inFilter('id', deptIds);
-      for (final d in depts) deptNames[d['id'] as String] = d['name'] as String;
+    final facIds = data.map((t) => t['faculty_id'] as String?).whereType<String>().toSet().toList();
+    final Map<String, String> facNames = {};
+    if (facIds.isNotEmpty) {
+      final facs = await _db.from('faculties').select('id, name').inFilter('id', facIds);
+      for (final f in facs) {
+        facNames[f['id'] as String] = f['name'] as String;
+      }
     }
 
     final coursesData = await _db.from('courses').select('teacher_id').inFilter('teacher_id', ids).eq('status', 'active');
@@ -705,23 +972,30 @@ class AdminService {
         fullName: fullName,
         email: profile?['email'] as String? ?? '',
         statusName: t['status'] as String? ?? 'active',
-        departmentName: t['department_id'] != null ? deptNames[t['department_id'] as String] : null,
+        facultyName: t['faculty_id'] != null ? facNames[t['faculty_id'] as String] : null,
         courseCount: courseCounts[tid] ?? 0,
       ));
     }
     return result;
   }
 
-  Future<List<AdminCourse>> getCourses({String? query}) async {
-    final data = await _db.from('courses')
-        .select('id, code, name, credits, teacher_id, semester_id, department_id, max_students, status')
-        .order('code');
+  Future<List<AdminCourse>> getCourses({String? query, bool activeOnly = true}) async {
+    final req = _db.from('courses')
+        .select('id, code, name, credits, teacher_id, semester_id, major_id, department_id, max_students, status');
+    final data = await (activeOnly ? req.eq('status', 'active') : req).order('code');
     if (data.isEmpty) return [];
 
     final courseIds = data.map((c) => c['id'] as String).toList();
     final teacherIds = data.map((c) => c['teacher_id'] as String?).whereType<String>().toSet().toList();
     final semIds = data.map((c) => c['semester_id'] as String?).whereType<String>().toSet().toList();
     final deptIds = data.map((c) => c['department_id'] as String?).whereType<String>().toSet().toList();
+    final majorIds = data.map((c) => c['major_id'] as String?).whereType<String>().toSet().toList();
+
+    final Map<String, String> majorNames = {};
+    if (majorIds.isNotEmpty) {
+      final majors = await _db.from('majors').select('id, name').inFilter('id', majorIds);
+      for (final m in majors) { majorNames[m['id'] as String] = m['name'] as String; }
+    }
 
     final Map<String, String> teacherNames = {};
     if (teacherIds.isNotEmpty) {
@@ -730,15 +1004,47 @@ class AdminService {
     }
 
     final Map<String, String> semNames = {};
+    final Map<String, String> semYears = {};
     if (semIds.isNotEmpty) {
-      final sems = await _db.from('semesters').select('id, name').inFilter('id', semIds);
-      for (final s in sems) semNames[s['id'] as String] = s['name'] as String;
+      final sems = await _db.from('semesters')
+          .select('id, name, academic_year')
+          .inFilter('id', semIds);
+      for (final s in sems) {
+        semNames[s['id'] as String] = s['name'] as String;
+        semYears[s['id'] as String] = s['academic_year'] as String? ?? '';
+      }
     }
 
-    final Map<String, String> deptNames = {};
+    // Resolve faculty id + name via department → faculty chain
+    final Map<String, String> deptToFacultyId = {};
+    final Map<String, String> deptToFacultyName = {};
     if (deptIds.isNotEmpty) {
-      final depts = await _db.from('departments').select('id, name').inFilter('id', deptIds);
-      for (final d in depts) deptNames[d['id'] as String] = d['name'] as String;
+      final depts = await _db.from('departments')
+          .select('id, faculty_id')
+          .inFilter('id', deptIds);
+      final facIds = depts
+          .map((d) => d['faculty_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final Map<String, String> facMap = {};
+      if (facIds.isNotEmpty) {
+        final facs = await _db.from('faculties')
+            .select('id, name')
+            .inFilter('id', facIds);
+        for (final f in facs) {
+          facMap[f['id'] as String] = f['name'] as String;
+        }
+      }
+      for (final d in depts) {
+        final fid = d['faculty_id'] as String?;
+        if (fid != null) {
+          deptToFacultyId[d['id'] as String] = fid;
+          if (facMap.containsKey(fid)) {
+            deptToFacultyName[d['id'] as String] = facMap[fid]!;
+          }
+        }
+      }
     }
 
     final enrollData = await _db.from('enrollments').select('course_id').inFilter('course_id', courseIds).neq('status', 'dropped');
@@ -757,14 +1063,21 @@ class AdminService {
       if (q != null && q.isNotEmpty) {
         if (!name.toLowerCase().contains(q) && !code.toLowerCase().contains(q)) continue;
       }
+      final sid = c['semester_id'] as String?;
+      final did = c['department_id'] as String?;
+      final mid = c['major_id'] as String?;
       result.add(AdminCourse(
         courseId: cid,
         code: code,
         name: name,
         credits: c['credits'] as int? ?? 3,
         teacherName: c['teacher_id'] != null ? teacherNames[c['teacher_id'] as String] : null,
-        departmentName: c['department_id'] != null ? deptNames[c['department_id'] as String] : null,
-        semesterName: c['semester_id'] != null ? semNames[c['semester_id'] as String] : null,
+        facultyId: did != null ? deptToFacultyId[did] : null,
+        facultyName: did != null ? deptToFacultyName[did] : null,
+        majorName: mid != null ? majorNames[mid] : null,
+        semesterId: sid,
+        semesterName: sid != null ? semNames[sid] : null,
+        semesterAcademicYear: sid != null ? semYears[sid] : null,
         enrolledCount: enrollCounts[cid] ?? 0,
         maxStudents: c['max_students'] as int? ?? 40,
         status: CourseStatus.values.byName(c['status'] as String? ?? 'active'),
@@ -822,6 +1135,25 @@ class AdminService {
     }).toList();
   }
 
+  Future<void> createLeaveRequest({
+    required String requesterId,
+    required String requesterType,
+    required String type,
+    required String reason,
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _db.from('leave_requests').insert({
+      'requester_id': requesterId,
+      'requester_type': requesterType,
+      'type': type.trim(),
+      'reason': reason.trim(),
+      'start_date': startDate,
+      'end_date': endDate,
+      'status': 'pending',
+    });
+  }
+
   Future<void> approveLeaveRequest(String id, String adminId, {String? notes}) async {
     await _db.from('leave_requests').update({
       'status': 'approved',
@@ -841,7 +1173,17 @@ class AdminService {
   }
 
   Future<List<AdminSemester>> getSemesters() async {
-    final data = await _db.from('semesters').select('*').order('start_date', ascending: false);
+    final data = await _db.from('semesters').select('id, name, academic_year, start_date, end_date, is_current, registration_open').order('start_date', ascending: false);
+    if (data.isEmpty) return [];
+
+    final semesterIds = data.map((s) => s['id'] as String).toList();
+    final classesData = await _db.from('classes').select('semester_id').inFilter('semester_id', semesterIds);
+    final Map<String, int> classCounts = {};
+    for (final s in classesData) {
+      final sid = s['semester_id'] as String?;
+      if (sid != null) classCounts[sid] = (classCounts[sid] ?? 0) + 1;
+    }
+
     return data.map((s) => AdminSemester(
       id: s['id'] as String,
       name: s['name'] as String,
@@ -849,6 +1191,19 @@ class AdminService {
       startDate: s['start_date'] as String,
       endDate: s['end_date'] as String,
       isCurrent: s['is_current'] as bool? ?? false,
+      registrationOpen: (s['registration_open'] as bool?) ?? false,
+      classCount: classCounts[s['id'] as String] ?? 0,
+    )).toList();
+  }
+
+  Future<List<AdminAcademicYear>> getAcademicYears() async {
+    final data = await _db.from('academic_years').select('id, name, start_date, end_date, is_current').order('start_date', ascending: false);
+    return data.map((y) => AdminAcademicYear(
+      id: y['id'] as String,
+      name: y['name'] as String,
+      startDate: y['start_date'] as String,
+      endDate: y['end_date'] as String,
+      isCurrent: y['is_current'] as bool? ?? false,
     )).toList();
   }
 
@@ -1035,7 +1390,7 @@ class AdminService {
 
   Future<AdminTeacherDetail?> getTeacherDetail(String teacherId) async {
     final t = await _db.from('teachers')
-        .select('id, employee_code, department_id, position, status')
+        .select('id, employee_code, faculty_id, position, status')
         .eq('id', teacherId)
         .maybeSingle();
     if (t == null) return null;
@@ -1045,10 +1400,11 @@ class AdminService {
         .eq('id', teacherId)
         .maybeSingle();
 
-    String? departmentName;
-    if (t['department_id'] != null) {
-      final d = await _db.from('departments').select('name').eq('id', t['department_id'] as String).maybeSingle();
-      departmentName = d?['name'] as String?;
+    final facultyId = t['faculty_id'] as String?;
+    String? facultyName;
+    if (facultyId != null) {
+      final f = await _db.from('faculties').select('name').eq('id', facultyId).maybeSingle();
+      facultyName = f?['name'] as String?;
     }
 
     final coursesData = await _db.from('courses')
@@ -1080,8 +1436,8 @@ class AdminService {
       phone: p?['phone'] as String?,
       position: t['position'] as String?,
       statusName: t['status'] as String? ?? 'active',
-      departmentId: t['department_id'] as String?,
-      departmentName: departmentName,
+      facultyId: facultyId,
+      facultyName: facultyName,
       assignedCourses: assignedCourses,
       totalStudents: totalStudents,
     );
@@ -1089,7 +1445,7 @@ class AdminService {
 
   Future<AdminCourseDetail?> getCourseDetail(String courseId) async {
     final c = await _db.from('courses')
-        .select('id, code, name, description, credits, teacher_id, semester_id, department_id, max_students, status')
+        .select('id, code, name, description, credits, teacher_id, semester_id, major_id, department_id, max_students, status, schedule')
         .eq('id', courseId)
         .maybeSingle();
     if (c == null) return null;
@@ -1109,10 +1465,26 @@ class AdminService {
       semesterName = s?['name'] as String?;
     }
 
+    String? majorName;
+    if (c['major_id'] != null) {
+      final m = await _db.from('majors').select('name').eq('id', c['major_id'] as String).maybeSingle();
+      majorName = m?['name'] as String?;
+    }
+
     String? departmentName;
+    String? facultyId;
+    String? facultyName;
     if (c['department_id'] != null) {
-      final d = await _db.from('departments').select('name').eq('id', c['department_id'] as String).maybeSingle();
+      final d = await _db.from('departments')
+          .select('name, faculty_id')
+          .eq('id', c['department_id'] as String)
+          .maybeSingle();
       departmentName = d?['name'] as String?;
+      facultyId = d?['faculty_id'] as String?;
+      if (facultyId != null) {
+        final f = await _db.from('faculties').select('name').eq('id', facultyId).maybeSingle();
+        facultyName = f?['name'] as String?;
+      }
     }
 
     final enrollData = await _db.from('enrollments')
@@ -1131,88 +1503,473 @@ class AdminService {
       teacherName: teacherName,
       semesterId: c['semester_id'] as String?,
       semesterName: semesterName,
+      majorId: c['major_id'] as String?,
+      majorName: majorName,
       departmentId: c['department_id'] as String?,
       departmentName: departmentName,
+      facultyId: facultyId,
+      facultyName: facultyName,
       maxStudents: c['max_students'] as int? ?? 40,
       enrolledCount: enrollData.length,
+      schedule: ((c['schedule'] as List?) ?? []).map((s) => Map<String, dynamic>.from(s as Map)).toList(),
     );
   }
 
   Future<List<AdminEnrollmentRecord>> getEnrollmentData() async {
-    final data = await _db.from('courses')
-        .select('id, code, name, teacher_id, max_students')
+    final classesData = await _db.from('classes')
+        .select('id, course_id, teacher_id, shift, class_code, semester_id, max_students, program_type, schedule_type, room')
         .eq('status', 'active')
-        .order('code');
+        .order('shift')
+        .order('class_code');
+    if (classesData.isEmpty) return [];
+
+    final classIds = classesData.map((s) => s['id'] as String).toList();
+    final courseIds = classesData.map((s) => s['course_id'] as String).toSet().toList();
+    final teacherIds = classesData.map((s) => s['teacher_id'] as String?).whereType<String>().toSet().toList();
+    final semIds = classesData.map((s) => s['semester_id'] as String?).whereType<String>().toSet().toList();
+
+    final Map<String, Map<String, String>> courseMap = {};
+    final Set<String> deptIdsFromCourses = {};
+    if (courseIds.isNotEmpty) {
+      final courses = await _db.from('courses').select('id, code, name, department_id').inFilter('id', courseIds);
+      for (final c in courses) {
+        final deptId = c['department_id'] as String?;
+        courseMap[c['id'] as String] = {
+          'code': c['code'] as String,
+          'name': c['name'] as String,
+          if (deptId != null) 'department_id': deptId,
+        };
+        if (deptId != null) deptIdsFromCourses.add(deptId);
+      }
+    }
+
+    // Resolve faculty id + name via department → faculty chain
+    final Map<String, String> deptToFacultyId = {};
+    final Map<String, String> deptToFacultyName = {};
+    if (deptIdsFromCourses.isNotEmpty) {
+      final depts = await _db.from('departments')
+          .select('id, faculty_id')
+          .inFilter('id', deptIdsFromCourses.toList());
+      final facIds = depts.map((d) => d['faculty_id'] as String?).whereType<String>().toSet().toList();
+      final Map<String, String> facMap = {};
+      if (facIds.isNotEmpty) {
+        final facs = await _db.from('faculties').select('id, name').inFilter('id', facIds);
+        for (final f in facs) { facMap[f['id'] as String] = f['name'] as String; }
+      }
+      for (final d in depts) {
+        final fid = d['faculty_id'] as String?;
+        if (fid != null) {
+          deptToFacultyId[d['id'] as String] = fid;
+          if (facMap.containsKey(fid)) deptToFacultyName[d['id'] as String] = facMap[fid]!;
+        }
+      }
+    }
+
+    final Map<String, String> teacherNameMap = {};
+    if (teacherIds.isNotEmpty) {
+      final ps = await _db.from('profiles').select('id, first_name, last_name').inFilter('id', teacherIds);
+      for (final p in ps) { teacherNameMap[p['id'] as String] = _joinName(p); }
+    }
+
+    final Map<String, String> semNameMap = {};
+    if (semIds.isNotEmpty) {
+      final sems = await _db.from('semesters').select('id, name').inFilter('id', semIds);
+      for (final s in sems) { semNameMap[s['id'] as String] = s['name'] as String; }
+    }
+
+    final enrollData = await _db.from('enrollments')
+        .select('class_id')
+        .inFilter('class_id', classIds)
+        .neq('status', 'dropped');
+    final Map<String, int> enrollCounts = {};
+    for (final e in enrollData) {
+      final cid = e['class_id'] as String?;
+      if (cid != null) enrollCounts[cid] = (enrollCounts[cid] ?? 0) + 1;
+    }
+
+    return classesData.map((s) {
+      final classId = s['id'] as String;
+      final courseId = s['course_id'] as String;
+      final teacherId = s['teacher_id'] as String?;
+      final semId = s['semester_id'] as String?;
+      final course = courseMap[courseId];
+      final deptId = course?['department_id'];
+      return AdminEnrollmentRecord(
+        classId: classId,
+        courseId: courseId,
+        semesterId: semId,
+        courseCode: course?['code'] ?? '—',
+        courseName: course?['name'] ?? 'Unknown',
+        teacherId: teacherId,
+        teacherName: teacherId != null ? teacherNameMap[teacherId] : null,
+        programType: s['program_type'] as String? ?? 'national',
+        scheduleType: s['schedule_type'] as String? ?? 'weekday',
+        shift: s['shift'] as String? ?? 'morning',
+        classCode: s['class_code'] as String,
+        room: s['room'] as String?,
+        semesterName: semId != null ? semNameMap[semId] : null,
+        facultyId: deptId != null ? deptToFacultyId[deptId] : null,
+        facultyName: deptId != null ? deptToFacultyName[deptId] : null,
+        enrolled: enrollCounts[classId] ?? 0,
+        maxStudents: s['max_students'] as int? ?? 30,
+      );
+    }).toList();
+  }
+
+  Future<List<CourseEnrollmentEntry>> getCourseEnrollments(String courseId) async {
+    final data = await _db
+        .from('enrollments')
+        .select('id, student_id, status, enrolled_at')
+        .eq('course_id', courseId)
+        .neq('status', 'dropped')
+        .order('enrolled_at');
     if (data.isEmpty) return [];
 
-    final courseIds = data.map((c) => c['id'] as String).toList();
-    final teacherIds = data.map((c) => c['teacher_id'] as String?).whereType<String>().toSet().toList();
+    final studentIds = data.map((e) => e['student_id'] as String).toList();
+    final profiles = await _db
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .inFilter('id', studentIds);
+    final studentsData = await _db
+        .from('students')
+        .select('id, student_code')
+        .inFilter('id', studentIds);
 
+    final nameMap = {for (final p in profiles) p['id'] as String: _joinName(p)};
+    final codeMap = {for (final s in studentsData) s['id'] as String: s['student_code'] as String};
+
+    return data.map((e) {
+      final sid = e['student_id'] as String;
+      final raw = e['enrolled_at'];
+      return CourseEnrollmentEntry(
+        enrollmentId: e['id'] as String,
+        studentId: sid,
+        studentCode: codeMap[sid] ?? '—',
+        studentName: nameMap[sid] ?? 'Unknown',
+        status: e['status'] as String? ?? 'enrolled',
+        enrolledAt: raw != null ? DateTime.tryParse(raw.toString()) : null,
+      );
+    }).toList();
+  }
+
+  Future<List<CourseEnrollmentEntry>> getClassEnrollments(String classId) async {
+    final data = await _db
+        .from('enrollments')
+        .select('id, student_id, status, enrolled_at')
+        .eq('class_id', classId)
+        .neq('status', 'dropped')
+        .order('enrolled_at');
+    if (data.isEmpty) return [];
+
+    final studentIds = data.map((e) => e['student_id'] as String).toList();
+    final profiles = await _db.from('profiles').select('id, first_name, last_name').inFilter('id', studentIds);
+    final studentsData = await _db.from('students').select('id, student_code').inFilter('id', studentIds);
+
+    final nameMap = {for (final p in profiles) p['id'] as String: _joinName(p)};
+    final codeMap = {for (final s in studentsData) s['id'] as String: s['student_code'] as String};
+
+    return data.map((e) {
+      final sid = e['student_id'] as String;
+      final raw = e['enrolled_at'];
+      return CourseEnrollmentEntry(
+        enrollmentId: e['id'] as String,
+        studentId: sid,
+        studentCode: codeMap[sid] ?? '—',
+        studentName: nameMap[sid] ?? 'Unknown',
+        status: e['status'] as String? ?? 'enrolled',
+        enrolledAt: raw != null ? DateTime.tryParse(raw.toString()) : null,
+      );
+    }).toList();
+  }
+
+  Future<List<AdminClass>> getClasses(String courseId) async {
+    final classes = await _db.from('classes')
+        .select('id, semester_id, teacher_id, shift, class_code, room, max_students, status')
+        .eq('course_id', courseId)
+        .eq('status', 'active')
+        .order('shift')
+        .order('class_code');
+    if (classes.isEmpty) return [];
+
+    final courseData = await _db.from('courses').select('code, name').eq('id', courseId).maybeSingle();
+    final courseCode = courseData?['code'] as String? ?? '';
+    final courseName = courseData?['name'] as String? ?? '';
+
+    final semIds = classes.map((s) => s['semester_id'] as String?).whereType<String>().toSet().toList();
+    final Map<String, String> semNames = {};
+    if (semIds.isNotEmpty) {
+      final sems = await _db.from('semesters').select('id, name').inFilter('id', semIds);
+      for (final s in sems) { semNames[s['id'] as String] = s['name'] as String; }
+    }
+
+    final teacherIds = classes.map((s) => s['teacher_id'] as String?).whereType<String>().toSet().toList();
     final Map<String, String> teacherNames = {};
     if (teacherIds.isNotEmpty) {
       final ps = await _db.from('profiles').select('id, first_name, last_name').inFilter('id', teacherIds);
       for (final p in ps) { teacherNames[p['id'] as String] = _joinName(p); }
     }
 
+    final classIds = classes.map((s) => s['id'] as String).toList();
     final enrollData = await _db.from('enrollments')
-        .select('course_id')
-        .inFilter('course_id', courseIds)
+        .select('class_id')
+        .inFilter('class_id', classIds)
         .neq('status', 'dropped');
     final Map<String, int> enrollCounts = {};
     for (final e in enrollData) {
-      final cid = e['course_id'] as String;
-      enrollCounts[cid] = (enrollCounts[cid] ?? 0) + 1;
+      final cid = e['class_id'] as String?;
+      if (cid != null) enrollCounts[cid] = (enrollCounts[cid] ?? 0) + 1;
     }
 
-    return data.map((c) {
-      final tid = c['teacher_id'] as String?;
-      return AdminEnrollmentRecord(
-        courseId: c['id'] as String,
-        courseCode: c['code'] as String,
-        courseName: c['name'] as String,
-        teacherName: tid != null ? teacherNames[tid] : null,
-        enrolled: enrollCounts[c['id'] as String] ?? 0,
-        maxStudents: c['max_students'] as int? ?? 40,
+    return classes.map((s) {
+      final cid = s['id'] as String;
+      final teacherId = s['teacher_id'] as String?;
+      final semId = s['semester_id'] as String?;
+      return AdminClass(
+        id: cid,
+        courseId: courseId,
+        courseCode: courseCode,
+        courseName: courseName,
+        semesterId: semId,
+        semesterName: semId != null ? semNames[semId] : null,
+        teacherId: teacherId,
+        teacherName: teacherId != null ? teacherNames[teacherId] : null,
+        programType: s['program_type'] as String? ?? 'national',
+        scheduleType: s['schedule_type'] as String? ?? 'weekday',
+        shift: s['shift'] as String,
+        classCode: s['class_code'] as String,
+        room: s['room'] as String?,
+        maxStudents: s['max_students'] as int? ?? 30,
+        enrolledCount: enrollCounts[cid] ?? 0,
+        status: s['status'] as String? ?? 'active',
       );
     }).toList();
   }
 
-  Future<List<AdminAttendanceRecord>> getAttendanceRecords({String? courseId}) async {
-    var query = _db.from('attendance').select('id, student_id, course_id, date, status');
-    final List<Map<String, dynamic>> data;
-    if (courseId != null) {
-      data = await query.eq('course_id', courseId).order('date', ascending: false).limit(50);
-    } else {
-      data = await query.order('date', ascending: false).limit(50);
-    }
+  Future<void> createClass({
+    required String courseId,
+    required String semesterId,
+    String? teacherId,
+    required String programType,
+    required String scheduleType,
+    required String shift,
+    required String classCode,
+    String? room,
+    int maxStudents = 30,
+  }) async {
+    await _db.from('classes').insert({
+      'course_id': courseId,
+      'semester_id': semesterId,
+      if (teacherId != null && teacherId.isNotEmpty) 'teacher_id': teacherId,
+      'program_type': programType,
+      'schedule_type': scheduleType,
+      'shift': shift,
+      'class_code': classCode.trim().toUpperCase(),
+      if (room != null && room.trim().isNotEmpty) 'room': room.trim(),
+      'max_students': maxStudents,
+      'status': 'active',
+    });
+  }
+
+  Future<void> updateClass({
+    required String classId,
+    required String semesterId,
+    String? teacherId,
+    required String programType,
+    required String scheduleType,
+    required String shift,
+    required String classCode,
+    String? room,
+    required int maxStudents,
+  }) async {
+    await _db.from('classes').update({
+      'semester_id': semesterId,
+      'teacher_id': (teacherId != null && teacherId.isNotEmpty) ? teacherId : null,
+      'program_type': programType,
+      'schedule_type': scheduleType,
+      'shift': shift,
+      'class_code': classCode.trim().toUpperCase(),
+      'room': (room != null && room.trim().isNotEmpty) ? room.trim() : null,
+      'max_students': maxStudents,
+    }).eq('id', classId);
+  }
+
+  Future<void> deleteClass(String classId) async {
+    await _db.from('classes').update({'status': 'inactive'}).eq('id', classId);
+  }
+
+  Future<void> enrollStudent({
+    required String studentId,
+    required String classId,
+  }) async {
+    final cls = await _db.from('classes')
+        .select('course_id, semester_id')
+        .eq('id', classId)
+        .single();
+    await _db.from('enrollments').insert({
+      'student_id': studentId,
+      'class_id': classId,
+      'course_id': cls['course_id'] as String,
+      'semester_id': cls['semester_id'] as String,
+      'status': 'enrolled',
+    });
+  }
+
+  Future<void> dropEnrollment(String enrollmentId) async {
+    await _db
+        .from('enrollments')
+        .update({'status': 'dropped'})
+        .eq('id', enrollmentId);
+  }
+
+  Future<List<AdminAttendanceRecord>> getAttendanceRecords() async {
+    final data = await _db
+        .from('attendance')
+        .select('id, student_id, course_id, date, status')
+        .order('date', ascending: false)
+        .limit(500);
     if (data.isEmpty) return [];
 
     final studentIds = data.map((a) => a['student_id'] as String).toSet().toList();
-    final courseIds = data.map((a) => a['course_id'] as String).toSet().toList();
+    final courseIds  = data.map((a) => a['course_id']  as String).toSet().toList();
 
-    final profiles = await _db.from('profiles').select('id, first_name, last_name').inFilter('id', studentIds);
-    final Map<String, String> nameMap = {for (final p in profiles) p['id'] as String: _joinName(p)};
+    // ── student profiles ──────────────────────────────────────────────────────
+    final profiles = await _db.from('profiles')
+        .select('id, first_name, last_name')
+        .inFilter('id', studentIds);
+    final nameMap = <String, String>{
+      for (final p in profiles) p['id'] as String: _joinName(p),
+    };
 
-    final studentsData = await _db.from('students').select('id, student_code').inFilter('id', studentIds);
-    final Map<String, String> codeMap = {for (final s in studentsData) s['id'] as String: s['student_code'] as String};
+    // ── students (code, year_level, major_id) ─────────────────────────────────
+    final studentsData = await _db.from('students')
+        .select('id, student_code, year_level, major_id')
+        .inFilter('id', studentIds);
+    final Map<String, Map<String, dynamic>> studentMap = {
+      for (final s in studentsData) s['id'] as String: s,
+    };
 
-    final coursesData = await _db.from('courses').select('id, name').inFilter('id', courseIds);
-    final Map<String, String> courseNameMap = {for (final c in coursesData) c['id'] as String: c['name'] as String};
+    // ── majors ────────────────────────────────────────────────────────────────
+    final majorIds = studentsData
+        .map((s) => s['major_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final Map<String, Map<String, String>> majorMap = {};
+    if (majorIds.isNotEmpty) {
+      final majors = await _db.from('majors')
+          .select('id, name, department_id')
+          .inFilter('id', majorIds);
+      for (final m in majors) {
+        majorMap[m['id'] as String] = {
+          'name':          m['name'] as String,
+          'department_id': m['department_id'] as String? ?? '',
+        };
+      }
+    }
 
+    // ── courses (name, department_id, semester_id) ────────────────────────────
+    final coursesData = await _db.from('courses')
+        .select('id, name, department_id, semester_id')
+        .inFilter('id', courseIds);
+    final Map<String, Map<String, dynamic>> courseMap = {
+      for (final c in coursesData) c['id'] as String: c,
+    };
+
+    // ── departments + faculties ───────────────────────────────────────────────
+    final deptIds = coursesData
+        .map((c) => c['department_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final Map<String, Map<String, String>> deptMap = {};
+    final Map<String, String> facultyNameMap = {};
+    if (deptIds.isNotEmpty) {
+      final depts = await _db.from('departments')
+          .select('id, name, faculty_id')
+          .inFilter('id', deptIds);
+      for (final d in depts) {
+        deptMap[d['id'] as String] = {
+          'name':       d['name'] as String,
+          'faculty_id': d['faculty_id'] as String? ?? '',
+        };
+      }
+      final facIds = depts
+          .map((d) => d['faculty_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      if (facIds.isNotEmpty) {
+        final facs = await _db.from('faculties')
+            .select('id, name')
+            .inFilter('id', facIds);
+        for (final f in facs) {
+          facultyNameMap[f['id'] as String] = f['name'] as String;
+        }
+      }
+    }
+
+    // ── semesters ─────────────────────────────────────────────────────────────
+    final semesterIds = coursesData
+        .map((c) => c['semester_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final Map<String, Map<String, String>> semMap = {};
+    if (semesterIds.isNotEmpty) {
+      final sems = await _db.from('semesters')
+          .select('id, name, academic_year')
+          .inFilter('id', semesterIds);
+      for (final s in sems) {
+        semMap[s['id'] as String] = {
+          'name':          s['name'] as String,
+          'academic_year': s['academic_year'] as String,
+        };
+      }
+    }
+
+    // ── assemble ──────────────────────────────────────────────────────────────
     return data.map((a) {
-      final sid = a['student_id'] as String;
-      final cid = a['course_id'] as String;
+      final sid     = a['student_id'] as String;
+      final cid     = a['course_id']  as String;
+      final student = studentMap[sid];
+      final course  = courseMap[cid];
+      final majorId = student?['major_id'] as String?;
+      final major   = majorId != null ? majorMap[majorId] : null;
+      final deptId  = course?['department_id'] as String?;
+      final dept    = deptId != null ? deptMap[deptId] : null;
+      final facId   = dept?['faculty_id'];
+      final semId   = course?['semester_id'] as String?;
+      final sem     = semId != null ? semMap[semId] : null;
+
       return AdminAttendanceRecord(
-        id: a['id'] as String,
-        studentId: sid,
-        studentName: nameMap[sid] ?? 'Unknown',
-        studentCode: codeMap[sid] ?? '—',
-        courseId: cid,
-        courseName: courseNameMap[cid] ?? 'Unknown Course',
-        date: a['date'] as String,
-        status: a['status'] as String,
+        id:           a['id'] as String,
+        studentId:    sid,
+        studentName:  nameMap[sid] ?? 'Unknown',
+        studentCode:  student?['student_code'] as String? ?? '—',
+        yearLevel:    student?['year_level'] as int?,
+        majorId:      majorId,
+        majorName:    major?['name'],
+        facultyId:    facId,
+        facultyName:  facId != null ? facultyNameMap[facId] : null,
+        courseId:     cid,
+        courseName:   course?['name'] as String? ?? 'Unknown Course',
+        semesterId:   semId,
+        semesterName: sem?['name'],
+        academicYear: sem?['academic_year'],
+        date:         a['date'] as String,
+        status:       a['status'] as String,
       );
     }).toList();
+  }
+
+  Future<void> updateAttendanceStatuses(List<String> ids, String status) async {
+    if (ids.isEmpty) return;
+    await _db.from('attendance').update({'status': status}).inFilter('id', ids);
+  }
+
+  Future<void> deleteAttendanceRecords(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await _db.from('attendance').delete().inFilter('id', ids);
   }
 
   Future<void> createStudent({
@@ -1258,7 +2015,7 @@ class AdminService {
     required String employeeCode,
     String? phone,
     String? position,
-    String? departmentId,
+    String? facultyId,
   }) async {
     final resp = await _admin.auth.admin.createUser(AdminUserAttributes(
       email: email,
@@ -1273,7 +2030,7 @@ class AdminService {
     await _db.from('teachers').insert({
       'id': uid,
       'employee_code': employeeCode,
-      if (departmentId != null) 'department_id': departmentId,
+      if (facultyId != null && facultyId.isNotEmpty) 'faculty_id': facultyId,
       if (position != null && position.isNotEmpty) 'position': position,
       'status': 'active',
     });
@@ -1323,6 +2080,207 @@ class AdminService {
     return null;
   }
 
+  Future<({String? departmentId, String? facultyId})> _resolveMajorHierarchy(String? majorId) async {
+    if (majorId == null || majorId.isEmpty) return (departmentId: null, facultyId: null);
+    final m = await _db.from('majors').select('department_id').eq('id', majorId).maybeSingle();
+    final deptId = m?['department_id'] as String?;
+    if (deptId == null) return (departmentId: null, facultyId: null);
+    final d = await _db.from('departments').select('faculty_id').eq('id', deptId).maybeSingle();
+    return (departmentId: deptId, facultyId: d?['faculty_id'] as String?);
+  }
+
+  Future<void> createCourse({
+    required String code,
+    required String name,
+    String? description,
+    required int credits,
+    String? majorId,
+  }) async {
+    final hierarchy = await _resolveMajorHierarchy(majorId);
+    await _db.from('courses').insert({
+      'code': code.trim().toUpperCase(),
+      'name': name.trim(),
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      'credits': credits,
+      if (majorId != null && majorId.isNotEmpty) 'major_id': majorId,
+      if (hierarchy.departmentId != null) 'department_id': hierarchy.departmentId,
+      if (hierarchy.facultyId != null) 'faculty_id': hierarchy.facultyId,
+      'status': 'active',
+    });
+  }
+
+  Future<void> updateCourse({
+    required String courseId,
+    required String code,
+    required String name,
+    String? description,
+    required int credits,
+    String? majorId,
+  }) async {
+    final hierarchy = await _resolveMajorHierarchy(majorId);
+    await _db.from('courses').update({
+      'code': code.trim().toUpperCase(),
+      'name': name.trim(),
+      'description': (description != null && description.trim().isNotEmpty)
+          ? description.trim()
+          : null,
+      'credits': credits,
+      'major_id': (majorId != null && majorId.isNotEmpty) ? majorId : null,
+      'department_id': hierarchy.departmentId,
+      'faculty_id': hierarchy.facultyId,
+    }).eq('id', courseId);
+  }
+
+  Future<void> deleteCourse(String courseId) async {
+    await _db.from('courses').update({'status': 'inactive'}).eq('id', courseId);
+  }
+
+  Future<void> createSemester({
+    required String name,
+    required String academicYear,
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _db.from('semesters').insert({
+      'name': name.trim(),
+      'academic_year': academicYear.trim(),
+      'start_date': startDate,
+      'end_date': endDate,
+      'is_current': false,
+      'registration_open': false,
+    });
+  }
+
+  Future<void> updateSemester({
+    required String semesterId,
+    required String name,
+    required String academicYear,
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _db.from('semesters').update({
+      'name': name.trim(),
+      'academic_year': academicYear.trim(),
+      'start_date': startDate,
+      'end_date': endDate,
+    }).eq('id', semesterId);
+  }
+
+  Future<void> setCurrentSemester(String semesterId) async {
+    await _db.from('semesters').update({'is_current': false}).neq('id', semesterId);
+    final sem = await _db.from('semesters')
+        .update({'is_current': true})
+        .eq('id', semesterId)
+        .select('academic_year')
+        .maybeSingle();
+
+    // Keep the academic year in sync so admins don't have to set both manually.
+    final academicYear = sem?['academic_year'] as String?;
+    if (academicYear != null) {
+      final year = await _db.from('academic_years').select('id').eq('name', academicYear).maybeSingle();
+      final yearId = year?['id'] as String?;
+      if (yearId != null) {
+        await _db.from('academic_years').update({'is_current': false}).neq('id', yearId);
+        await _db.from('academic_years').update({'is_current': true}).eq('id', yearId);
+      }
+    }
+  }
+
+  Future<void> toggleSemesterRegistration(String semesterId, {required bool open}) async {
+    await _db.from('semesters').update({'registration_open': open}).eq('id', semesterId);
+  }
+
+  Future<void> createAcademicYear({
+    required String name,
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _db.from('academic_years').insert({
+      'name': name.trim(),
+      'start_date': startDate,
+      'end_date': endDate,
+      'is_current': false,
+    });
+  }
+
+  Future<void> updateAcademicYear({
+    required String academicYearId,
+    required String name,
+    required String startDate,
+    required String endDate,
+  }) async {
+    await _db.from('academic_years').update({
+      'name': name.trim(),
+      'start_date': startDate,
+      'end_date': endDate,
+    }).eq('id', academicYearId);
+  }
+
+  Future<void> setCurrentAcademicYear(String academicYearId) async {
+    await _db.from('academic_years').update({'is_current': false}).neq('id', academicYearId);
+    await _db.from('academic_years').update({'is_current': true}).eq('id', academicYearId);
+  }
+
+  Future<void> deleteAcademicYear(String academicYearId) async {
+    await _db.from('academic_years').delete().eq('id', academicYearId);
+  }
+
+  Future<void> updateCourseSchedule({
+    required String courseId,
+    required List<Map<String, dynamic>> schedule,
+  }) async {
+    await _db.from('courses').update({'schedule': schedule}).eq('id', courseId);
+  }
+
+  Future<void> updateFaculty({
+    required String facultyId,
+    required String name,
+    required String code,
+  }) async {
+    await _db.from('faculties').update({
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+    }).eq('id', facultyId);
+  }
+
+  Future<void> updateMajor({
+    required String majorId,
+    required String name,
+  }) async {
+    await _db.from('majors').update({
+      'name': name.trim(),
+    }).eq('id', majorId);
+  }
+
+  Future<void> createFaculty({
+    required String name,
+    required String code,
+  }) async {
+    await _db.from('faculties').insert({
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+    });
+  }
+
+  Future<void> createMajor({
+    required String name,
+    required String departmentId,
+  }) async {
+    await _db.from('majors').insert({
+      'name': name.trim(),
+      'department_id': departmentId,
+    });
+  }
+
+  Future<void> deleteFaculty(String facultyId) async {
+    await _db.from('faculties').delete().eq('id', facultyId);
+  }
+
+  Future<void> deleteMajor(String majorId) async {
+    await _db.from('majors').delete().eq('id', majorId);
+  }
+
   Future<void> updateTeacher({
     required String teacherId,
     required String firstName,
@@ -1330,7 +2288,7 @@ class AdminService {
     String? phone,
     String? position,
     String? statusLabel,
-    String? departmentId,
+    String? facultyId,
   }) async {
     await _db.from('profiles').update({
       'first_name': firstName,
@@ -1340,12 +2298,187 @@ class AdminService {
     final upd = <String, dynamic>{};
     if (position != null) upd['position'] = position.isEmpty ? null : position;
     if (statusLabel != null) upd['status'] = statusLabel == 'Active' ? 'active' : 'inactive';
-    if (departmentId != null) upd['department_id'] = departmentId.isEmpty ? null : departmentId;
+    if (facultyId != null) upd['faculty_id'] = facultyId.isEmpty ? null : facultyId;
     if (upd.isNotEmpty) await _db.from('teachers').update(upd).eq('id', teacherId);
   }
 
   Future<void> deleteUser(String userId) async {
     await _admin.auth.admin.deleteUser(userId);
+  }
+
+  Future<AdminAnalyticsData> getAnalyticsData() async {
+    try {
+      final enrollRows =
+          await _db.from('enrollments').select('enrolled_at');
+      final gradeRows =
+          await _db.from('grades').select('letter_grade, gpa_points');
+      final invoiceRows =
+          await _db.from('invoices').select('amount, status, student_id');
+      final studentRows =
+          await _db.from('students').select('id, faculty_id');
+      final facultyRows =
+          await _db.from('faculties').select('id, name');
+      final attendanceRows =
+          await _db.from('attendance').select('student_id, status');
+
+      // ── Monthly enrollments (last 12 months) ─────────────────────────
+      final monthCounts = <String, int>{};
+      for (final r in enrollRows) {
+        final raw = r['enrolled_at'];
+        if (raw == null) continue;
+        try {
+          final dt = raw is DateTime ? raw : DateTime.parse(raw.toString());
+          final key =
+              '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+          monthCounts[key] = (monthCounts[key] ?? 0) + 1;
+        } catch (_) {}
+      }
+      final now = DateTime.now();
+      final monthly = <({String month, int count})>[];
+      for (var i = 11; i >= 0; i--) {
+        final d = DateTime(now.year, now.month - i, 1);
+        final key =
+            '${d.year}-${d.month.toString().padLeft(2, '0')}';
+        monthly.add((
+          month: _monthAbbr(d.month),
+          count: monthCounts[key] ?? 0,
+        ));
+      }
+
+      // ── Grade distribution ────────────────────────────────────────────
+      final gradeCounts = <String, int>{
+        'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0
+      };
+      var totalGrades = 0;
+      var gpaSum = 0.0;
+      var gpaCount = 0;
+      for (final r in gradeRows) {
+        final g = (r['letter_grade'] as String?)
+            ?.toUpperCase()
+            .substring(0, 1);
+        if (g != null && gradeCounts.containsKey(g)) {
+          gradeCounts[g] = gradeCounts[g]! + 1;
+          totalGrades++;
+        }
+        final gp = (r['gpa_points'] as num?)?.toDouble();
+        if (gp != null) {
+          gpaSum += gp;
+          gpaCount++;
+        }
+      }
+      final gradeDistribution = gradeCounts.entries
+          .map((e) => (grade: e.key, count: e.value))
+          .toList();
+      final passCount = (gradeCounts['A'] ?? 0) +
+          (gradeCounts['B'] ?? 0) +
+          (gradeCounts['C'] ?? 0) +
+          (gradeCounts['D'] ?? 0);
+      final passRate =
+          totalGrades > 0 ? passCount / totalGrades : 0.0;
+      final avgGpa =
+          gpaCount > 0 ? gpaSum / gpaCount : 0.0;
+
+      // ── Faculty maps ──────────────────────────────────────────────────
+      final studentFacMap = <String, String?>{};
+      for (final r in studentRows) {
+        studentFacMap[r['id'] as String] = r['faculty_id'] as String?;
+      }
+      final facultyNameMap = <String, String>{};
+      for (final r in facultyRows) {
+        facultyNameMap[r['id'] as String] = r['name'] as String;
+      }
+
+      // ── Faculty revenue ───────────────────────────────────────────────
+      final facTotal = <String, double>{};
+      final facCollected = <String, double>{};
+      for (final inv in invoiceRows) {
+        final sid = inv['student_id'] as String?;
+        if (sid == null) continue;
+        final facId = studentFacMap[sid];
+        if (facId == null) continue;
+        final amount = (inv['amount'] as num?)?.toDouble() ?? 0;
+        final status = inv['status'] as String? ?? '';
+        facTotal[facId] = (facTotal[facId] ?? 0) + amount;
+        if (status == 'paid') {
+          facCollected[facId] = (facCollected[facId] ?? 0) + amount;
+        }
+      }
+      final facultyRevenue = facultyNameMap.entries
+          .where((e) => facTotal.containsKey(e.key))
+          .map((e) {
+            final total = facTotal[e.key] ?? 0;
+            final collected = facCollected[e.key] ?? 0;
+            final pct =
+                total > 0 ? (collected / total).clamp(0.0, 1.0) : 0.0;
+            return (name: e.value, collectedPct: pct);
+          })
+          .toList()
+        ..sort((a, b) => b.collectedPct.compareTo(a.collectedPct));
+
+      // ── Attendance by faculty ─────────────────────────────────────────
+      final facAttTotal = <String, int>{};
+      final facAttPresent = <String, int>{};
+      final studentAttTotal = <String, int>{};
+      final studentAttPresent = <String, int>{};
+      for (final att in attendanceRows) {
+        final sid = att['student_id'] as String?;
+        if (sid == null) continue;
+        final facId = studentFacMap[sid];
+        final status = att['status'] as String? ?? '';
+        studentAttTotal[sid] = (studentAttTotal[sid] ?? 0) + 1;
+        if (status == 'present' || status == 'late') {
+          studentAttPresent[sid] = (studentAttPresent[sid] ?? 0) + 1;
+        }
+        if (facId != null) {
+          facAttTotal[facId] = (facAttTotal[facId] ?? 0) + 1;
+          if (status == 'present' || status == 'late') {
+            facAttPresent[facId] = (facAttPresent[facId] ?? 0) + 1;
+          }
+        }
+      }
+      final facultyAttendance = facultyNameMap.entries
+          .where((e) => facAttTotal.containsKey(e.key))
+          .map((e) {
+            final total = facAttTotal[e.key] ?? 0;
+            final present = facAttPresent[e.key] ?? 0;
+            final pct =
+                total > 0 ? (present / total).clamp(0.0, 1.0) : 0.0;
+            return (name: e.value, attendancePct: pct);
+          })
+          .toList()
+        ..sort(
+            (a, b) => b.attendancePct.compareTo(a.attendancePct));
+
+      // ── At-risk count (<75% attendance, min 3 sessions) ──────────────
+      var atRisk = 0;
+      for (final sid in studentAttTotal.keys) {
+        final total = studentAttTotal[sid] ?? 0;
+        if (total < 3) continue;
+        final present = studentAttPresent[sid] ?? 0;
+        if (present / total < 0.75) atRisk++;
+      }
+
+      return AdminAnalyticsData(
+        monthlyEnrollments: monthly,
+        facultyRevenue: facultyRevenue,
+        gradeDistribution: gradeDistribution,
+        facultyAttendance: facultyAttendance,
+        atRiskCount: atRisk,
+        avgGpa: avgGpa,
+        passRate: passRate,
+      );
+    } catch (e, st) {
+      debugPrint('getAnalyticsData error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  static String _monthAbbr(int month) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return months[month - 1];
   }
 
   String _studentStatusToDb(String label) {

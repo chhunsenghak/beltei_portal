@@ -43,3 +43,28 @@ final leaveDetailProvider =
       .read(teacherServiceProvider)
       .getLeaveRequestDetail(requestId);
 });
+
+final courseGradesProvider =
+    FutureProvider.family<List<CourseGradeData>, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getCourseGrades(courseId);
+});
+
+final attendanceForDateProvider = FutureProvider.family<Map<String, String>,
+    ({String courseId, String date})>((ref, p) async {
+  return ref.read(teacherServiceProvider).getAttendanceForDate(p.courseId, p.date);
+});
+
+final courseMaterialsProvider =
+    FutureProvider.family<List<CourseMaterialItem>, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getCourseMaterials(courseId);
+});
+
+final attendanceSummaryProvider =
+    FutureProvider.family<AttendanceSummaryData, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getAttendanceSummary(courseId);
+});
+
+final courseAnalyticsProvider =
+    FutureProvider.family<CourseAnalyticsData, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getCourseAnalytics(courseId);
+});

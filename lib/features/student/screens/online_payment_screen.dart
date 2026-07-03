@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kOutstanding = '\$4,250.00';
-const _kDefaultAmount = '4,250.00';
-const _kReceiptNumber = 'RCP-2024-00847';
-const _kStudentName = 'SOVANN REAKSA';
-const _kStudentId = 'B-2024-00892';
+import '../../../core/providers/student_providers.dart';
 
 const _kMethods = [
   (name: 'ABA Bank', icon: Icons.account_balance_outlined),
@@ -19,16 +13,18 @@ const _kMethods = [
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class OnlinePaymentScreen extends StatefulWidget {
+class OnlinePaymentScreen extends ConsumerStatefulWidget {
   const OnlinePaymentScreen({super.key});
 
   @override
-  State<OnlinePaymentScreen> createState() => _OnlinePaymentScreenState();
+  ConsumerState<OnlinePaymentScreen> createState() =>
+      _OnlinePaymentScreenState();
 }
 
-class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
+class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
   int _methodIndex = 0;
-  final _amountController = TextEditingController(text: _kDefaultAmount);
+  final _amountController = TextEditingController();
+  bool _amountInitialized = false;
   bool _processing = false;
   bool _succeeded = false;
 
@@ -38,9 +34,20 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
     super.dispose();
   }
 
+  void _initAmount(double outstanding) {
+    if (_amountInitialized) return;
+    _amountInitialized = true;
+    _amountController.text = outstanding.toStringAsFixed(2);
+  }
+
+  String _receiptNumber(String studentCode) {
+    final hash = studentCode.hashCode.abs() % 100000;
+    return 'RCP-${DateTime.now().year}-${hash.toString().padLeft(5, '0')}';
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  void _confirmPayment() {
+  void _confirmPayment(String studentName, String studentCode) {
     final amount = _amountController.text.trim();
     if (amount.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,7 +56,8 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
               style: AppTextStyles.body.copyWith(color: Colors.white)),
           backgroundColor: AppColors.statusRed,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
@@ -65,12 +73,9 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
   }
 
   Future<void> _processPayment() async {
-    Navigator.of(context).pop(); // close dialog
+    Navigator.of(context).pop();
     setState(() => _processing = true);
-
-    // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 1800));
-
     if (mounted) {
       setState(() {
         _processing = false;
@@ -83,7 +88,21 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_succeeded) return _buildSuccessScreen();
+    final profileAsync = ref.watch(studentProfileProvider);
+    final financeAsync = ref.watch(studentFinanceProvider);
+
+    final profile = profileAsync.valueOrNull;
+    final finance = financeAsync.valueOrNull;
+
+    if (finance != null) _initAmount(finance.outstanding);
+
+    final studentName = profile?.fullName.toUpperCase() ?? '—';
+    final studentCode = profile?.studentCode ?? '—';
+    final outstanding = finance?.outstanding ?? 0.0;
+
+    if (_succeeded) {
+      return _buildSuccessScreen(studentName, studentCode);
+    }
     if (_processing) return _buildProcessingScreen();
 
     return Scaffold(
@@ -94,15 +113,15 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildOutstandingBanner(),
+            _buildOutstandingBanner(outstanding),
             const SizedBox(height: AppSpacing.sectionGap),
             _buildPaymentMethodSelector(),
             const SizedBox(height: AppSpacing.sectionGap),
             _buildAmountField(),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildOrderSummaryCard(),
+            _buildOrderSummaryCard(studentName, studentCode),
             const SizedBox(height: AppSpacing.xl),
-            _buildPayButton(),
+            _buildPayButton(studentName, studentCode),
             const SizedBox(height: 24),
           ],
         ),
@@ -127,26 +146,48 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
 
   // ── Outstanding balance banner ─────────────────────────────────────────────
 
-  Widget _buildOutstandingBanner() {
+  Widget _buildOutstandingBanner(double outstanding) {
+    final isZero = outstanding <= 0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
-        color: AppColors.statusRedBg,
+        color: isZero
+            ? AppColors.statusGreenBg
+            : AppColors.statusRedBg,
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.statusRed.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: isZero
+              ? AppColors.statusGreen.withValues(alpha: 0.3)
+              : AppColors.statusRed.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_outlined, color: AppColors.statusRed),
+          Icon(
+            isZero
+                ? Icons.check_circle_outline
+                : Icons.warning_amber_outlined,
+            color: isZero
+                ? AppColors.statusGreen
+                : AppColors.statusRed,
+          ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Outstanding Balance',
-                  style: AppTextStyles.h3.copyWith(color: AppColors.statusRed)),
-              Text(_kOutstanding,
+              Text(
+                isZero ? 'No Outstanding Balance' : 'Outstanding Balance',
+                style: AppTextStyles.h3.copyWith(
+                    color: isZero
+                        ? AppColors.statusGreen
+                        : AppColors.statusRed),
+              ),
+              if (!isZero)
+                Text(
+                  '\$${outstanding.toStringAsFixed(2)}',
                   style: AppTextStyles.metric.copyWith(
-                      color: AppColors.statusRed, fontSize: 22)),
+                      color: AppColors.statusRed, fontSize: 22),
+                ),
             ],
           ),
         ],
@@ -168,33 +209,45 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
             final method = _kMethods[i];
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: i < _kMethods.length - 1 ? 8 : 0),
+                padding: EdgeInsets.only(
+                    right: i < _kMethods.length - 1 ? 8 : 0),
                 child: GestureDetector(
                   onTap: () => setState(() => _methodIndex = i),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                      color: isSelected
+                          ? AppColors.primaryNavy
+                          : AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(
+                          AppSpacing.cardRadius),
                       border: Border.all(
-                        color: isSelected ? AppColors.primaryNavy : AppColors.border,
+                        color: isSelected
+                            ? AppColors.primaryNavy
+                            : AppColors.border,
                       ),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(method.icon,
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
                             size: 20),
                         const SizedBox(height: 4),
                         Text(
                           method.name,
                           textAlign: TextAlign.center,
                           style: AppTextStyles.caption.copyWith(
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
-                            fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                       ],
@@ -219,10 +272,12 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: _amountController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.attach_money, color: AppColors.textLabel),
+          decoration: InputDecoration(
+            prefixIcon: Icon(Icons.attach_money,
+                color: AppColors.textLabel),
             hintText: '0.00',
           ),
         ),
@@ -232,7 +287,7 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
 
   // ── Order summary ──────────────────────────────────────────────────────────
 
-  Widget _buildOrderSummaryCard() {
+  Widget _buildOrderSummaryCard(String studentName, String studentCode) {
     final amount = _amountController.text.trim().isEmpty
         ? '0.00'
         : _amountController.text.trim();
@@ -248,12 +303,12 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
         children: [
           Text('ORDER SUMMARY', style: AppTextStyles.label),
           const SizedBox(height: 12),
-          _buildSummaryRow('Student', _kStudentName),
-          const Divider(color: AppColors.divider, height: 16),
-          _buildSummaryRow('Student ID', _kStudentId),
-          const Divider(color: AppColors.divider, height: 16),
+          _buildSummaryRow('Student', studentName),
+          Divider(color: AppColors.divider, height: 16),
+          _buildSummaryRow('Student ID', studentCode),
+          Divider(color: AppColors.divider, height: 16),
           _buildSummaryRow('Method', _kMethods[_methodIndex].name),
-          const Divider(color: AppColors.divider, height: 16),
+          Divider(color: AppColors.divider, height: 16),
           _buildSummaryRow('Amount', '\$$amount',
               valueStyle: AppTextStyles.metric
                   .copyWith(color: AppColors.primaryNavy, fontSize: 18)),
@@ -268,7 +323,8 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+            style: AppTextStyles.body
+                .copyWith(color: AppColors.textSecondary)),
         Text(value, style: valueStyle ?? AppTextStyles.bodyMedium),
       ],
     );
@@ -276,12 +332,12 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
 
   // ── Pay button ─────────────────────────────────────────────────────────────
 
-  Widget _buildPayButton() {
+  Widget _buildPayButton(String studentName, String studentCode) {
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: ElevatedButton.icon(
-        onPressed: _confirmPayment,
+        onPressed: () => _confirmPayment(studentName, studentCode),
         icon: const Icon(Icons.lock_outline, size: 18),
         label: Text('Proceed to Pay', style: AppTextStyles.button),
       ),
@@ -298,7 +354,7 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(
+              SizedBox(
                 width: 64,
                 height: 64,
                 child: CircularProgressIndicator(
@@ -311,7 +367,8 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
               const SizedBox(height: 8),
               Text(
                 'Please do not close this screen.',
-                style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -322,10 +379,11 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
-  Widget _buildSuccessScreen() {
+  Widget _buildSuccessScreen(String studentName, String studentCode) {
     final amount = _amountController.text.trim().isEmpty
-        ? _kDefaultAmount
+        ? '0.00'
         : _amountController.text.trim();
+    final receiptNo = _receiptNumber(studentCode);
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -337,11 +395,11 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreenBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_outline,
+                child: Icon(Icons.check_circle_outline,
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
@@ -355,7 +413,7 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              _buildReceiptCard(amount),
+              _buildReceiptCard(amount, studentName, studentCode, receiptNo),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -372,7 +430,8 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
     );
   }
 
-  Widget _buildReceiptCard(String amount) {
+  Widget _buildReceiptCard(String amount, String studentName,
+      String studentCode, String receiptNo) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -382,16 +441,16 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
       ),
       child: Column(
         children: [
-          _buildReceiptRow('Receipt No.', _kReceiptNumber,
+          _buildReceiptRow('Receipt No.', receiptNo,
               valueColor: AppColors.primaryBlue),
-          const Divider(color: AppColors.divider, height: 20),
-          _buildReceiptRow('Student', _kStudentName),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
+          _buildReceiptRow('Student', studentName),
+          Divider(color: AppColors.divider, height: 20),
           _buildReceiptRow('Method', _kMethods[_methodIndex].name),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
           _buildReceiptRow('Amount Paid', '\$$amount',
               valueColor: AppColors.statusGreen),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
           _buildReceiptRow('Status', 'PAID',
               valueColor: AppColors.statusGreen),
         ],
@@ -399,12 +458,14 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
     );
   }
 
-  Widget _buildReceiptRow(String label, String value, {Color? valueColor}) {
+  Widget _buildReceiptRow(String label, String value,
+      {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+            style: AppTextStyles.body
+                .copyWith(color: AppColors.textSecondary)),
         Text(
           value,
           style: AppTextStyles.bodyMedium.copyWith(color: valueColor),
@@ -432,7 +493,8 @@ class _ConfirmDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: AppColors.bgCard,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.cardRadius + 4)),
+          borderRadius:
+              BorderRadius.circular(AppSpacing.cardRadius + 4)),
       title: Text('Confirm Payment', style: AppTextStyles.h2),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -485,11 +547,13 @@ class _DialogRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+            style: AppTextStyles.body
+                .copyWith(color: AppColors.textSecondary)),
         Text(value,
             style: AppTextStyles.bodyMedium.copyWith(
                 color: bold ? AppColors.primaryNavy : AppColors.textPrimary,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+                fontWeight:
+                    bold ? FontWeight.w700 : FontWeight.w600,
                 fontSize: bold ? 16 : null)),
       ],
     );

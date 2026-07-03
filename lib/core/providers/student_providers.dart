@@ -71,3 +71,19 @@ final studentNotificationsProvider =
   if (user == null) return [];
   return ref.read(studentServiceProvider).getNotifications(user.id);
 });
+
+final studentAttendanceCalendarProvider =
+    FutureProvider<Map<String, AttendanceStatus>>((ref) async {
+  final user = await ref.watch(currentUserProvider.future);
+  if (user == null) return {};
+  return ref.read(studentServiceProvider).getAttendanceCalendar(user.id);
+});
+
+final studentCourseAttendanceProvider =
+    FutureProvider.family<List<AttendanceRecord>, String>((ref, courseId) async {
+  final user = await ref.watch(currentUserProvider.future);
+  if (user == null) return [];
+  return ref
+      .read(studentServiceProvider)
+      .getCourseAttendanceHistory(user.id, courseId);
+});

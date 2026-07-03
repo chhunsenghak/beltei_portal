@@ -58,7 +58,7 @@ class _LeaveManagementScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline,
+                    Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
                     Text('Could not load leave requests',
@@ -118,7 +118,7 @@ class _LeaveManagementScreenState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.visibility_outlined,
+                    Icon(Icons.visibility_outlined,
                         size: 14, color: AppColors.statusAmber),
                     const SizedBox(width: 4),
                     Text('View Only',
@@ -210,7 +210,7 @@ class _LeaveManagementScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.inbox_outlined,
+          Icon(Icons.inbox_outlined,
               color: AppColors.textLabel, size: 48),
           const SizedBox(height: 12),
           Text('No requests found',
@@ -288,7 +288,7 @@ class _LeaveCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.visibility_outlined,
+                      Icon(Icons.visibility_outlined,
                           size: 12, color: AppColors.primaryBlue),
                       const SizedBox(width: 4),
                       Text('View Details',
@@ -297,7 +297,7 @@ class _LeaveCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios,
+                Icon(Icons.arrow_forward_ios,
                     size: 14, color: AppColors.primaryNavy),
               ],
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -12,16 +13,43 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _idController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _submitted = false;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
-    _idController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  void _onSubmit() => setState(() => _submitted = true);
+  Future<void> _onSubmit() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email address.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      if (mounted) setState(() => _submitted = true);
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+            () => _errorMessage = 'Something went wrong. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   // ── build ──────────────────────────────────────────────────────────────────
 
@@ -71,7 +99,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textSecondary),
+          Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textSecondary),
           Text('Back', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
         ],
       ),
@@ -86,7 +114,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         color: AppColors.statusBlueBg,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Icon(Icons.lock_reset, color: AppColors.primaryNavy, size: 30),
+      child: Icon(Icons.lock_reset, color: AppColors.primaryNavy, size: 30),
     );
   }
 
@@ -96,7 +124,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildSubtitle() {
     return Text(
-      'Enter your Student ID or Employee ID and we\'ll send reset instructions to your registered email.',
+      'Enter your registered email address and we\'ll send you a password reset link.',
       style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, height: 1.5),
     );
   }
@@ -105,15 +133,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Student ID / Employee ID', style: AppTextStyles.bodySemiBold),
+        Text('Email Address', style: AppTextStyles.bodySemiBold),
         const SizedBox(height: 6),
         TextField(
-          controller: _idController,
-          decoration: const InputDecoration(
-            hintText: 'Enter your ID',
-            prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppColors.textLabel),
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            hintText: 'Enter your email',
+            prefixIcon: Icon(Icons.email_outlined, size: 20, color: AppColors.textLabel),
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage!,
+            style: AppTextStyles.caption.copyWith(color: AppColors.statusRed),
+          ),
+        ],
       ],
     );
   }
@@ -123,8 +159,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: ElevatedButton(
-        onPressed: _onSubmit,
-        child: Text('Send Reset Instructions', style: AppTextStyles.button),
+        onPressed: _isLoading ? null : _onSubmit,
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            : Text('Send Reset Link', style: AppTextStyles.button),
       ),
     );
   }
@@ -187,7 +230,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         color: AppColors.statusGreenBg,
         shape: BoxShape.circle,
       ),
-      child: const Icon(Icons.mark_email_read_outlined, color: AppColors.statusGreen, size: 36),
+      child: Icon(Icons.mark_email_read_outlined, color: AppColors.statusGreen, size: 36),
     );
   }
 }

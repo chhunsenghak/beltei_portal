@@ -6,22 +6,25 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
 
-const _kEnrollmentData = [0.55, 0.62, 0.58, 0.72, 0.68, 0.78, 0.85, 0.80, 0.90, 0.88, 0.95, 0.92];
-const _kMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-final _kDeptAttendance = [
-  (dept: 'Engineering',  pct: 0.92, color: AppColors.primaryNavy),
-  (dept: 'Business',     pct: 0.85, color: AppColors.primaryBlue),
-  (dept: 'IT',           pct: 0.88, color: Color(0xFF7C3AED)),
-  (dept: 'Languages',    pct: 0.79, color: AppColors.statusAmber),
-  (dept: 'Law',          pct: 0.76, color: AppColors.statusRed),
+const _kMonths = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-const _kGradeData = [
-  (grade: 'A (90-100%)', count: 320, color: AppColors.statusGreen),
-  (grade: 'B (80-89%)',  count: 580, color: AppColors.primaryBlue),
-  (grade: 'C (70-79%)',  count: 410, color: AppColors.statusAmber),
-  (grade: 'D (60-69%)',  count: 180, color: AppColors.statusRed),
+final _kGradeColors = [
+  AppColors.statusGreen,
+  AppColors.primaryBlue,
+  AppColors.statusAmber,
+  AppColors.statusRed,
+  AppColors.primaryNavy,
+];
+
+final _kAttendanceColors = [
+  AppColors.primaryNavy,
+  AppColors.primaryBlue,
+  Color(0xFF7C3AED),
+  AppColors.statusAmber,
+  AppColors.statusRed,
 ];
 
 class UniversityAnalyticsScreen extends ConsumerStatefulWidget {
@@ -39,7 +42,9 @@ class _UniversityAnalyticsScreenState
   @override
   Widget build(BuildContext context) {
     final statsAsync = ref.watch(adminStatsProvider);
+    final analyticsAsync = ref.watch(adminAnalyticsProvider);
     final stats = statsAsync.valueOrNull;
+    final analytics = analyticsAsync.valueOrNull;
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
@@ -47,15 +52,15 @@ class _UniversityAnalyticsScreenState
         children: [
           _buildHeader(),
           const SizedBox(height: 16),
-          _buildKpiCards(stats),
+          _buildKpiCards(stats, analytics),
           const SizedBox(height: 20),
-          _buildEnrollmentTrend(),
+          _buildEnrollmentTrend(analytics),
           const SizedBox(height: 16),
-          _buildGradeDistribution(),
+          _buildGradeDistribution(analytics),
           const SizedBox(height: 16),
-          _buildDeptAttendance(),
+          _buildDeptAttendance(analytics),
           const SizedBox(height: 16),
-          _buildAtRiskCard(),
+          _buildAtRiskCard(analytics),
           const SizedBox(height: 24),
         ],
       ),
@@ -93,7 +98,8 @@ class _UniversityAnalyticsScreenState
                       'Fall Semester 2022 — 2023',
                     ]
                         .map((e) => DropdownMenuItem(
-                            value: e, child: Text(e, style: AppTextStyles.caption)))
+                            value: e,
+                            child: Text(e, style: AppTextStyles.caption)))
                         .toList(),
                     onChanged: (v) => setState(() => _semester = v!),
                   ),
@@ -103,8 +109,10 @@ class _UniversityAnalyticsScreenState
             const SizedBox(width: 10),
             ElevatedButton.icon(
               onPressed: () {},
-              icon: const Icon(Icons.download_outlined, size: 14, color: Colors.white),
-              label: Text('Export', style: AppTextStyles.button.copyWith(fontSize: 13)),
+              icon: const Icon(Icons.download_outlined,
+                  size: 14, color: Colors.white),
+              label:
+                  Text('Export', style: AppTextStyles.button.copyWith(fontSize: 13)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryNavy,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -118,12 +126,41 @@ class _UniversityAnalyticsScreenState
     );
   }
 
-  Widget _buildKpiCards(AdminStats? stats) {
+  Widget _buildKpiCards(AdminStats? stats, AdminAnalyticsData? analytics) {
+    // Compute weighted average attendance from faculty data
+    String attendanceLabel = '—';
+    if (analytics != null && analytics.facultyAttendance.isNotEmpty) {
+      final avg = analytics.facultyAttendance
+              .fold<double>(0, (s, f) => s + f.attendancePct) /
+          analytics.facultyAttendance.length;
+      attendanceLabel = '${(avg * 100).toStringAsFixed(1)}%';
+    }
+
     final kpis = [
-      (label: 'Active Students', value: stats != null ? '${stats.studentCount}' : '—', sub: 'enrolled', color: AppColors.primaryNavy),
-      (label: 'Active Courses',  value: stats != null ? '${stats.courseCount}'  : '—', sub: 'this semester', color: AppColors.primaryBlue),
-      (label: 'Attendance Rate', value: '94.8%',  sub: 'avg rate', color: AppColors.statusGreen),
-      (label: 'Revenue Collected', value: stats?.fmtCollected ?? '—', sub: 'this year', color: AppColors.statusAmber),
+      (
+        label: 'Active Students',
+        value: stats != null ? '${stats.studentCount}' : '—',
+        sub: 'enrolled',
+        color: AppColors.primaryNavy
+      ),
+      (
+        label: 'Active Courses',
+        value: stats != null ? '${stats.courseCount}' : '—',
+        sub: 'this semester',
+        color: AppColors.primaryBlue
+      ),
+      (
+        label: 'Attendance Rate',
+        value: attendanceLabel,
+        sub: 'avg rate',
+        color: AppColors.statusGreen
+      ),
+      (
+        label: 'Revenue Collected',
+        value: stats?.fmtCollected ?? '—',
+        sub: 'this year',
+        color: AppColors.statusAmber
+      ),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -144,14 +181,13 @@ class _UniversityAnalyticsScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(k.label,
-                  style: AppTextStyles.label.copyWith(fontSize: 9)),
+              Text(k.label, style: AppTextStyles.label.copyWith(fontSize: 9)),
               Text(k.value,
-                  style: AppTextStyles.metric.copyWith(
-                      color: k.color, fontSize: 20)),
+                  style: AppTextStyles.metric
+                      .copyWith(color: k.color, fontSize: 20)),
               Text(k.sub,
-                  style: AppTextStyles.caption.copyWith(
-                      color: AppColors.statusGreen, fontSize: 11)),
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.statusGreen, fontSize: 11)),
             ],
           ),
         );
@@ -159,130 +195,184 @@ class _UniversityAnalyticsScreenState
     );
   }
 
-  Widget _buildEnrollmentTrend() {
+  Widget _buildEnrollmentTrend(AdminAnalyticsData? analytics) {
+    // Pad/truncate to 12 months; align to _kMonths labels
+    final data = analytics?.monthlyEnrollments ?? [];
+    final maxCount = data.fold<int>(1, (m, e) => e.count > m ? e.count : m);
+
     return _AnalyticsCard(
       title: 'Student Enrollment Trend',
       subtitle: 'Total Enrollment',
       child: SizedBox(
         height: 80,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: List.generate(_kEnrollmentData.length, (i) {
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 1),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Container(
-                      height: _kEnrollmentData[i] * 70,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBlue
-                            .withValues(alpha: 0.2 + _kEnrollmentData[i] * 0.5),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(3)),
+        child: data.isEmpty
+            ? const Center(
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(data.length, (i) {
+                  final norm = data[i].count / maxCount;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            height: (norm * 70).clamp(2.0, 70.0),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlue
+                                  .withValues(alpha: 0.2 + norm * 0.5),
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(3)),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            data[i].month.isNotEmpty
+                                ? data[i].month
+                                : (i < _kMonths.length ? _kMonths[i] : ''),
+                            style: AppTextStyles.label.copyWith(fontSize: 7),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(_kMonths[i],
-                        style: AppTextStyles.label.copyWith(fontSize: 7)),
-                  ],
-                ),
+                  );
+                }),
               ),
-            );
-          }),
-        ),
       ),
     );
   }
 
-  Widget _buildGradeDistribution() {
-    final total = _kGradeData.fold<int>(0, (s, g) => s + g.count);
+  Widget _buildGradeDistribution(AdminAnalyticsData? analytics) {
+    final grades = analytics?.gradeDistribution ?? [];
+    final total =
+        grades.fold<int>(1, (s, g) => s + g.count);
+
     return _AnalyticsCard(
       title: 'Grade Distribution',
-      child: Column(
-        children: _kGradeData.map((g) {
-          final pct = g.count / total;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  child: Text(g.grade,
-                      style: AppTextStyles.label.copyWith(fontSize: 9, letterSpacing: 0)),
-                ),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      minHeight: 12,
-                      backgroundColor: AppColors.border,
-                      valueColor: AlwaysStoppedAnimation<Color>(g.color),
-                    ),
+      child: grades.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ))
+          : Column(
+              children: List.generate(grades.length, (i) {
+                final pct = grades[i].count / total;
+                final color =
+                    _kGradeColors[i % _kGradeColors.length];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          grades[i].grade,
+                          style: AppTextStyles.label
+                              .copyWith(fontSize: 9, letterSpacing: 0),
+                        ),
+                      ),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            minHeight: 12,
+                            backgroundColor: AppColors.border,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 30,
+                        child: Text(
+                          '${(pct * 100).toInt()}%',
+                          style: AppTextStyles.label.copyWith(
+                              fontSize: 9,
+                              letterSpacing: 0,
+                              color: AppColors.textSecondary),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 30,
-                  child: Text('${(pct * 100).toInt()}%',
-                      style: AppTextStyles.label.copyWith(
-                          fontSize: 9, letterSpacing: 0,
-                          color: AppColors.textSecondary)),
-                ),
-              ],
+                );
+              }),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 
-  Widget _buildDeptAttendance() {
+  Widget _buildDeptAttendance(AdminAnalyticsData? analytics) {
+    final depts = analytics?.facultyAttendance ?? [];
+
     return _AnalyticsCard(
       title: 'Department Attendance (%)',
-      child: Column(
-        children: _kDeptAttendance.map((d) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                SizedBox(
-                    width: 80,
-                    child: Text(d.dept,
-                        style: AppTextStyles.label.copyWith(fontSize: 9, letterSpacing: 0))),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: d.pct,
-                      minHeight: 10,
-                      backgroundColor: AppColors.border,
-                      valueColor: AlwaysStoppedAnimation<Color>(d.color),
-                    ),
+      child: depts.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ))
+          : Column(
+              children: List.generate(depts.length, (i) {
+                final color =
+                    _kAttendanceColors[i % _kAttendanceColors.length];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 80,
+                        child: Text(
+                          depts[i].name,
+                          style: AppTextStyles.label
+                              .copyWith(fontSize: 9, letterSpacing: 0),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: depts[i].attendancePct,
+                            minHeight: 10,
+                            backgroundColor: AppColors.border,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(color),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${(depts[i].attendancePct * 100).toInt()}%',
+                        style: AppTextStyles.label.copyWith(
+                            fontSize: 9,
+                            letterSpacing: 0,
+                            color: AppColors.textSecondary),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text('${(d.pct * 100).toInt()}%',
-                    style: AppTextStyles.label.copyWith(
-                        fontSize: 9, letterSpacing: 0,
-                        color: AppColors.textSecondary)),
-              ],
+                );
+              }),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 
-  Widget _buildAtRiskCard() {
+  Widget _buildAtRiskCard(AdminAnalyticsData? analytics) {
+    final label = analytics != null
+        ? '${analytics.atRiskCount} Students'
+        : '— Students';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
         color: AppColors.statusRedBg,
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.statusRed.withValues(alpha: 0.3)),
+        border:
+            Border.all(color: AppColors.statusRed.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -290,21 +380,23 @@ class _UniversityAnalyticsScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('At-Risk Students',
-                  style: AppTextStyles.h3.copyWith(color: AppColors.statusRed)),
+                  style:
+                      AppTextStyles.h3.copyWith(color: AppColors.statusRed)),
               const SizedBox(height: 4),
-              Text('Trend', style: AppTextStyles.caption),
+              Text('Attendance < 75%', style: AppTextStyles.caption),
             ],
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.statusRed,
               borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
             ),
-            child: Text('42 Students',
-                style: AppTextStyles.label.copyWith(
-                    color: Colors.white, letterSpacing: 0.3)),
+            child: Text(label,
+                style: AppTextStyles.label
+                    .copyWith(color: Colors.white, letterSpacing: 0.3)),
           ),
         ],
       ),
@@ -313,7 +405,8 @@ class _UniversityAnalyticsScreenState
 }
 
 class _AnalyticsCard extends StatelessWidget {
-  const _AnalyticsCard({required this.title, this.subtitle, required this.child});
+  const _AnalyticsCard(
+      {required this.title, this.subtitle, required this.child});
   final String title;
   final String? subtitle;
   final Widget child;

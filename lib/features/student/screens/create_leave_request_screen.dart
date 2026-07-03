@@ -65,7 +65,7 @@ class _CreateLeaveRequestScreenState
       lastDate: DateTime(now.year + 1),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
+          colorScheme: ColorScheme.light(
               primary: AppColors.primaryNavy),
         ),
         child: child!,
@@ -348,7 +348,7 @@ class _CreateLeaveRequestScreenState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.schedule,
+          Icon(Icons.schedule,
               color: AppColors.primaryBlue, size: 14),
           const SizedBox(width: 6),
           Text(
@@ -406,7 +406,7 @@ class _CreateLeaveRequestScreenState
           ),
           child: Column(
             children: [
-              const Icon(Icons.cloud_upload_outlined,
+              Icon(Icons.cloud_upload_outlined,
                   color: AppColors.textLabel, size: 32),
               const SizedBox(height: 8),
               Text(
@@ -462,11 +462,11 @@ class _CreateLeaveRequestScreenState
               Container(
                 width: 80,
                 height: 80,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreenBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_outline,
+                child: Icon(Icons.check_circle_outline,
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
@@ -510,13 +510,13 @@ class _CreateLeaveRequestScreenState
       child: Column(
         children: [
           _summaryRow('Type', '$leaveLabel Leave'),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
           _summaryRow('Period',
               '${_formatDate(_startDate!)} → ${_formatDate(_endDate!)}'),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
           _summaryRow('Duration',
               '$_totalDays day${_totalDays == 1 ? '' : 's'}'),
-          const Divider(color: AppColors.divider, height: 20),
+          Divider(color: AppColors.divider, height: 20),
           _summaryRow('Status', 'Pending Review'),
         ],
       ),

@@ -1,6 +1,6 @@
 -- Create majors table (faculty → department → majors)
 CREATE TABLE IF NOT EXISTS majors (
-  id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
   name          TEXT NOT NULL,
   created_at    TIMESTAMPTZ DEFAULT NOW()

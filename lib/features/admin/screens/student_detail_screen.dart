@@ -87,7 +87,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+                    Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
                     Text('Could not load student data', style: AppTextStyles.body),
                   ],
@@ -124,7 +124,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
 
   Widget _buildNavRow(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -132,7 +132,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
+            icon: Icon(Icons.arrow_back, color: AppColors.primaryNavy),
             onPressed: () => context.pop(),
           ),
           Text('Student Detail',
@@ -180,7 +180,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.credit_card_outlined,
+              Icon(Icons.credit_card_outlined,
                   size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 4),
               Text('ID: ${detail.studentCode}', style: AppTextStyles.caption),
@@ -332,9 +332,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       title: 'Contact Info',
       children: [
         _FormField(label: 'Phone Number', controller: _phoneController,
-            prefix: const Icon(Icons.phone_outlined, size: 16, color: AppColors.textSecondary)),
+            prefix: Icon(Icons.phone_outlined, size: 16, color: AppColors.textSecondary)),
         _FormField(label: 'Email Address', controller: _emailController,
-            prefix: const Icon(Icons.email_outlined, size: 16, color: AppColors.textSecondary)),
+            prefix: Icon(Icons.email_outlined, size: 16, color: AppColors.textSecondary)),
         _FormField(label: 'Residential Address', controller: _addressController, maxLines: 3),
       ],
     );
@@ -403,7 +403,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
-              side: const BorderSide(color: AppColors.statusRed),
+              side: BorderSide(color: AppColors.statusRed),
               foregroundColor: AppColors.statusRed,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
@@ -441,7 +441,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           const SizedBox(height: 10),
           TextButton.icon(
             onPressed: _saving ? null : () => _showDeleteDialog(context),
-            icon: const Icon(Icons.delete_outline, color: AppColors.statusRed, size: 16),
+            icon: Icon(Icons.delete_outline, color: AppColors.statusRed, size: 16),
             label: Text('Delete Student', style: AppTextStyles.caption.copyWith(color: AppColors.statusRed)),
           ),
         ],
@@ -472,7 +472,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       ref.invalidate(adminStudentsProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Student updated successfully'), backgroundColor: AppColors.statusGreen),
+          SnackBar(content: Text('Student updated successfully'), backgroundColor: AppColors.statusGreen),
         );
       }
     } catch (e) {
@@ -589,15 +589,15 @@ class _FormField extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.primaryNavy),
+              borderSide: BorderSide(color: AppColors.primaryNavy),
             ),
           ),
         ),

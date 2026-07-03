@@ -297,7 +297,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                       showDivider: !isLast,
                     );
                   }),
-                  const Divider(height: 1, color: AppColors.border),
+                  Divider(height: 1, color: AppColors.border),
                   TextButton(
                     onPressed: () => context.go(AppRoutes.notificationCenter),
                     child: Text('VIEW ALL NOTIFICATIONS',
@@ -409,7 +409,7 @@ class _FinanceSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(color: AppColors.border),
+          Divider(color: AppColors.border),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -453,7 +453,7 @@ class _FinanceSummaryCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time, color: AppColors.statusAmber, size: 18),
+                  Icon(Icons.access_time, color: AppColors.statusAmber, size: 18),
                   const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,7 +568,7 @@ class _NotifActivityItem extends StatelessWidget {
             ],
           ),
         ),
-        if (showDivider) const Divider(height: 1, color: AppColors.divider),
+        if (showDivider) Divider(height: 1, color: AppColors.divider),
       ],
     );
   }

@@ -1,5 +1,5 @@
 name: beltei_seeder
-description: Database seeder for BELTEI Campus Portal
+description: Database seeder for BELTEI Portal
 publish_to: none
 
 environment:

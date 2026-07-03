@@ -31,7 +31,7 @@ class StudentProfileScreen extends ConsumerWidget {
         ),
         data: (profile) {
           if (profile == null) {
-            return const Center(child: Text('Profile not found.'));
+            return _buildProfileNotFound(context, ref);
           }
           final gpa = asyncGrades
               .whenData((semesters) => _cumulativeGpa(semesters))
@@ -64,6 +64,72 @@ class StudentProfileScreen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildProfileNotFound(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.statusRedBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.person_off_outlined,
+                  color: AppColors.statusRed, size: 36),
+            ),
+            const SizedBox(height: 20),
+            Text('Profile Not Found',
+                style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(
+              'Your student record could not be loaded. '
+              'This may be a temporary issue or your account may not be fully set up yet.',
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () => ref.invalidate(studentProfileProvider),
+              icon: const Icon(Icons.refresh, size: 18, color: Colors.white),
+              label: Text('Try Again', style: AppTextStyles.button),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryNavy,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                if (context.mounted) context.go(AppRoutes.login);
+              },
+              icon: Icon(Icons.logout,
+                  size: 18, color: AppColors.statusRed),
+              label: Text('Sign Out',
+                  style: AppTextStyles.button
+                      .copyWith(color: AppColors.statusRed)),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                side: BorderSide(color: AppColors.statusRed),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.buttonRadius)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -293,7 +359,7 @@ class StudentProfileScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.emergency_outlined,
+              Icon(Icons.emergency_outlined,
                   color: AppColors.statusRed, size: 18),
               const SizedBox(width: 8),
               Text('Emergency Contact', style: AppTextStyles.h3),
@@ -363,21 +429,21 @@ class StudentProfileScreen extends ConsumerWidget {
                       Text(e.value.title, style: AppTextStyles.bodyMedium),
                   subtitle:
                       Text(e.value.subtitle, style: AppTextStyles.caption),
-                  trailing: const Icon(Icons.chevron_right,
+                  trailing: Icon(Icons.chevron_right,
                       color: AppColors.textLabel),
                   onTap: e.value.onTap,
                   dense: true,
                 ),
                 if (!isLast)
-                  const Divider(
+                  Divider(
                       color: AppColors.divider, height: 1, indent: 16),
               ],
             );
           }),
-          const Divider(
+          Divider(
               color: AppColors.border, height: 1, indent: 16),
           ListTile(
-            leading: const Icon(Icons.language_outlined,
+            leading: Icon(Icons.language_outlined,
                 color: AppColors.primaryNavy, size: 22),
             title: Text('Language Settings',
                 style: AppTextStyles.bodyMedium),
@@ -389,7 +455,7 @@ class StudentProfileScreen extends ConsumerWidget {
                 Text('English',
                     style: AppTextStyles.bodyMedium
                         .copyWith(color: AppColors.textSecondary)),
-                const Icon(Icons.chevron_right,
+                Icon(Icons.chevron_right,
                     color: AppColors.textLabel),
               ],
             ),
@@ -411,7 +477,7 @@ class StudentProfileScreen extends ConsumerWidget {
       },
       child: Row(
         children: [
-          const Icon(Icons.logout, color: AppColors.statusRed, size: 20),
+          Icon(Icons.logout, color: AppColors.statusRed, size: 20),
           const SizedBox(width: 8),
           Text('Logout',
               style:

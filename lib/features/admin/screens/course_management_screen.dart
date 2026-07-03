@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
+import '../../../shared/widgets/app_toast.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -20,8 +21,7 @@ class CourseManagementScreen extends ConsumerStatefulWidget {
 class _CourseManagementScreenState
     extends ConsumerState<CourseManagementScreen> {
   String _searchQuery = '';
-  String _selectedDept = 'All Departments';
-  String _selectedSemester = 'All Semesters';
+  String _selectedFaculty = 'All Faculties';
   String _selectedTeacher = 'All Teachers';
 
   List<AdminCourse> _applyFilters(List<AdminCourse> all) {
@@ -31,10 +31,8 @@ class _CourseManagementScreenState
         if (!c.name.toLowerCase().contains(q) &&
             !c.code.toLowerCase().contains(q)) return false;
       }
-      if (_selectedDept != 'All Departments' &&
-          c.departmentName != _selectedDept) return false;
-      if (_selectedSemester != 'All Semesters' &&
-          c.semesterName != _selectedSemester) return false;
+      if (_selectedFaculty != 'All Faculties' &&
+          c.facultyName != _selectedFaculty) return false;
       if (_selectedTeacher != 'All Teachers' &&
           c.teacherName != _selectedTeacher) return false;
       return true;
@@ -44,11 +42,14 @@ class _CourseManagementScreenState
   @override
   Widget build(BuildContext context) {
     final coursesAsync = ref.watch(adminCoursesProvider);
+    // Pre-load faculties/majors for the create sheet's Faculty → Major cascade
+    ref.watch(adminFacultiesProvider);
+    ref.watch(adminMajorsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () => _showCreateCourseSheet(context),
         backgroundColor: AppColors.primaryBlue,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -58,7 +59,7 @@ class _CourseManagementScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load courses', style: AppTextStyles.bodyMedium),
@@ -70,22 +71,22 @@ class _CourseManagementScreenState
           ),
         ),
         data: (all) {
-          final depts = ['All Departments'] +
-              all.map((c) => c.departmentName ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort();
-          final semesters = ['All Semesters'] +
-              all.map((c) => c.semesterName ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort();
+          final allFacultiesAsync = ref.watch(adminFacultiesProvider);
+          final facultyNamesFromProvider = allFacultiesAsync.valueOrNull?.map((f) => f.name).toSet() ?? {};
+          final facultyNamesFromCourses = all.map((c) => c.facultyName ?? '').where((s) => s.isNotEmpty).toSet();
+          final mergedFaculties = {...facultyNamesFromProvider, ...facultyNamesFromCourses}.toList()..sort();
+          final faculties = ['All Faculties', ...mergedFaculties];
           final teachers = ['All Teachers'] +
-              all.map((c) => c.teacherName ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort();
+              (all.map((c) => c.teacherName ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort());
 
-          if (!depts.contains(_selectedDept)) _selectedDept = 'All Departments';
-          if (!semesters.contains(_selectedSemester)) _selectedSemester = 'All Semesters';
+          if (!faculties.contains(_selectedFaculty)) _selectedFaculty = 'All Faculties';
           if (!teachers.contains(_selectedTeacher)) _selectedTeacher = 'All Teachers';
 
           final filtered = _applyFilters(all);
 
           return Column(
             children: [
-              _buildFilters(depts, semesters, teachers),
+              _buildFilters(faculties, teachers),
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -109,8 +110,7 @@ class _CourseManagementScreenState
     );
   }
 
-  Widget _buildFilters(
-      List<String> depts, List<String> semesters, List<String> teachers) {
+  Widget _buildFilters(List<String> faculties, List<String> teachers) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -123,47 +123,309 @@ class _CourseManagementScreenState
               hintText: 'Search courses by name or code...',
               hintStyle: AppTextStyles.caption,
               prefixIcon:
-                  const Icon(Icons.search, color: AppColors.textLabel, size: 20),
+                  Icon(Icons.search, color: AppColors.textLabel, size: 20),
               filled: true,
               fillColor: AppColors.bgInput,
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: AppColors.border),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                borderSide: const BorderSide(color: AppColors.primaryNavy),
+                borderSide: BorderSide(color: AppColors.primaryNavy),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          _FilterDropdown(
-            label: 'Department',
-            value: _selectedDept,
-            items: depts,
-            onChanged: (v) => setState(() => _selectedDept = v!),
-          ),
-          const SizedBox(height: 8),
-          _FilterDropdown(
-            label: 'Semester',
-            value: _selectedSemester,
-            items: semesters,
-            onChanged: (v) => setState(() => _selectedSemester = v!),
-          ),
-          const SizedBox(height: 8),
-          _FilterDropdown(
-            label: 'Teacher',
-            value: _selectedTeacher,
-            items: teachers,
-            onChanged: (v) => setState(() => _selectedTeacher = v!),
+          Row(
+            children: [
+              Expanded(
+                child: _FilterDropdown(
+                  label: 'Faculty',
+                  value: _selectedFaculty,
+                  items: faculties,
+                  onChanged: (v) => setState(() => _selectedFaculty = v!),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FilterDropdown(
+                  label: 'Teacher',
+                  value: _selectedTeacher,
+                  items: teachers,
+                  onChanged: (v) => setState(() => _selectedTeacher = v!),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  // ── Create course sheet ───────────────────────────────────────────────────
+
+  Future<void> _showCreateCourseSheet(BuildContext context) async {
+    final faculties = ref.read(adminFacultiesProvider).valueOrNull ?? [];
+    final allMajors = ref.read(adminMajorsProvider).valueOrNull ?? [];
+
+    final codeCtrl    = TextEditingController();
+    final nameCtrl    = TextEditingController();
+    final descCtrl    = TextEditingController();
+    final creditsCtrl = TextEditingController(text: '3');
+
+    String? selectedFacultyId;
+    String? selectedMajorId;
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final filteredMajors = selectedFacultyId == null
+              ? allMajors
+              : allMajors.where((m) => m.facultyId == selectedFacultyId).toList();
+          return Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 20, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('New Course',
+                    style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
+                const SizedBox(height: 4),
+                Text('Assign teachers and shifts by adding classes after creation.',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+                const SizedBox(height: 16),
+                _SheetField(label: 'Course Code *', controller: codeCtrl,
+                    hint: 'e.g. CS101'),
+                const SizedBox(height: 12),
+                _SheetField(label: 'Course Name *', controller: nameCtrl,
+                    hint: 'e.g. Introduction to Programming'),
+                const SizedBox(height: 12),
+                _SheetField(label: 'Description', controller: descCtrl,
+                    hint: 'Optional', maxLines: 3),
+                const SizedBox(height: 12),
+                _SheetField(
+                    label: 'Credits *', controller: creditsCtrl,
+                    hint: '3', keyboardType: TextInputType.number),
+                const SizedBox(height: 12),
+                _SheetDropdown<String?>(
+                  label: 'Faculty',
+                  value: selectedFacultyId,
+                  hint: 'Select faculty',
+                  items: faculties
+                      .map((f) => DropdownMenuItem<String?>(
+                            value: f.id,
+                            child: Text(f.name, overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.body),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setSheet(() {
+                    selectedFacultyId = v;
+                    selectedMajorId = null;
+                  }),
+                ),
+                const SizedBox(height: 12),
+                _SheetDropdown<String?>(
+                  label: 'Major',
+                  value: selectedMajorId,
+                  hint: 'Select major',
+                  items: filteredMajors
+                      .map((m) => DropdownMenuItem<String?>(
+                            value: m.id,
+                            child: Text(m.name, overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.body),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setSheet(() => selectedMajorId = v),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryNavy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final code    = codeCtrl.text.trim();
+                            final name    = nameCtrl.text.trim();
+                            final credits = int.tryParse(creditsCtrl.text.trim()) ?? 3;
+                            if (code.isEmpty || name.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Course code and name are required')),
+                              );
+                              return;
+                            }
+                            setSheet(() => saving = true);
+                            try {
+                              await ref.read(adminServiceProvider).createCourse(
+                                    code: code,
+                                    name: name,
+                                    description: descCtrl.text,
+                                    credits: credits,
+                                    majorId: selectedMajorId,
+                                  );
+                              ref.invalidate(adminCoursesProvider);
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (mounted) showSuccessToast(context, 'Course created.');
+                            } catch (e) {
+                              setSheet(() => saving = false);
+                              if (ctx.mounted) {
+                                final msg = e.toString().contains('unique')
+                                    ? 'A course with that code already exists.'
+                                    : 'Error: $e';
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                      content: Text(msg),
+                                      backgroundColor: AppColors.statusRed),
+                                );
+                              }
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Create Course'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        },
+      ),
+    );
+
+    codeCtrl.dispose();
+    nameCtrl.dispose();
+    descCtrl.dispose();
+    creditsCtrl.dispose();
+  }
+}
+
+// ── Sheet helpers ─────────────────────────────────────────────────────────────
+
+class _SheetField extends StatelessWidget {
+  const _SheetField({
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.maxLines = 1,
+    this.keyboardType,
+  });
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final int maxLines;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: AppTextStyles.caption
+                .copyWith(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: AppTextStyles.body,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle:
+                AppTextStyles.caption.copyWith(color: AppColors.textLabel),
+            filled: true,
+            fillColor: AppColors.bgInput,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.primaryNavy),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SheetDropdown<T> extends StatelessWidget {
+  const _SheetDropdown({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+  });
+  final String label;
+  final T value;
+  final String hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: AppTextStyles.caption
+                .copyWith(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgInput,
+            borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isExpanded: true,
+              hint: Text(hint,
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textLabel)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              items: items,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -260,8 +522,8 @@ class _CourseCard extends StatelessWidget {
                       style: AppTextStyles.label
                           .copyWith(color: color, letterSpacing: 0.6)),
                 ),
-                if (course.semesterName != null)
-                  Text(course.semesterName!,
+                if (course.majorName != null)
+                  Text(course.majorName!,
                       style: AppTextStyles.caption.copyWith(fontSize: 10)),
               ],
             ),
@@ -271,22 +533,22 @@ class _CourseCard extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.person_outline,
+                  Icon(Icons.person_outline,
                       size: 13, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
                   Text(course.teacherName!, style: AppTextStyles.caption),
                 ],
               ),
             ],
-            const Divider(height: 20, color: AppColors.divider),
+            Divider(height: 20, color: AppColors.divider),
             Row(
               children: [
-                const Icon(Icons.school_outlined,
+                Icon(Icons.school_outlined,
                     size: 13, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
                 Text('${course.credits} Credits', style: AppTextStyles.caption),
                 const Spacer(),
-                const Icon(Icons.people_outline,
+                Icon(Icons.people_outline,
                     size: 13, color: AppColors.statusAmber),
                 const SizedBox(width: 4),
                 Text('${course.enrolledCount} / ${course.maxStudents}',

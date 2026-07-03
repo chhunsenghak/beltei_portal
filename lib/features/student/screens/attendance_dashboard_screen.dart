@@ -28,7 +28,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load attendance',
@@ -150,7 +150,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_outlined,
+                  Icon(Icons.warning_amber_outlined,
                       color: AppColors.statusRed, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
@@ -200,7 +200,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
           child: Column(
             children: [
               _buildLogTableHeader(),
-              const Divider(color: AppColors.border, height: 16),
+              Divider(color: AppColors.border, height: 16),
               if (records.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(16),

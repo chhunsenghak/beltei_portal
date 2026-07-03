@@ -131,7 +131,7 @@ class _MarkAttendanceScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load students',
@@ -217,7 +217,7 @@ class _MarkAttendanceScreenState
     final room = slot?['room'] as String? ?? course?.room ?? '---';
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -238,7 +238,7 @@ class _MarkAttendanceScreenState
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreen,
                   shape: BoxShape.circle,
                 ),
@@ -258,7 +258,7 @@ class _MarkAttendanceScreenState
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenPadding, vertical: 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -347,11 +347,11 @@ class _MarkAttendanceScreenState
               Container(
                 width: 80,
                 height: 80,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.statusGreenBg,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle_outline,
+                child: Icon(Icons.check_circle_outline,
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
@@ -423,7 +423,7 @@ class _StudentAttendanceCard extends StatelessWidget {
   final String? status;
   final ValueChanged<String?> onChanged;
 
-  static const _options = [
+  static final _options = [
     (
       value: 'P',
       label: 'Present',

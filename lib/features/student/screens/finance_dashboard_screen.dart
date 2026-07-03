@@ -47,7 +47,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load finance data',
@@ -211,7 +211,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
               value: fin.paidPercent,
               minHeight: 10,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(
+              valueColor: AlwaysStoppedAnimation<Color>(
                   AppColors.primaryNavy),
             ),
           ),
@@ -268,7 +268,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
           child: Column(
             children: [
               _buildTableHeader(),
-              const Divider(color: AppColors.border, height: 1),
+              Divider(color: AppColors.border, height: 1),
               if (invoices.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(24),
@@ -282,7 +282,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
                     children: [
                       _buildInvoiceRow(context, e.value),
                       if (!isLast)
-                        const Divider(
+                        Divider(
                             color: AppColors.divider, height: 1),
                     ],
                   );

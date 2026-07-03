@@ -53,7 +53,7 @@ class _NotificationCenterScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline,
+                    Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
                     Text('Could not load notifications',
@@ -133,7 +133,7 @@ class _NotificationCenterScreenState
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       itemCount: notifications.length,
       separatorBuilder: (_, _) =>
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: AppColors.divider, height: 1),
       itemBuilder: (_, i) => _NotifTile(
         notif: notifications[i],
         onTap: () {
@@ -250,7 +250,7 @@ class _NotifTile extends StatelessWidget {
                           Container(
                             width: 8,
                             height: 8,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: AppColors.statusAmber,
                               shape: BoxShape.circle,
                             ),

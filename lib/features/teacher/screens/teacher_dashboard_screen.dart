@@ -348,7 +348,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.event_available_outlined,
+                Icon(Icons.event_available_outlined,
                     color: AppColors.textLabel, size: 22),
                 const SizedBox(width: 12),
                 Text('No classes scheduled today',
@@ -435,7 +435,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.inbox_outlined,
+                Icon(Icons.inbox_outlined,
                     color: AppColors.textLabel, size: 22),
                 const SizedBox(width: 12),
                 Text('No pending requests',
@@ -498,14 +498,14 @@ class TeacherDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios,
+                Icon(Icons.arrow_forward_ios,
                     size: 14, color: AppColors.primaryNavy),
               ],
             ),
           ),
         ),
         if (showDivider)
-          const Divider(height: 1, color: AppColors.divider),
+          Divider(height: 1, color: AppColors.divider),
       ],
     );
   }
@@ -628,17 +628,17 @@ class _ScheduleTodayCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.access_time_outlined,
+                    Icon(Icons.access_time_outlined,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
                     Text(startTime, style: AppTextStyles.caption),
                     const SizedBox(width: 10),
-                    const Icon(Icons.meeting_room_outlined,
+                    Icon(Icons.meeting_room_outlined,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
                     Text(room, style: AppTextStyles.caption),
                     const SizedBox(width: 10),
-                    const Icon(Icons.people_outline,
+                    Icon(Icons.people_outline,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
                     Text('${course.studentCount} Students',

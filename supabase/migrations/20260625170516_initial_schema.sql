@@ -1,5 +1,5 @@
 -- ============================================================
--- BELTEI Campus Portal — Supabase Schema
+-- BELTEI Portal — Supabase Schema
 -- Run this in: Supabase Dashboard → SQL Editor → New query
 -- ============================================================
 

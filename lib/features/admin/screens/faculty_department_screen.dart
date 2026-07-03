@@ -24,11 +24,15 @@ class _FacultyDepartmentScreenState
   Widget build(BuildContext context) {
     final facultiesAsync = ref.watch(adminFacultiesProvider);
     final majorsAsync = ref.watch(adminMajorsProvider);
+    // pre-load for create-major sheet
+    ref.watch(adminDepartmentsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () => _showFaculties
+            ? _showCreateFacultySheet()
+            : _showCreateMajorSheet(),
         backgroundColor: AppColors.primaryBlue,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -90,7 +94,7 @@ class _FacultyDepartmentScreenState
               color: AppColors.primaryBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.school_outlined,
+            child: Icon(Icons.school_outlined,
                 color: AppColors.primaryBlue, size: 24),
           ),
           const SizedBox(width: 12),
@@ -159,7 +163,10 @@ class _FacultyDepartmentScreenState
           delegate: SliverChildBuilderDelegate(
             (_, i) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _FacultyCard(faculty: faculties[i]),
+              child: _FacultyCard(
+                faculty: faculties[i],
+                onEdit: () => _showEditFacultySheet(faculties[i]),
+              ),
             ),
             childCount: faculties.length,
           ),
@@ -190,7 +197,10 @@ class _FacultyDepartmentScreenState
           delegate: SliverChildBuilderDelegate(
             (_, i) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _MajorCard(major: majors[i]),
+              child: _MajorCard(
+                major: majors[i],
+                onEdit: () => _showEditMajorSheet(majors[i]),
+              ),
             ),
             childCount: majors.length,
           ),
@@ -198,15 +208,403 @@ class _FacultyDepartmentScreenState
       },
     );
   }
+
+  Future<void> _showEditFacultySheet(AdminFaculty faculty) async {
+    final nameCtrl = TextEditingController(text: faculty.name);
+    final codeCtrl = TextEditingController(text: faculty.code);
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 20, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Edit Faculty',
+                  style: AppTextStyles.h3
+                      .copyWith(color: AppColors.primaryNavy)),
+              const SizedBox(height: 16),
+              _SheetField(
+                  label: 'Faculty Name', controller: nameCtrl),
+              const SizedBox(height: 12),
+              _SheetField(
+                  label: 'Faculty Code', controller: codeCtrl),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryNavy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final name = nameCtrl.text.trim();
+                          final code = codeCtrl.text.trim();
+                          if (name.isEmpty || code.isEmpty) return;
+                          setSheetState(() => saving = true);
+                          try {
+                            await ref
+                                .read(adminServiceProvider)
+                                .updateFaculty(
+                                    facultyId: faculty.id,
+                                    name: name,
+                                    code: code);
+                            ref.invalidate(adminFacultiesProvider);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          } catch (e) {
+                            setSheetState(() => saving = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor:
+                                        AppColors.statusRed),
+                              );
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Save Changes'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    nameCtrl.dispose();
+    codeCtrl.dispose();
+  }
+
+  Future<void> _showEditMajorSheet(AdminMajor major) async {
+    final nameCtrl = TextEditingController(text: major.name);
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 20, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Edit Major',
+                  style: AppTextStyles.h3
+                      .copyWith(color: AppColors.primaryNavy)),
+              if (major.facultyName != null) ...[
+                const SizedBox(height: 4),
+                Text(major.facultyName!,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.primaryBlue)),
+              ],
+              const SizedBox(height: 16),
+              _SheetField(label: 'Major Name', controller: nameCtrl),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryNavy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final name = nameCtrl.text.trim();
+                          if (name.isEmpty) return;
+                          setSheetState(() => saving = true);
+                          try {
+                            await ref
+                                .read(adminServiceProvider)
+                                .updateMajor(
+                                    majorId: major.id, name: name);
+                            ref.invalidate(adminMajorsProvider);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          } catch (e) {
+                            setSheetState(() => saving = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                    content: Text('Error: $e'),
+                                    backgroundColor:
+                                        AppColors.statusRed),
+                              );
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Save Changes'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    nameCtrl.dispose();
+  }
+
+  Future<void> _showCreateFacultySheet() async {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 20, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('New Faculty',
+                  style: AppTextStyles.h3
+                      .copyWith(color: AppColors.primaryNavy)),
+              const SizedBox(height: 16),
+              _SheetField(label: 'Faculty Name *', controller: nameCtrl,
+                  hint: 'e.g. Faculty of Computer Science'),
+              const SizedBox(height: 12),
+              _SheetField(label: 'Faculty Code *', controller: codeCtrl,
+                  hint: 'e.g. FCS'),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryNavy,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final name = nameCtrl.text.trim();
+                          final code = codeCtrl.text.trim();
+                          if (name.isEmpty || code.isEmpty) return;
+                          setSheetState(() => saving = true);
+                          try {
+                            await ref
+                                .read(adminServiceProvider)
+                                .createFaculty(name: name, code: code);
+                            ref.invalidate(adminFacultiesProvider);
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          } catch (e) {
+                            setSheetState(() => saving = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: AppColors.statusRed,
+                              ));
+                            }
+                          }
+                        },
+                  child: saving
+                      ? const SizedBox(
+                          height: 18, width: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Create Faculty'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    nameCtrl.dispose();
+    codeCtrl.dispose();
+  }
+
+  Future<void> _showCreateMajorSheet() async {
+    final faculties = ref.read(adminFacultiesProvider).valueOrNull ?? [];
+    final departments = ref.read(adminDepartmentsProvider).valueOrNull ?? [];
+
+    final nameCtrl = TextEditingController();
+    String? selectedFacultyId;
+    String? selectedDeptId;
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final filteredDepts = departments
+              .where((d) => d.facultyId == selectedFacultyId)
+              .toList();
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+                16, 20, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('New Major',
+                    style: AppTextStyles.h3
+                        .copyWith(color: AppColors.primaryNavy)),
+                const SizedBox(height: 16),
+                _SheetField(label: 'Major Name *', controller: nameCtrl,
+                    hint: 'e.g. Software Engineering'),
+                const SizedBox(height: 12),
+                _SheetDropdown<String?>(
+                  label: 'Faculty *',
+                  value: faculties.any((f) => f.id == selectedFacultyId)
+                      ? selectedFacultyId
+                      : null,
+                  hint: 'Select faculty',
+                  items: faculties
+                      .map((f) => DropdownMenuItem<String?>(
+                            value: f.id,
+                            child: Text(f.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.body),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setSheetState(() {
+                    selectedFacultyId = v;
+                    selectedDeptId = null;
+                  }),
+                ),
+                if (selectedFacultyId != null) ...[
+                  const SizedBox(height: 12),
+                  _SheetDropdown<String?>(
+                    label: 'Department *',
+                    value: filteredDepts.any((d) => d.id == selectedDeptId)
+                        ? selectedDeptId
+                        : null,
+                    hint: filteredDepts.isEmpty
+                        ? 'No departments in this faculty'
+                        : 'Select department',
+                    items: filteredDepts
+                        .map((d) => DropdownMenuItem<String?>(
+                              value: d.id,
+                              child: Text(d.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.body),
+                            ))
+                        .toList(),
+                    onChanged: filteredDepts.isEmpty
+                        ? null
+                        : (v) => setSheetState(() => selectedDeptId = v),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryNavy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final name = nameCtrl.text.trim();
+                            if (name.isEmpty || selectedDeptId == null) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Major name and department are required')),
+                              );
+                              return;
+                            }
+                            setSheetState(() => saving = true);
+                            try {
+                              await ref
+                                  .read(adminServiceProvider)
+                                  .createMajor(
+                                      name: name,
+                                      departmentId: selectedDeptId!);
+                              ref.invalidate(adminMajorsProvider);
+                              ref.invalidate(adminFacultiesProvider);
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            } catch (e) {
+                              setSheetState(() => saving = false);
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: AppColors.statusRed,
+                                ));
+                              }
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(
+                            height: 18, width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Create Major'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    nameCtrl.dispose();
+  }
 }
 
 // ── Faculty card ──────────────────────────────────────────────────────────────
 
 class _FacultyCard extends StatelessWidget {
-  const _FacultyCard({required this.faculty});
+  const _FacultyCard({required this.faculty, required this.onEdit});
   final AdminFaculty faculty;
+  final VoidCallback onEdit;
 
-  static const _colors = [
+  static final _colors = [
     AppColors.primaryNavy,
     AppColors.primaryBlue,
     Color(0xFF7C3AED),
@@ -273,8 +671,11 @@ class _FacultyCard extends StatelessWidget {
                     style: AppTextStyles.label.copyWith(
                         color: AppColors.primaryBlue, letterSpacing: 0.3)),
               ),
-              const Icon(Icons.edit_outlined,
-                  size: 18, color: AppColors.textSecondary),
+              GestureDetector(
+                onTap: onEdit,
+                child: Icon(Icons.edit_outlined,
+                    size: 18, color: AppColors.textSecondary),
+              ),
             ],
           ),
         ],
@@ -286,8 +687,9 @@ class _FacultyCard extends StatelessWidget {
 // ── Major card ────────────────────────────────────────────────────────────────
 
 class _MajorCard extends StatelessWidget {
-  const _MajorCard({required this.major});
+  const _MajorCard({required this.major, required this.onEdit});
   final AdminMajor major;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +708,7 @@ class _MajorCard extends StatelessWidget {
               color: AppColors.primaryNavy.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.bookmark_outline,
+            child: Icon(Icons.bookmark_outline,
                 color: AppColors.primaryNavy, size: 18),
           ),
           const SizedBox(width: 12),
@@ -322,10 +724,115 @@ class _MajorCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.edit_outlined,
-              size: 18, color: AppColors.textSecondary),
+          GestureDetector(
+            onTap: onEdit,
+            child: Icon(Icons.edit_outlined,
+                size: 18, color: AppColors.textSecondary),
+          ),
         ],
       ),
+    );
+  }
+}
+
+// ── Sheet text field ──────────────────────────────────────────────────────────
+
+class _SheetField extends StatelessWidget {
+  const _SheetField({
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.keyboardType,
+  });
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: AppTextStyles.caption
+                .copyWith(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: AppTextStyles.body,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle:
+                AppTextStyles.caption.copyWith(color: AppColors.textLabel),
+            filled: true,
+            fillColor: AppColors.bgInput,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+              borderSide: BorderSide(color: AppColors.primaryNavy),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SheetDropdown<T> extends StatelessWidget {
+  const _SheetDropdown({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+  });
+  final String label;
+  final T value;
+  final String hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: AppTextStyles.caption
+                .copyWith(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgInput,
+            borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isExpanded: true,
+              hint: Text(hint,
+                  style:
+                      AppTextStyles.caption.copyWith(color: AppColors.textLabel)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              items: items,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -33,7 +33,7 @@ class _PaymentManagementScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load payments', style: AppTextStyles.bodyMedium),
@@ -291,21 +291,21 @@ class _PaymentManagementScreenState
         hintText: 'Search student name or ID...',
         hintStyle: AppTextStyles.caption,
         prefixIcon:
-            const Icon(Icons.search, color: AppColors.textLabel, size: 20),
+            Icon(Icons.search, color: AppColors.textLabel, size: 20),
         filled: true,
         fillColor: AppColors.bgInput,
         contentPadding: const EdgeInsets.symmetric(vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-          borderSide: const BorderSide(color: AppColors.primaryNavy),
+          borderSide: BorderSide(color: AppColors.primaryNavy),
         ),
       ),
     );
@@ -401,7 +401,7 @@ class _PaymentManagementScreenState
                 ),
               ),
               if (!isLast)
-                const Divider(height: 1, color: AppColors.divider),
+                Divider(height: 1, color: AppColors.divider),
             ],
           );
         }).toList(),

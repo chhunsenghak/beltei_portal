@@ -14,6 +14,10 @@ final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
   return ref.read(adminServiceProvider).getAdminStats();
 });
 
+final appSettingsProvider = FutureProvider<AdminAppSettings>((ref) async {
+  return ref.read(adminServiceProvider).getAppSettings();
+});
+
 final adminStudentsProvider = FutureProvider<List<AdminStudent>>((ref) async {
   return ref.read(adminServiceProvider).getStudents();
 });
@@ -26,6 +30,11 @@ final adminCoursesProvider = FutureProvider<List<AdminCourse>>((ref) async {
   return ref.read(adminServiceProvider).getCourses();
 });
 
+// All courses (active + inactive) — used for filter dropdowns in attendance screen
+final adminAllCoursesProvider = FutureProvider<List<AdminCourse>>((ref) async {
+  return ref.read(adminServiceProvider).getCourses(activeOnly: false);
+});
+
 final adminLeaveRequestsProvider =
     FutureProvider<List<AdminLeaveRequest>>((ref) async {
   return ref.read(adminServiceProvider).getLeaveRequests();
@@ -36,6 +45,11 @@ final adminSemestersProvider =
   return ref.read(adminServiceProvider).getSemesters();
 });
 
+final adminAcademicYearsProvider =
+    FutureProvider<List<AdminAcademicYear>>((ref) async {
+  return ref.read(adminServiceProvider).getAcademicYears();
+});
+
 final adminFacultiesProvider =
     FutureProvider<List<AdminFaculty>>((ref) async {
   return ref.read(adminServiceProvider).getFaculties();
@@ -44,6 +58,11 @@ final adminFacultiesProvider =
 final adminMajorsProvider =
     FutureProvider<List<AdminMajor>>((ref) async {
   return ref.read(adminServiceProvider).getMajors();
+});
+
+final adminDepartmentsProvider =
+    FutureProvider<List<AdminDepartment>>((ref) async {
+  return ref.read(adminServiceProvider).getDepartments();
 });
 
 final adminInvoicesProvider =
@@ -74,4 +93,24 @@ final adminEnrollmentProvider =
 final adminAttendanceProvider =
     FutureProvider<List<AdminAttendanceRecord>>((ref) async {
   return ref.read(adminServiceProvider).getAttendanceRecords();
+});
+
+final courseEnrollmentsProvider =
+    FutureProvider.family<List<CourseEnrollmentEntry>, String>((ref, courseId) async {
+  return ref.read(adminServiceProvider).getCourseEnrollments(courseId);
+});
+
+final classEnrollmentsProvider =
+    FutureProvider.family<List<CourseEnrollmentEntry>, String>((ref, classId) async {
+  return ref.read(adminServiceProvider).getClassEnrollments(classId);
+});
+
+final classesForCourseProvider =
+    FutureProvider.family<List<AdminClass>, String>((ref, courseId) async {
+  return ref.read(adminServiceProvider).getClasses(courseId);
+});
+
+final adminAnalyticsProvider =
+    FutureProvider<AdminAnalyticsData>((ref) async {
+  return ref.read(adminServiceProvider).getAnalyticsData();
 });

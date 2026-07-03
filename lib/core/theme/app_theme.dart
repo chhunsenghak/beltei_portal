@@ -6,16 +6,26 @@ import '../constants/app_spacing.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light => ThemeData(
+  // A getter (not a cached field) so it re-resolves from the current
+  // AppColors brightness every time the app rebuilds after a theme change.
+  static ThemeData get current => ThemeData(
         useMaterial3: true,
+        brightness: AppColors.brightness,
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primaryNavy,
+          brightness: AppColors.brightness,
           primary: AppColors.primaryNavy,
           surface: AppColors.bgPage,
         ),
         scaffoldBackgroundColor: AppColors.bgPage,
-        textTheme: GoogleFonts.interTextTheme(),
-        appBarTheme: const AppBarTheme(
+        textTheme: GoogleFonts.interTextTheme(
+          AppColors.brightness == Brightness.dark
+              ? ThemeData.dark().textTheme
+              : ThemeData.light().textTheme,
+        ).apply(
+          fontFamilyFallback: [GoogleFonts.notoSansKhmer().fontFamily!],
+        ),
+        appBarTheme: AppBarTheme(
           backgroundColor: AppColors.bgPage,
           elevation: 0,
           scrolledUnderElevation: 0,
@@ -27,7 +37,7 @@ class AppTheme {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-            side: const BorderSide(color: AppColors.border),
+            side: BorderSide(color: AppColors.border),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -50,24 +60,24 @@ class AppTheme {
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+            borderSide: BorderSide(color: AppColors.primaryBlue, width: 1.5),
           ),
-          hintStyle: const TextStyle(color: AppColors.textLabel, fontSize: 14),
+          hintStyle: TextStyle(color: AppColors.textLabel, fontSize: 14),
         ),
-        dividerTheme: const DividerThemeData(
+        dividerTheme: DividerThemeData(
           color: AppColors.divider,
           thickness: 1,
           space: 1,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: AppColors.bgCard,
           selectedItemColor: AppColors.primaryNavy,
           unselectedItemColor: AppColors.textSecondary,

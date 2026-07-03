@@ -24,7 +24,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
   final _designationController = TextEditingController();
   final _phoneController       = TextEditingController();
 
-  String? _departmentId;
+  String? _facultyId;
   List<String> _assignedCourses = [];
   int _totalStudents = 0;
 
@@ -47,7 +47,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
       _designationController.text = detail.position ?? '';
       _phoneController.text       = detail.phone ?? '';
       setState(() {
-        _departmentId    = detail.departmentId;
+        _facultyId       = detail.facultyId;
         _assignedCourses = List<String>.from(detail.assignedCourses);
         _totalStudents   = detail.totalStudents;
       });
@@ -72,7 +72,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+                    Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
                     Text('Could not load teacher data\n$e', style: AppTextStyles.body, textAlign: TextAlign.center),
                   ],
@@ -82,6 +82,8 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
                 if (detail == null) {
                   return Center(child: Text('Teacher not found', style: AppTextStyles.body));
                 }
+                final faculties =
+                    ref.watch(adminFacultiesProvider).valueOrNull ?? [];
                 return SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -92,7 +94,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _buildPersonalInfoSection(),
+                            _buildPersonalInfoSection(faculties),
                             const SizedBox(height: 16),
                             _buildAssignedCoursesSection(),
                             const SizedBox(height: 16),
@@ -116,7 +118,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
 
   Widget _buildNavRow(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -124,7 +126,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: AppColors.primaryNavy),
+            icon: Icon(Icons.arrow_back, color: AppColors.primaryNavy),
             onPressed: () => context.pop(),
           ),
           Text('Teacher Detail',
@@ -183,7 +185,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
+              Icon(Icons.email_outlined, size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 4),
               Text(detail.email, style: AppTextStyles.caption),
             ],
@@ -193,7 +195,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
+                Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
                 Text(detail.phone!, style: AppTextStyles.caption),
               ],
@@ -204,7 +206,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
     );
   }
 
-  Widget _buildPersonalInfoSection() {
+  Widget _buildPersonalInfoSection(List<AdminFaculty> faculties) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -219,7 +221,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Personal Information', style: AppTextStyles.h3),
-              const Icon(Icons.info_outline, size: 18, color: AppColors.textLabel),
+              Icon(Icons.info_outline, size: 18, color: AppColors.textLabel),
             ],
           ),
           const SizedBox(height: 14),
@@ -234,6 +236,13 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
           _LabeledField(label: 'Phone Number', controller: _phoneController),
           const SizedBox(height: 12),
           _LabeledField(label: 'Designation / Position', controller: _designationController),
+          const SizedBox(height: 12),
+          _FacultyDropdown(
+            label: 'Faculty',
+            value: _facultyId,
+            faculties: faculties,
+            onChanged: (v) => setState(() => _facultyId = v),
+          ),
         ],
       ),
     );
@@ -309,7 +318,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
                           const SizedBox(width: 6),
                           GestureDetector(
                             onTap: () => setState(() => _assignedCourses.remove(course)),
-                            child: const Icon(Icons.close,
+                            child: Icon(Icons.close,
                                 size: 14, color: AppColors.textLabel),
                           ),
                         ],
@@ -354,7 +363,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
               value: pct.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
             ),
           ),
           const SizedBox(height: 4),
@@ -406,7 +415,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
             },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
-              side: const BorderSide(color: AppColors.border),
+              side: BorderSide(color: AppColors.border),
               foregroundColor: AppColors.textPrimary,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.buttonRadius)),
@@ -416,7 +425,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: _saving ? null : () => _showDeleteDialog(context),
-            icon: const Icon(Icons.delete_outline, color: AppColors.statusRed, size: 16),
+            icon: Icon(Icons.delete_outline, color: AppColors.statusRed, size: 16),
             label: Text('Delete Teacher', style: AppTextStyles.caption.copyWith(color: AppColors.statusRed)),
           ),
         ],
@@ -433,13 +442,13 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
         lastName: _lastNameController.text.trim(),
         phone: _phoneController.text.trim(),
         position: _designationController.text.trim(),
-        departmentId: _departmentId ?? '',
+        facultyId: _facultyId ?? '',
       );
       ref.invalidate(teacherDetailProvider(widget.teacherId));
       ref.invalidate(adminTeachersProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Teacher updated successfully'), backgroundColor: AppColors.statusGreen),
+          SnackBar(content: Text('Teacher updated successfully'), backgroundColor: AppColors.statusGreen),
         );
       }
     } catch (e) {
@@ -487,6 +496,53 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
   }
 }
 
+class _FacultyDropdown extends StatelessWidget {
+  const _FacultyDropdown({
+    required this.label,
+    required this.value,
+    required this.faculties,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? value;
+  final List<AdminFaculty> faculties;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.bgInput,
+            borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButton<String?>(
+            value: value,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            style: AppTextStyles.body,
+            items: [
+              const DropdownMenuItem(value: null, child: Text('None')),
+              ...faculties.map(
+                (f) => DropdownMenuItem(value: f.id, child: Text(f.name)),
+              ),
+            ],
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _LabeledField extends StatelessWidget {
   const _LabeledField({required this.label, required this.controller});
   final String label;
@@ -509,15 +565,15 @@ class _LabeledField extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.primaryNavy),
+              borderSide: BorderSide(color: AppColors.primaryNavy),
             ),
           ),
         ),

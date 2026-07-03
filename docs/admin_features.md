@@ -1,4 +1,4 @@
-# BELTEI Campus Portal — Admin Features
+# BELTEI Portal — Admin Features
 
 ## Overview
 

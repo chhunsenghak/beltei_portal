@@ -25,7 +25,7 @@ class TeacherCourseListScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load courses',
@@ -85,7 +85,7 @@ class TeacherCourseListScreen extends ConsumerWidget {
         padding: const EdgeInsets.only(top: 60),
         child: Column(
           children: [
-            const Icon(Icons.menu_book_outlined,
+            Icon(Icons.menu_book_outlined,
                 color: AppColors.textLabel, size: 48),
             const SizedBox(height: 12),
             Text('No courses assigned yet.',
@@ -120,7 +120,7 @@ class _CourseCard extends StatelessWidget {
           const SizedBox(height: 10),
           _buildCardMeta(),
           const SizedBox(height: 14),
-          const Divider(color: AppColors.border, height: 1),
+          Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 12),
           _buildCardActions(context),
         ],
@@ -139,7 +139,7 @@ class _CourseCard extends StatelessWidget {
             color: AppColors.primaryNavy.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.menu_book_outlined,
+          child: Icon(Icons.menu_book_outlined,
               color: AppColors.primaryNavy, size: 22),
         ),
         const SizedBox(width: 12),
@@ -198,7 +198,7 @@ class _CourseCard extends StatelessWidget {
             label: const Text('Attendance'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryNavy,
-              side: const BorderSide(color: AppColors.primaryNavy),
+              side: BorderSide(color: AppColors.primaryNavy),
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
@@ -212,7 +212,7 @@ class _CourseCard extends StatelessWidget {
             label: const Text('Grades'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryBlue,
-              side: const BorderSide(color: AppColors.primaryBlue),
+              side: BorderSide(color: AppColors.primaryBlue),
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
@@ -225,9 +225,9 @@ class _CourseCard extends StatelessWidget {
 // ── Small helpers ──────────────────────────────────────────────────────────────
 
 class _CodeChip extends StatelessWidget {
-  const _CodeChip(this.label,
-      {this.color = AppColors.primaryNavy,
-      this.bg = AppColors.statusBlueBg});
+  _CodeChip(this.label, {Color? color, Color? bg})
+      : color = color ?? AppColors.primaryNavy,
+        bg = bg ?? AppColors.statusBlueBg;
   final String label;
   final Color color;
   final Color bg;

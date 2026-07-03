@@ -82,21 +82,21 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
               : 'Search teachers by name, ID or department...',
           hintStyle: AppTextStyles.caption,
           prefixIcon:
-              const Icon(Icons.search, color: AppColors.textLabel, size: 20),
+              Icon(Icons.search, color: AppColors.textLabel, size: 20),
           filled: true,
           fillColor: AppColors.bgInput,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.border),
+            borderSide: BorderSide(color: AppColors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-            borderSide: const BorderSide(color: AppColors.primaryNavy),
+            borderSide: BorderSide(color: AppColors.primaryNavy),
           ),
         ),
       ),
@@ -194,7 +194,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
                     initials: t.initials,
                     name: t.fullName,
                     teacherId: t.employeeCode,
-                    department: t.departmentName ?? 'No Department',
+                    faculty: t.facultyName ?? 'No Faculty',
                     status: t.statusLabel,
                     courses: t.courseCount,
                     onTap: () => context.push('/admin/users/teachers/${t.id}'),
@@ -219,7 +219,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
+          Icon(Icons.error_outline, color: AppColors.statusRed, size: 40),
           const SizedBox(height: 8),
           Text('Could not load data', style: AppTextStyles.bodyMedium),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
@@ -233,7 +233,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.inbox_outlined, color: AppColors.textLabel, size: 48),
+          Icon(Icons.inbox_outlined, color: AppColors.textLabel, size: 48),
           const SizedBox(height: 12),
           Text(msg, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
         ],
@@ -281,7 +281,7 @@ class _StudentRow extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 1),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
@@ -316,7 +316,7 @@ class _StudentRow extends StatelessWidget {
                       color: _statusColor, fontWeight: FontWeight.w600)),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: AppColors.textLabel, size: 18),
+            Icon(Icons.chevron_right, color: AppColors.textLabel, size: 18),
           ],
         ),
       ),
@@ -418,13 +418,14 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
           employeeCode: _employeeCodeCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
           position: _positionCtrl.text.trim(),
+          facultyId: _facultyId,
         );
         ref.invalidate(adminTeachersProvider);
       }
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User created successfully'), backgroundColor: AppColors.statusGreen),
+          SnackBar(content: Text('User created successfully'), backgroundColor: AppColors.statusGreen),
         );
       }
     } catch (e) {
@@ -466,13 +467,13 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
                 children: [
                   Text('Add New User', style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
                   IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.textLabel),
+                    icon: Icon(Icons.close, color: AppColors.textLabel),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             Expanded(
               child: ListView(
                 controller: scrollController,
@@ -584,6 +585,16 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
                     _SheetField(label: 'Employee Code *', controller: _employeeCodeCtrl),
                     const SizedBox(height: 12),
                     _SheetField(label: 'Position', controller: _positionCtrl),
+                    const SizedBox(height: 12),
+                    _SheetDropdown<String?>(
+                      label: 'Faculty',
+                      value: _facultyId,
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('None')),
+                        ...faculties.map((f) => DropdownMenuItem(value: f.id, child: Text(f.name))),
+                      ],
+                      onChanged: (v) => setState(() => _facultyId = v),
+                    ),
                   ],
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -639,15 +650,15 @@ class _SheetField extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-              borderSide: const BorderSide(color: AppColors.primaryNavy),
+              borderSide: BorderSide(color: AppColors.primaryNavy),
             ),
           ),
         ),
@@ -705,13 +716,13 @@ class _TeacherCard extends StatelessWidget {
     required this.initials,
     required this.name,
     required this.teacherId,
-    required this.department,
+    required this.faculty,
     required this.status,
     required this.courses,
     required this.onTap,
   });
 
-  final String initials, name, teacherId, department, status;
+  final String initials, name, teacherId, faculty, status;
   final int courses;
   final VoidCallback onTap;
 
@@ -757,7 +768,7 @@ class _TeacherCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.textLabel, size: 18),
+                Icon(Icons.chevron_right, color: AppColors.textLabel, size: 18),
               ],
             ),
             const SizedBox(height: 8),
@@ -775,12 +786,12 @@ class _TeacherCard extends StatelessWidget {
                 color: AppColors.primaryBlue.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
               ),
-              child: Text(department,
+              child: Text(faculty,
                   style: AppTextStyles.label.copyWith(
                       color: AppColors.primaryBlue, letterSpacing: 0.3)),
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: AppColors.divider),
+            Divider(height: 1, color: AppColors.divider),
             const SizedBox(height: 10),
             Row(
               children: [

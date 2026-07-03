@@ -26,7 +26,7 @@ class TeacherProfileScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load profile',
@@ -166,7 +166,7 @@ class TeacherProfileScreen extends ConsumerWidget {
                                 .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.menu_book_outlined,
+                          child: Icon(Icons.menu_book_outlined,
                               color: AppColors.primaryNavy, size: 18),
                         ),
                         const SizedBox(width: 10),
@@ -288,13 +288,13 @@ class TeacherProfileScreen extends ConsumerWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () => context.go('/login'),
-              icon: const Icon(Icons.logout,
+              icon: Icon(Icons.logout,
                   size: 16, color: AppColors.statusRed),
               label: Text('Sign Out',
                   style: AppTextStyles.button
                       .copyWith(color: AppColors.statusRed)),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.statusRed),
+                side: BorderSide(color: AppColors.statusRed),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -334,7 +334,7 @@ class _SectionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(color: AppColors.border, height: 1),
+          Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 14),
           child,
         ],
@@ -401,7 +401,7 @@ class _SettingsTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: AppColors.primaryNavy, size: 20),
       title: Text(label, style: AppTextStyles.body),
-      trailing: const Icon(Icons.chevron_right,
+      trailing: Icon(Icons.chevron_right,
           color: AppColors.textSecondary),
       onTap: onTap,
     );

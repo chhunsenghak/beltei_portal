@@ -76,7 +76,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline,
+                    Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
                     Text('Could not load courses',
@@ -117,7 +117,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
         decoration: InputDecoration(
           hintText: 'Search courses, professors, or codes...',
           prefixIcon:
-              const Icon(Icons.search, color: AppColors.textLabel, size: 20),
+              Icon(Icons.search, color: AppColors.textLabel, size: 20),
           fillColor: AppColors.bgCard,
           filled: true,
         ),
@@ -244,7 +244,7 @@ class _CourseCard extends StatelessWidget {
       children: [
         _CodeChip(code: course.code),
         const Spacer(),
-        const Icon(Icons.chevron_right, color: AppColors.textLabel, size: 20),
+        Icon(Icons.chevron_right, color: AppColors.textLabel, size: 20),
       ],
     );
   }

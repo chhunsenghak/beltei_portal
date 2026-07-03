@@ -7,26 +7,21 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
 
-// ── Static data ────────────────────────────────────────────────────────────────
-
-const _kEnrollmentMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-const _kEnrollmentValues = [0.55, 0.7, 0.65, 0.82, 0.75, 0.90];
-
-final _kRevenueDepts = [
-  (dept: 'Engineering',  pct: 0.82, color: AppColors.primaryNavy),
-  (dept: 'Business',     pct: 0.65, color: AppColors.primaryBlue),
-  (dept: 'IT',           pct: 0.74, color: Color(0xFF7C3AED)),
-  (dept: 'Languages',    pct: 0.48, color: AppColors.statusAmber),
-  (dept: 'Law',          pct: 0.41, color: AppColors.statusRed),
-];
-
 final _kQuickManagement = [
   (icon: Icons.school_outlined,     label: 'Students',  route: '/admin/users'),
   (icon: Icons.person_outlined,     label: 'Teachers',  route: '/admin/users'),
   (icon: Icons.menu_book_outlined,  label: 'Courses',   route: '/admin/academic'),
-  (icon: Icons.date_range_outlined, label: 'Semesters', route: '/admin/academic'),
+  (icon: Icons.class_outlined,      label: 'Classes',   route: '/admin/academic'),
+  (icon: Icons.how_to_reg_outlined, label: 'Enrollment',route: '/admin/academic'),
   (icon: Icons.payments_outlined,   label: 'Payments',  route: '/admin/finance'),
-  (icon: Icons.bar_chart_outlined,  label: 'Reports',   route: '/admin/finance'),
+];
+
+final _kBarColors = [
+  AppColors.primaryNavy,
+  AppColors.primaryBlue,
+  Color(0xFF7C3AED),
+  AppColors.statusAmber,
+  AppColors.statusRed,
 ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -38,6 +33,8 @@ class AdminDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminStatsProvider);
     final leavesAsync = ref.watch(adminLeaveRequestsProvider);
+    final analyticsAsync = ref.watch(adminAnalyticsProvider);
+    final analytics = analyticsAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -52,21 +49,21 @@ class AdminDashboardScreen extends ConsumerWidget {
             data: (stats) => _buildStatsGrid(stats),
           ),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildEnrollmentTrends(),
+          _buildEnrollmentTrends(analytics),
           const SizedBox(height: AppSpacing.sectionGap),
           statsAsync.when(
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (stats) => _buildAttendanceAndRevenue(stats),
+            error: (_, _) => const SizedBox.shrink(),
+            data: (stats) => _buildAttendanceAndRevenue(stats, analytics),
           ),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAcademicPerformance(),
+          _buildAcademicPerformance(analytics),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildQuickManagement(context),
           const SizedBox(height: AppSpacing.sectionGap),
           leavesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (leaves) => _buildRecentLeaves(context, leaves),
           ),
           const SizedBox(height: 24),
@@ -85,7 +82,7 @@ class AdminDashboardScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.statusRed),
+          Icon(Icons.error_outline, color: AppColors.statusRed),
           const SizedBox(width: 8),
           const Expanded(child: Text('Could not load stats')),
           TextButton(
@@ -121,7 +118,16 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   // ── Enrollment trends ──────────────────────────────────────────────────────
 
-  Widget _buildEnrollmentTrends() {
+  Widget _buildEnrollmentTrends(AdminAnalyticsData? analytics) {
+    // Last 6 months of the 12-month data
+    final monthly = analytics != null && analytics.monthlyEnrollments.length >= 6
+        ? analytics.monthlyEnrollments.sublist(
+            analytics.monthlyEnrollments.length - 6)
+        : List.generate(6, (i) => (month: '', count: 0));
+
+    final maxCount = monthly.fold<int>(
+        1, (m, e) => e.count > m ? e.count : m);
+
     return _SectionCard(
       title: 'Enrollment Trends',
       subtitle: 'Last 6 Months',
@@ -130,7 +136,8 @@ class AdminDashboardScreen extends ConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(_kEnrollmentMonths.length, (i) {
+          children: List.generate(monthly.length, (i) {
+            final norm = monthly[i].count / maxCount;
             return Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -140,18 +147,18 @@ class AdminDashboardScreen extends ConsumerWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 400),
                       width: 28,
-                      height: _kEnrollmentValues[i] * 80,
+                      height: (norm * 80).clamp(2.0, 80.0),
                       decoration: BoxDecoration(
                         color: AppColors.primaryBlue
-                            .withValues(alpha: 0.15 + _kEnrollmentValues[i] * 0.5),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(4)),
+                            .withValues(alpha: 0.15 + norm * 0.5),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4)),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(_kEnrollmentMonths[i],
+                Text(monthly[i].month,
                     style: AppTextStyles.label.copyWith(fontSize: 10)),
               ],
             );
@@ -163,10 +170,13 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   // ── Attendance + Revenue ───────────────────────────────────────────────────
 
-  Widget _buildAttendanceAndRevenue(AdminStats stats) {
+  Widget _buildAttendanceAndRevenue(
+      AdminStats stats, AdminAnalyticsData? analytics) {
     final totalBilled = stats.totalRevenue;
     final collected = stats.collectedRevenue;
     final collectedPct = totalBilled > 0 ? collected / totalBilled : 0.0;
+
+    final depts = analytics?.facultyRevenue ?? [];
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,26 +191,30 @@ class AdminDashboardScreen extends ConsumerWidget {
                   alignment: Alignment.center,
                   children: [
                     SizedBox(
-                      width: 80, height: 80,
+                      width: 80,
+                      height: 80,
                       child: CircularProgressIndicator(
                         value: collectedPct,
                         strokeWidth: 10,
                         backgroundColor: AppColors.statusRedBg,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
+                        valueColor: AlwaysStoppedAnimation<Color>(
                             AppColors.primaryBlue),
                       ),
                     ),
                     Text('${(collectedPct * 100).round()}%',
-                        style: AppTextStyles.bodySemiBold.copyWith(fontSize: 16)),
+                        style: AppTextStyles.bodySemiBold
+                            .copyWith(fontSize: 16)),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LegendDot(color: AppColors.primaryBlue, label: 'Collected'),
+                    _LegendDot(
+                        color: AppColors.primaryBlue, label: 'Collected'),
                     const SizedBox(width: 10),
-                    _LegendDot(color: AppColors.statusRedBg, label: 'Pending'),
+                    _LegendDot(
+                        color: AppColors.statusRedBg, label: 'Pending'),
                   ],
                 ),
               ],
@@ -211,28 +225,46 @@ class AdminDashboardScreen extends ConsumerWidget {
         Expanded(
           child: _SectionCard(
             title: 'Revenue',
-            subtitle: 'by Dept',
-            child: Column(
-              children: _kRevenueDepts.map((d) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(d.dept, style: AppTextStyles.label.copyWith(fontSize: 9)),
-                    const SizedBox(height: 2),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: LinearProgressIndicator(
-                        value: d.pct,
-                        minHeight: 5,
-                        backgroundColor: AppColors.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(d.color),
-                      ),
+            subtitle: 'by Faculty',
+            child: depts.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                  ],
-                ),
-              )).toList(),
-            ),
+                  )
+                : Column(
+                    children: List.generate(
+                      depts.length.clamp(0, 5),
+                      (i) {
+                        final barColor = _kBarColors[
+                            i % _kBarColors.length];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(depts[i].name,
+                                  style: AppTextStyles.label
+                                      .copyWith(fontSize: 9),
+                                  overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 2),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(3),
+                                child: LinearProgressIndicator(
+                                  value: depts[i].collectedPct,
+                                  minHeight: 5,
+                                  backgroundColor: AppColors.border,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      barColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ),
       ],
@@ -241,7 +273,14 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   // ── Academic performance ───────────────────────────────────────────────────
 
-  Widget _buildAcademicPerformance() {
+  Widget _buildAcademicPerformance(AdminAnalyticsData? analytics) {
+    final gpa = analytics != null
+        ? analytics.avgGpa.toStringAsFixed(2)
+        : '—';
+    final pass = analytics != null
+        ? '${(analytics.passRate * 100).toStringAsFixed(1)}%'
+        : '—';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -258,16 +297,14 @@ class AdminDashboardScreen extends ConsumerWidget {
           Text('Academic Performance',
               style: AppTextStyles.h3.copyWith(color: Colors.white)),
           const SizedBox(height: 4),
-          Text('Overall GPA trend across all faculties',
+          Text('Overall GPA & pass rate across all faculties',
               style: AppTextStyles.captionWhite),
           const SizedBox(height: 16),
           Row(
             children: [
-              _PerformanceStat(value: '3.42', label: 'Avg GPA'),
+              _PerformanceStat(value: gpa, label: 'Avg GPA'),
               const SizedBox(width: 24),
-              _PerformanceStat(value: '94.8%', label: 'Pass Rate'),
-              const SizedBox(width: 24),
-              _PerformanceStat(value: '314', label: 'Honors'),
+              _PerformanceStat(value: pass, label: 'Pass Rate'),
             ],
           ),
         ],
@@ -408,7 +445,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (!isLast) const Divider(height: 1, color: AppColors.divider),
+                  if (!isLast) Divider(height: 1, color: AppColors.divider),
                 ],
               );
             }).toList(),

@@ -1,173 +1,171 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+const _kDayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-class _ClassItem {
-  const _ClassItem({
-    required this.title,
+// ── Data model ────────────────────────────────────────────────────────────────
+
+class _Slot {
+  const _Slot({
+    required this.courseName,
+    required this.courseCode,
     required this.room,
-    required this.professor,
+    required this.teacher,
     required this.startHour,
     required this.endHour,
-    required this.startMinute,
-    required this.endMinute,
   });
-  final String title, room, professor;
-  final int startHour, endHour, startMinute, endMinute;
+  final String courseName, courseCode;
+  final String? room, teacher;
+  final double startHour, endHour; // fractional hours, e.g. 8.5 = 08:30
 
-  String get startLabel =>
-      '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')} '
-      '${startHour < 12 ? 'AM' : 'PM'}';
-  String get endLabel =>
-      '${endHour.toString().padLeft(2, '0')}:${endMinute.toString().padLeft(2, '0')} '
-      '${endHour < 12 ? 'AM' : 'PM'}';
-  String get rangeLabel =>
-      '${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')}\n'
-      '-\n'
-      '${endHour.toString().padLeft(2, '0')}:${endMinute.toString().padLeft(2, '0')}';
+  String _fmtHour(double h) {
+    final wholeH = h.toInt();
+    final mins = ((h - wholeH) * 60).round();
+    return '${wholeH.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}';
+  }
+
+  String get startLabel => _fmtHour(startHour);
+  String get endLabel => _fmtHour(endHour);
 }
 
-final _kScheduleByDay = <String, List<_ClassItem>>{
-  'Mon': [
-    _ClassItem(
-      title: 'Advanced Algorithms & Complexity',
-      room: 'Room 402, Science Wing',
-      professor: 'Dr. Sarah Jenkins',
-      startHour: 8, startMinute: 30,
-      endHour: 10, endMinute: 0,
-    ),
-    _ClassItem(
-      title: 'Database Management Systems',
-      room: 'Lab 12, Tech Center',
-      professor: 'Prof. Michael Chen',
-      startHour: 10, startMinute: 30,
-      endHour: 12, endMinute: 0,
-    ),
-    _ClassItem(
-      title: 'Software Engineering Principles',
-      room: 'Auditorium B',
-      professor: 'Dr. Elena Rodriguez',
-      startHour: 13, startMinute: 30,
-      endHour: 15, endMinute: 0,
-    ),
-  ],
-  'Tue': [
-    _ClassItem(
-      title: 'Computer Networks',
-      room: 'Room 305',
-      professor: 'Prof. Alan Wu',
-      startHour: 9, startMinute: 0,
-      endHour: 10, endMinute: 30,
-    ),
-    _ClassItem(
-      title: 'Operating Systems',
-      room: 'Lab 8',
-      professor: 'Dr. Mark Bloom',
-      startHour: 14, startMinute: 0,
-      endHour: 15, endMinute: 30,
-    ),
-  ],
-  'Wed': [
-    _ClassItem(
-      title: 'Advanced Algorithms & Complexity',
-      room: 'Room 402, Science Wing',
-      professor: 'Dr. Sarah Jenkins',
-      startHour: 8, startMinute: 30,
-      endHour: 10, endMinute: 0,
-    ),
-  ],
-  'Thu': [
-    _ClassItem(
-      title: 'Database Management Systems',
-      room: 'Lab 12, Tech Center',
-      professor: 'Prof. Michael Chen',
-      startHour: 10, startMinute: 30,
-      endHour: 12, endMinute: 0,
-    ),
-    _ClassItem(
-      title: 'Software Engineering Principles',
-      room: 'Auditorium B',
-      professor: 'Dr. Elena Rodriguez',
-      startHour: 13, startMinute: 30,
-      endHour: 15, endMinute: 0,
-    ),
-  ],
-  'Fri': [
-    _ClassItem(
-      title: 'Computer Networks',
-      room: 'Room 305',
-      professor: 'Prof. Alan Wu',
-      startHour: 9, startMinute: 0,
-      endHour: 10, endMinute: 30,
-    ),
-  ],
-};
+double _parseHour(String t) {
+  final parts = t.split(':');
+  if (parts.length < 2) return 0;
+  final h = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  return h + m / 60;
+}
 
-const _kDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const _kTimeSlots = [8, 9, 10, 11, 12, 13, 14, 15];
+Map<String, List<_Slot>> _buildScheduleMap(List<EnrolledCourse> courses) {
+  final result = <String, List<_Slot>>{};
+  for (final course in courses) {
+    if (!course.isCurrentSemester) continue;
+    for (final entry in course.schedule) {
+      final day = entry['day'] as String?;
+      final start = entry['start'] as String?;
+      final end = entry['end'] as String?;
+      if (day == null || start == null || end == null) continue;
+      result.putIfAbsent(day, () => []).add(_Slot(
+        courseName: course.name,
+        courseCode: course.code,
+        room: entry['room'] as String?,
+        teacher: course.teacherName,
+        startHour: _parseHour(start),
+        endHour: _parseHour(end),
+      ));
+    }
+  }
+  // Sort each day's slots by start time
+  for (final slots in result.values) {
+    slots.sort((a, b) => a.startHour.compareTo(b.startHour));
+  }
+  return result;
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class ScheduleScreen extends StatefulWidget {
+class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
+  ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   int _selectedDayIndex = 0;
-
-  String get _selectedDay => _kDays[_selectedDayIndex];
-  List<_ClassItem> get _classes => _kScheduleByDay[_selectedDay] ?? [];
-
-  // ── build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final asyncCourses = ref.watch(studentCoursesProvider);
+
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          _buildDayTabs(),
-          Expanded(child: _buildTimeline()),
-        ],
+      body: asyncCourses.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load schedule', style: AppTextStyles.body),
+              TextButton(
+                onPressed: () => ref.invalidate(studentCoursesProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (courses) {
+          final scheduleMap = _buildScheduleMap(courses);
+
+          // Ordered list of days that have at least one slot
+          final activeDays = _kDayOrder
+              .where((d) => scheduleMap.containsKey(d))
+              .toList();
+
+          // If no days have classes, show all weekdays
+          final days = activeDays.isEmpty
+              ? _kDayOrder.sublist(0, 5)
+              : activeDays;
+
+          final safeIndex =
+              _selectedDayIndex.clamp(0, days.length - 1);
+          final selectedDay = days[safeIndex];
+          final slots = scheduleMap[selectedDay] ?? [];
+
+          // Compute time grid bounds from all slots in this day
+          final int firstHour = slots.isEmpty
+              ? 8
+              : slots.map((s) => s.startHour.toInt()).reduce((a, b) => a < b ? a : b);
+          final int lastHour = slots.isEmpty
+              ? 16
+              : (slots
+                      .map((s) => s.endHour.ceil())
+                      .reduce((a, b) => a > b ? a : b))
+                  .clamp(firstHour + 1, 22);
+          final timeSlots =
+              List.generate(lastHour - firstHour, (i) => firstHour + i);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(courses),
+              _buildDayTabs(days, safeIndex),
+              Expanded(
+                child: _buildTimeline(slots, timeSlots, firstHour),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() {
+  Widget _buildHeader(List<EnrolledCourse> courses) {
+    final currentSem = courses
+        .where((c) => c.isCurrentSemester && c.semesterName != null)
+        .map((c) => '${c.semesterName} ${c.semesterAcademicYear ?? ''}')
+        .firstOrNull;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ACADEMIC YEAR 2024', style: AppTextStyles.label),
+          if (currentSem != null)
+            Text(currentSem.trim().toUpperCase(),
+                style: AppTextStyles.label),
           const SizedBox(height: 4),
           Text('Weekly Schedule', style: AppTextStyles.h1),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.statusGrayBg,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.filter_list, size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: 6),
-                Text('Semester 1', style: AppTextStyles.bodyMedium),
-              ],
-            ),
-          ),
           const SizedBox(height: AppSpacing.md),
         ],
       ),
@@ -176,32 +174,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   // ── Day tabs ───────────────────────────────────────────────────────────────
 
-  Widget _buildDayTabs() {
+  Widget _buildDayTabs(List<String> days, int activeIndex) {
     return SizedBox(
       height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        itemCount: _kDays.length,
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        itemCount: days.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final isActive = i == _selectedDayIndex;
+          final isActive = i == activeIndex;
           return GestureDetector(
             onTap: () => setState(() => _selectedDayIndex = i),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primaryNavy : AppColors.bgCard,
-                borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                color: isActive
+                    ? AppColors.primaryNavy
+                    : AppColors.bgCard,
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.chipRadius),
                 border: Border.all(
-                  color: isActive ? AppColors.primaryNavy : AppColors.border,
+                  color: isActive
+                      ? AppColors.primaryNavy
+                      : AppColors.border,
                 ),
               ),
               child: Text(
-                _kDays[i],
+                days[i],
                 style: AppTextStyles.bodySemiBold.copyWith(
-                  color: isActive ? Colors.white : AppColors.textSecondary,
+                  color: isActive
+                      ? Colors.white
+                      : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -213,23 +220,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   // ── Timeline ───────────────────────────────────────────────────────────────
 
-  Widget _buildTimeline() {
+  Widget _buildTimeline(
+      List<_Slot> slots, List<int> timeSlots, int firstHour) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTimeColumn(),
+          _buildTimeColumn(timeSlots),
           const SizedBox(width: 8),
-          Expanded(child: _buildEventColumn()),
+          Expanded(child: _buildEventColumn(slots, timeSlots, firstHour)),
         ],
       ),
     );
   }
 
-  Widget _buildTimeColumn() {
+  Widget _buildTimeColumn(List<int> timeSlots) {
     return Column(
-      children: _kTimeSlots.map((hour) {
+      children: timeSlots.map((hour) {
         final label = hour < 12
             ? '${hour.toString().padLeft(2, '0')}:00 AM'
             : hour == 12
@@ -247,73 +255,94 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Widget _buildEventColumn() {
-    if (_classes.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: 60),
-          child: Text('No classes today'),
+  Widget _buildEventColumn(
+      List<_Slot> slots, List<int> timeSlots, int firstHour) {
+    if (slots.isEmpty) {
+      return SizedBox(
+        height: timeSlots.length * 72.0,
+        child: Stack(
+          children: [
+            Column(
+              children: timeSlots
+                  .map((_) => SizedBox(
+                        height: 72,
+                        child: Column(children: [
+                          Divider(color: AppColors.border, height: 1),
+                          Spacer(),
+                        ]),
+                      ))
+                  .toList(),
+            ),
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 60),
+                child: Text('No classes today'),
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return Stack(
-      children: [
-        // Divider lines per time slot
-        Column(
-          children: _kTimeSlots.map((hour) {
-            final isLunch = hour == 13;
-            return SizedBox(
-              height: 72,
-              child: Column(
-                children: [
-                  if (isLunch)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Expanded(child: Divider(color: AppColors.border)),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('LUNCH BREAK', style: AppTextStyles.label),
-                          ),
-                          const Expanded(child: Divider(color: AppColors.border)),
-                        ],
-                      ),
-                    )
-                  else
-                    const Divider(color: AppColors.border, height: 1),
-                  const Spacer(),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-        // Class cards
-        ..._classes.map((cls) => _buildClassCard(cls)),
-      ],
+    return SizedBox(
+      height: timeSlots.length * 72.0,
+      child: Stack(
+        children: [
+          Column(
+            children: timeSlots.map((hour) {
+              final isLunch = hour == 12;
+              return SizedBox(
+                height: 72,
+                child: Column(
+                  children: [
+                    if (isLunch)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                                child: Divider(color: AppColors.border)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8),
+                              child: Text('LUNCH BREAK',
+                                  style: AppTextStyles.label),
+                            ),
+                            Expanded(
+                                child: Divider(color: AppColors.border)),
+                          ],
+                        ),
+                      )
+                    else
+                      Divider(color: AppColors.border, height: 1),
+                    const Spacer(),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          ...slots.map((slot) => _buildSlotCard(slot, firstHour)),
+        ],
+      ),
     );
   }
 
-  Widget _buildClassCard(_ClassItem cls) {
-    final topOffset = (cls.startHour - _kTimeSlots.first) * 72.0 +
-        cls.startMinute / 60 * 72.0;
-    final durationHours =
-        (cls.endHour - cls.startHour) + (cls.endMinute - cls.startMinute) / 60;
-    final height = durationHours * 72.0;
+  Widget _buildSlotCard(_Slot slot, int firstHour) {
+    final topOffset = (slot.startHour - firstHour) * 72.0;
+    final height = (slot.endHour - slot.startHour) * 72.0;
 
     return Positioned(
       top: topOffset,
       left: 0,
       right: 0,
-      height: height,
+      height: height.clamp(36.0, double.infinity),
       child: Container(
         margin: const EdgeInsets.only(right: 4, bottom: 2),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-          border: const Border(
+          border: Border(
             left: BorderSide(color: AppColors.primaryNavy, width: 3),
           ),
           boxShadow: [
@@ -331,47 +360,54 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cls.title,
+                  Text(slot.courseName,
                       style: AppTextStyles.h3,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.door_back_door_outlined,
-                          size: 13, color: AppColors.textSecondary),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(cls.room,
-                            style: AppTextStyles.caption,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline,
-                          size: 13, color: AppColors.textSecondary),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(cls.professor,
-                            style: AppTextStyles.caption,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
+                  if (slot.room != null)
+                    Row(
+                      children: [
+                        Icon(Icons.door_back_door_outlined,
+                            size: 13,
+                            color: AppColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(slot.room!,
+                              style: AppTextStyles.caption,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  if (slot.teacher != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline,
+                            size: 13,
+                            color: AppColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(slot.teacher!,
+                              style: AppTextStyles.caption,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+                color:
+                    AppColors.primaryBlue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '${cls.startHour.toString().padLeft(2, '0')}:${cls.startMinute.toString().padLeft(2, '0')}\n-\n${cls.endHour.toString().padLeft(2, '0')}:${cls.endMinute.toString().padLeft(2, '0')}',
+                '${slot.startLabel}\n-\n${slot.endLabel}',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.caption.copyWith(
                     color: AppColors.primaryBlue,

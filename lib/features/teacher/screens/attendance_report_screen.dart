@@ -1,99 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-
-// ── Mock data ──────────────────────────────────────────────────────────────────
-
-const _kCourses = [
-  'Advanced Web Development (WD-401)',
-  'Introduction to Computer Science (CS101)',
-  'Data Structures & Algorithms (CS301)',
-];
-
-class _StudentRecord {
-  const _StudentRecord({required this.name, required this.present, required this.absent});
-  final String name;
-  final int present, absent;
-}
-
-const _kRecords = [
-  _StudentRecord(name: 'Liam Henderson',  present: 22, absent: 1),
-  _StudentRecord(name: 'Sophia Martinez', present: 16, absent: 4),
-  _StudentRecord(name: 'Ethan Wright',    present: 20, absent: 2),
-  _StudentRecord(name: 'Ava Thompson',    present: 13, absent: 9),
-  _StudentRecord(name: 'Isabella Garcia', present: 14, absent: 6),
-];
+import '../../../core/providers/teacher_providers.dart';
+import '../../../core/services/teacher_service.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class AttendanceReportScreen extends StatefulWidget {
+class AttendanceReportScreen extends ConsumerWidget {
   const AttendanceReportScreen({super.key, required this.courseId});
   final String courseId;
 
   @override
-  State<AttendanceReportScreen> createState() => _AttendanceReportScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final courseAsync = ref.watch(courseInfoProvider(courseId));
+    final summaryAsync = ref.watch(attendanceSummaryProvider(courseId));
 
-class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
-  String _selectedCourse = _kCourses[0];
-  final _fromController = TextEditingController(text: '09/01/2023');
-  final _toController   = TextEditingController(text: '12/15/2023');
-
-  @override
-  void dispose() {
-    _fromController.dispose();
-    _toController.dispose();
-    super.dispose();
-  }
-
-  void _apply() {
-    FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Filter applied.',
-            style: AppTextStyles.body.copyWith(color: Colors.white)),
-        backgroundColor: AppColors.primaryNavy,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTitle(),
-            const SizedBox(height: AppSpacing.md),
-            _buildExportButton(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildFilterCard(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildStatCards(),
-            const SizedBox(height: AppSpacing.sectionGap),
-            _buildStudentRecords(),
-            const SizedBox(height: 24),
-          ],
+      body: summaryAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  color: AppColors.statusRed, size: 40),
+              const SizedBox(height: 8),
+              Text('Could not load report', style: AppTextStyles.body),
+              TextButton(
+                onPressed: () =>
+                    ref.invalidate(attendanceSummaryProvider(courseId)),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
+        data: (summary) {
+          final course = courseAsync.valueOrNull;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTitle(course?.name),
+                const SizedBox(height: AppSpacing.md),
+                _buildExportButton(),
+                const SizedBox(height: AppSpacing.sectionGap),
+                _buildStatCards(summary),
+                const SizedBox(height: AppSpacing.sectionGap),
+                _buildStudentRecords(summary),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle() {
+  Widget _buildTitle(String? courseName) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Attendance Report', style: AppTextStyles.h1),
-        Text('Analyze student participation and attendance patterns for the current semester.',
-            style: AppTextStyles.caption.copyWith(height: 1.4)),
+        if (courseName != null)
+          Text(courseName,
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.primaryNavy)),
+        if (courseName == null)
+          Text('Analyze student participation and attendance patterns.',
+              style: AppTextStyles.caption.copyWith(height: 1.4)),
       ],
     );
   }
@@ -111,137 +91,48 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     );
   }
 
-  // ── Filter card ────────────────────────────────────────────────────────────
-
-  Widget _buildFilterCard() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('SELECT COURSE', style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          _buildCourseDropdown(),
-          const SizedBox(height: 16),
-          Text('DATE RANGE FILTER', style: AppTextStyles.label),
-          const SizedBox(height: 8),
-          TextField(
-              controller: _fromController,
-              decoration: const InputDecoration(
-                hintText: 'mm/dd/yyyy',
-              )),
-          const SizedBox(height: 8),
-          Text('to', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
-          TextField(
-              controller: _toController,
-              decoration: const InputDecoration(
-                hintText: 'mm/dd/yyyy',
-              )),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _apply,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text('Apply', style: AppTextStyles.button),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseDropdown() {
-    return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        backgroundColor: AppColors.bgCard,
-        shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (_) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 16),
-            ..._kCourses.map((c) => ListTile(
-                  title: Text(c, style: AppTextStyles.body),
-                  trailing: c == _selectedCourse
-                      ? const Icon(Icons.check, color: AppColors.primaryNavy)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedCourse = c);
-                    Navigator.pop(context);
-                  },
-                )),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.bgPage,
-          borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(_selectedCourse,
-                  style: AppTextStyles.body,
-                  overflow: TextOverflow.ellipsis),
-            ),
-            const Icon(Icons.keyboard_arrow_down,
-                color: AppColors.textLabel),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Stat cards ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatCards() {
+  Widget _buildStatCards(AttendanceSummaryData summary) {
+    final presentRate = summary.avgPresentRate;
+    final absentRate =
+        summary.students.isNotEmpty && summary.totalSessions > 0
+            ? summary.totalAbsent /
+                (summary.students.length * summary.totalSessions)
+            : 0.0;
+
     return Column(
       children: [
         _AccentCard(
           accentColor: AppColors.primaryNavy,
-          label: 'TOTAL CLASSES',
-          value: '24 Sessions',
-          subLabel: 'Semestral Total',
-          subIcon: Icons.calendar_today_outlined,
+          label: 'TOTAL SESSIONS',
+          value: '${summary.totalSessions} Sessions',
+          subLabel: '${summary.students.length} Students',
+          subIcon: Icons.people_outline,
         ),
         const SizedBox(height: 10),
         _AccentCard(
           accentColor: AppColors.statusGreen,
           label: 'PRESENT AVG',
-          value: '92%',
-          progress: 0.92,
+          value: '${(presentRate * 100).toStringAsFixed(1)}%',
+          progress: presentRate.clamp(0, 1),
           progressColor: AppColors.statusGreen,
         ),
         const SizedBox(height: 10),
         _AccentCard(
           accentColor: AppColors.statusRed,
           label: 'ABSENT AVG',
-          value: '5%',
-          progress: 0.05,
+          value: '${(absentRate * 100).toStringAsFixed(1)}%',
+          progress: absentRate.clamp(0, 1),
           progressColor: AppColors.statusRed,
         ),
       ],
     );
   }
 
-  // ── Student records table ──────────────────────────────────────────────────
+  // ── Student records ────────────────────────────────────────────────────────
 
-  Widget _buildStudentRecords() {
+  Widget _buildStudentRecords(AttendanceSummaryData summary) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -256,16 +147,35 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
           child: Column(
             children: [
               _buildTableHeader(),
-              const Divider(height: 1, color: AppColors.border),
-              ..._kRecords.asMap().entries.map((e) => Column(
-                    children: [
-                      _buildRecordRow(e.value),
-                      if (e.key < _kRecords.length - 1)
-                        const Divider(height: 1, color: AppColors.divider),
-                    ],
-                  )),
-              const Divider(height: 1, color: AppColors.border),
-              _buildPagination(),
+              Divider(height: 1, color: AppColors.border),
+              if (summary.students.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: Text('No attendance data yet.',
+                        style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary)),
+                  ),
+                )
+              else
+                ...summary.students.asMap().entries.map((e) => Column(
+                      children: [
+                        _buildRecordRow(e.value),
+                        if (e.key < summary.students.length - 1)
+                          Divider(
+                              height: 1, color: AppColors.divider),
+                      ],
+                    )),
+              if (summary.students.isNotEmpty) ...[
+                Divider(height: 1, color: AppColors.border),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Showing all ${summary.students.length} students',
+                    style: AppTextStyles.caption,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -278,7 +188,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
               flex: 3,
               child: Text('STUDENT\nNAME',
                   style: TextStyle(
@@ -286,12 +196,9 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                       fontWeight: FontWeight.w600,
                       color: AppColors.textLabel,
                       letterSpacing: 0.5))),
-          ...[
-            'PRESENT',
-            'ABSENT'
-          ].map((h) => Expanded(
+          ...['PRESENT', 'ABSENT'].map((h) => Expanded(
                 child: Text(h,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textLabel,
@@ -303,7 +210,9 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     );
   }
 
-  Widget _buildRecordRow(_StudentRecord r) {
+  Widget _buildRecordRow(
+      ({String studentId, String fullName, int presentCount, int absentCount})
+          r) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
@@ -314,49 +223,34 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-                  child: Text(r.name[0],
+                  backgroundColor:
+                      AppColors.primaryNavy.withValues(alpha: 0.1),
+                  child: Text(
+                      r.fullName.isNotEmpty ? r.fullName[0].toUpperCase() : '?',
                       style: AppTextStyles.caption.copyWith(
                           color: AppColors.primaryNavy,
                           fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                    child: Text(r.name,
+                    child: Text(r.fullName,
                         style: AppTextStyles.body,
                         overflow: TextOverflow.ellipsis)),
               ],
             ),
           ),
           Expanded(
-            child: Text('${r.present}',
+            child: Text('${r.presentCount}',
                 style: AppTextStyles.bodyMedium
                     .copyWith(color: AppColors.statusGreen),
                 textAlign: TextAlign.center),
           ),
           Expanded(
-            child: Text('${r.absent}',
+            child: Text('${r.absentCount}',
                 style: AppTextStyles.bodyMedium
                     .copyWith(color: AppColors.statusRed),
                 textAlign: TextAlign.center),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPagination() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Text('Showing 5 of 32 students',
-              style: AppTextStyles.caption),
-          const Spacer(),
-          _PageBtn(Icons.chevron_left, enabled: false, onTap: () {}),
-          _PageBtn(null, label: '1', active: true, onTap: () {}),
-          _PageBtn(null, label: '2', onTap: () {}),
-          _PageBtn(Icons.chevron_right, onTap: () {}),
         ],
       ),
     );
@@ -391,8 +285,6 @@ class _AccentCard extends StatelessWidget {
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
         border: Border.all(color: AppColors.border),
-        // ignore: prefer_const_constructors
-        boxShadow: const [],
       ),
       child: Row(
         children: [
@@ -419,7 +311,8 @@ class _AccentCard extends StatelessWidget {
                   Row(
                     children: [
                       if (subIcon != null)
-                        Icon(subIcon!, size: 12, color: AppColors.textSecondary),
+                        Icon(subIcon!,
+                            size: 12, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(subLabel!, style: AppTextStyles.caption),
                     ],
@@ -442,43 +335,6 @@ class _AccentCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Pagination button ──────────────────────────────────────────────────────────
-
-class _PageBtn extends StatelessWidget {
-  const _PageBtn(this.icon, {this.label, this.active = false, this.enabled = true, required this.onTap});
-  final IconData? icon;
-  final String? label;
-  final bool active, enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        margin: const EdgeInsets.only(left: 4),
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: active ? AppColors.primaryNavy : AppColors.bgPage,
-          shape: BoxShape.circle,
-          border: Border.all(
-              color: active ? AppColors.primaryNavy : AppColors.border),
-        ),
-        child: Center(
-          child: icon != null
-              ? Icon(icon, size: 16,
-                  color: enabled ? AppColors.textPrimary : AppColors.textLabel)
-              : Text(label!,
-                  style: AppTextStyles.caption.copyWith(
-                      color: active ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.w600)),
-        ),
       ),
     );
   }

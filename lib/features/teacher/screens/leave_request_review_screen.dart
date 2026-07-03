@@ -53,7 +53,7 @@ class LeaveRequestReviewScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline,
+              Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
               Text('Could not load request',
@@ -121,7 +121,7 @@ class _LeaveDetailBody extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline,
+          Icon(Icons.info_outline,
               color: AppColors.statusAmber, size: 20),
           const SizedBox(width: 10),
           Expanded(
@@ -304,7 +304,7 @@ class _LeaveDetailBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(color: AppColors.border),
+          Divider(color: AppColors.border),
           const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,7 +392,7 @@ class _LeaveDetailBody extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               url.split('/').last,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textSecondary, fontSize: 12),
               overflow: TextOverflow.ellipsis,
             ),
@@ -410,7 +410,7 @@ class _LeaveDetailBody extends StatelessWidget {
         title: 'Decision',
         child: Row(
           children: [
-            const Icon(Icons.hourglass_empty_outlined,
+            Icon(Icons.hourglass_empty_outlined,
                 color: AppColors.statusAmber, size: 20),
             const SizedBox(width: 10),
             Expanded(
@@ -450,7 +450,7 @@ class _LeaveDetailBody extends StatelessWidget {
           if (leave.reviewNotes != null &&
               leave.reviewNotes!.isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Divider(color: AppColors.border),
+            Divider(color: AppColors.border),
             const SizedBox(height: 10),
             Text('REVIEWER NOTES', style: AppTextStyles.label),
             const SizedBox(height: 4),

@@ -35,6 +35,7 @@ class TeacherCourse {
   final String code;
   final String name;
   final int credits;
+  final String? semesterId;
   final String? semesterName;
   final String? semesterAcademicYear;
   final bool isCurrentSemester;
@@ -49,6 +50,7 @@ class TeacherCourse {
     required this.code,
     required this.name,
     required this.credits,
+    this.semesterId,
     this.semesterName,
     this.semesterAcademicYear,
     this.isCurrentSemester = false,
@@ -87,6 +89,116 @@ class CourseStudent {
     required this.studentId,
     required this.studentCode,
     required this.fullName,
+  });
+}
+
+class CourseGradeData {
+  final String studentId;
+  final double? midterm;
+  final double? finalExam;
+  final double? assignment;
+  final double? participation;
+
+  const CourseGradeData({
+    required this.studentId,
+    this.midterm,
+    this.finalExam,
+    this.assignment,
+    this.participation,
+  });
+
+  CourseGradeData copyWith({
+    double? midterm,
+    double? finalExam,
+    double? assignment,
+    double? participation,
+  }) =>
+      CourseGradeData(
+        studentId: studentId,
+        midterm: midterm ?? this.midterm,
+        finalExam: finalExam ?? this.finalExam,
+        assignment: assignment ?? this.assignment,
+        participation: participation ?? this.participation,
+      );
+}
+
+// ── Course material DTO ────────────────────────────────────────────────────────
+
+class CourseMaterialItem {
+  final String id;
+  final String title;
+  final String? description;
+  final String fileUrl;
+  final String? fileType;
+  final int? fileSize;
+  final DateTime? uploadedAt;
+
+  const CourseMaterialItem({
+    required this.id,
+    required this.title,
+    this.description,
+    required this.fileUrl,
+    this.fileType,
+    this.fileSize,
+    this.uploadedAt,
+  });
+
+  factory CourseMaterialItem.fromMap(Map<String, dynamic> m) =>
+      CourseMaterialItem(
+        id: m['id'] as String,
+        title: m['title'] as String,
+        description: m['description'] as String?,
+        fileUrl: m['file_url'] as String,
+        fileType: m['file_type'] as String?,
+        fileSize: m['file_size'] as int?,
+        uploadedAt: m['uploaded_at'] == null
+            ? null
+            : DateTime.parse(m['uploaded_at'] as String),
+      );
+
+  String get sizeLabel {
+    if (fileSize == null) return '';
+    final kb = fileSize! / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(0)} KB';
+    return '${(kb / 1024).toStringAsFixed(1)} MB';
+  }
+}
+
+// ── Attendance summary DTO ─────────────────────────────────────────────────────
+
+class AttendanceSummaryData {
+  final int totalSessions;
+  final List<({String studentId, String fullName, int presentCount, int absentCount})> students;
+
+  const AttendanceSummaryData({
+    required this.totalSessions,
+    required this.students,
+  });
+
+  int get totalPresent =>
+      students.fold(0, (s, e) => s + e.presentCount);
+  int get totalAbsent =>
+      students.fold(0, (s, e) => s + e.absentCount);
+  double get avgPresentRate {
+    if (students.isEmpty || totalSessions == 0) return 0;
+    final total = students.length * totalSessions;
+    return total > 0 ? totalPresent / total : 0;
+  }
+}
+
+// ── Course analytics DTO ───────────────────────────────────────────────────────
+
+class CourseAnalyticsData {
+  final List<({String grade, int count})> gradeDistribution;
+  final List<({String name, double score})> ranking;
+  final List<({String name, int attendancePct, String letterGrade})> atRiskStudents;
+  final List<({String month, double avgPct})> monthlyAttendance;
+
+  const CourseAnalyticsData({
+    required this.gradeDistribution,
+    required this.ranking,
+    required this.atRiskStudents,
+    required this.monthlyAttendance,
   });
 }
 
@@ -291,6 +403,7 @@ class TeacherService {
         code: c['code'] as String,
         name: c['name'] as String,
         credits: c['credits'] as int? ?? 3,
+        semesterId: semId,
         semesterName: semesterName,
         semesterAcademicYear: semesterAcademicYear,
         isCurrentSemester: isCurrentSemester,
@@ -522,6 +635,270 @@ class TeacherService {
       debugPrint('getLeaveRequestDetail error: $e\n$st');
       rethrow;
     }
+  }
+
+  Future<List<CourseGradeData>> getCourseGrades(String courseId) async {
+    try {
+      final rows = await _db
+          .from('grades')
+          .select('student_id, midterm, final_exam, assignment, participation')
+          .eq('course_id', courseId);
+      return rows
+          .map((r) => CourseGradeData(
+                studentId: r['student_id'] as String,
+                midterm: (r['midterm'] as num?)?.toDouble(),
+                finalExam: (r['final_exam'] as num?)?.toDouble(),
+                assignment: (r['assignment'] as num?)?.toDouble(),
+                participation: (r['participation'] as num?)?.toDouble(),
+              ))
+          .toList();
+    } catch (e, st) {
+      debugPrint('getCourseGrades error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> saveGrades({
+    required String courseId,
+    required String semesterId,
+    required List<CourseGradeData> grades,
+  }) async {
+    if (grades.isEmpty) return;
+    try {
+      final records = grades.map((g) {
+        final m = <String, dynamic>{
+          'course_id': courseId,
+          'semester_id': semesterId,
+          'student_id': g.studentId,
+        };
+        if (g.midterm != null) m['midterm'] = g.midterm;
+        if (g.finalExam != null) m['final_exam'] = g.finalExam;
+        if (g.assignment != null) m['assignment'] = g.assignment;
+        if (g.participation != null) m['participation'] = g.participation;
+        return m;
+      }).toList();
+      await _db.from('grades').upsert(
+            records,
+            onConflict: 'student_id, course_id, semester_id',
+          );
+    } catch (e, st) {
+      debugPrint('saveGrades error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Attendance for a specific date ────────────────────────────────────────
+
+  Future<Map<String, String>> getAttendanceForDate(
+      String courseId, String date) async {
+    try {
+      final rows = await _db
+          .from('attendance')
+          .select('student_id, status')
+          .eq('course_id', courseId)
+          .eq('date', date);
+      return {
+        for (final r in rows)
+          r['student_id'] as String: r['status'] as String
+      };
+    } catch (e, st) {
+      debugPrint('getAttendanceForDate error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Create announcement ────────────────────────────────────────────────────
+
+  Future<void> createAnnouncement({
+    required String teacherId,
+    String? courseId,
+    required String title,
+    required String body,
+    bool isPinned = false,
+  }) async {
+    try {
+      await _db.from('announcements').insert({
+        'teacher_id': teacherId,
+        if (courseId != null) 'course_id': courseId,
+        'title': title,
+        'body': body,
+        'is_pinned': isPinned,
+      });
+    } catch (e, st) {
+      debugPrint('createAnnouncement error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Course materials ───────────────────────────────────────────────────────
+
+  Future<List<CourseMaterialItem>> getCourseMaterials(String courseId) async {
+    try {
+      final rows = await _db
+          .from('course_materials')
+          .select('id, title, description, file_url, file_type, file_size, uploaded_at')
+          .eq('course_id', courseId)
+          .order('uploaded_at', ascending: false);
+      return rows.map((r) => CourseMaterialItem.fromMap(r)).toList();
+    } catch (e, st) {
+      debugPrint('getCourseMaterials error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Attendance summary ─────────────────────────────────────────────────────
+
+  Future<AttendanceSummaryData> getAttendanceSummary(String courseId) async {
+    try {
+      final rows = await _db
+          .from('attendance')
+          .select('student_id, date, status, profiles(full_name)')
+          .eq('course_id', courseId);
+
+      final dates = <String>{};
+      final byStudent = <String, ({String name, int present, int absent})>{};
+
+      for (final row in rows) {
+        final studentId = row['student_id'] as String;
+        final status = row['status'] as String;
+        final date = row['date'] as String;
+        final name = (row['profiles'] as Map?)?['full_name'] as String? ?? 'Unknown';
+        dates.add(date);
+        final prev = byStudent[studentId] ?? (name: name, present: 0, absent: 0);
+        final isPresent = status == 'present' || status == 'late';
+        byStudent[studentId] = (
+          name: name,
+          present: prev.present + (isPresent ? 1 : 0),
+          absent: prev.absent + (status == 'absent' ? 1 : 0),
+        );
+      }
+
+      final students = byStudent.entries
+          .map((e) => (
+                studentId: e.key,
+                fullName: e.value.name,
+                presentCount: e.value.present,
+                absentCount: e.value.absent,
+              ))
+          .toList()
+        ..sort((a, b) => a.fullName.compareTo(b.fullName));
+
+      return AttendanceSummaryData(
+          totalSessions: dates.length, students: students);
+    } catch (e, st) {
+      debugPrint('getAttendanceSummary error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Course analytics ───────────────────────────────────────────────────────
+
+  Future<CourseAnalyticsData> getCourseAnalytics(String courseId) async {
+    try {
+      final gradeRows = await _db
+          .from('grades')
+          .select('student_id, total, letter_grade, profiles(full_name)')
+          .eq('course_id', courseId);
+
+      final attendRows = await _db
+          .from('attendance')
+          .select('student_id, date, status')
+          .eq('course_id', courseId);
+
+      // Grade distribution
+      final gradeCounts = <String, int>{};
+      for (final g in gradeRows) {
+        final grade = g['letter_grade'] as String? ?? '—';
+        gradeCounts[grade] = (gradeCounts[grade] ?? 0) + 1;
+      }
+      const gradeOrder = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'D', 'F'];
+      final gradeDistribution = gradeCounts.entries
+          .map((e) => (grade: e.key, count: e.value))
+          .toList()
+        ..sort((a, b) {
+          final ai = gradeOrder.indexOf(a.grade);
+          final bi = gradeOrder.indexOf(b.grade);
+          return (ai < 0 ? 99 : ai).compareTo(bi < 0 ? 99 : bi);
+        });
+
+      // Ranking
+      final ranking = gradeRows
+          .where((g) => g['total'] != null)
+          .map((g) => (
+                name: (g['profiles'] as Map?)?['full_name'] as String? ?? '—',
+                score: (g['total'] as num).toDouble(),
+              ))
+          .toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+
+      // Attendance per student
+      final attendByStudent = <String, ({int total, int present})>{};
+      final byMonth = <String, ({int total, int present})>{};
+      for (final a in attendRows) {
+        final studentId = a['student_id'] as String;
+        final status = a['status'] as String;
+        final date = a['date'] as String;
+        final monthKey = date.length >= 7 ? date.substring(0, 7) : '';
+        final isPresent = status == 'present' || status == 'late';
+
+        final prev = attendByStudent[studentId] ?? (total: 0, present: 0);
+        attendByStudent[studentId] = (
+          total: prev.total + 1,
+          present: prev.present + (isPresent ? 1 : 0),
+        );
+
+        if (monthKey.isNotEmpty) {
+          final pm = byMonth[monthKey] ?? (total: 0, present: 0);
+          byMonth[monthKey] = (
+            total: pm.total + 1,
+            present: pm.present + (isPresent ? 1 : 0),
+          );
+        }
+      }
+
+      // At-risk students (attendance < 75%)
+      final atRisk = <({String name, int attendancePct, String letterGrade})>[];
+      for (final g in gradeRows) {
+        final studentId = g['student_id'] as String;
+        final name = (g['profiles'] as Map?)?['full_name'] as String? ?? '—';
+        final letterGrade = g['letter_grade'] as String? ?? '—';
+        final ad = attendByStudent[studentId];
+        if (ad != null && ad.total >= 3) {
+          final pct = (ad.present / ad.total * 100).round();
+          if (pct < 75) {
+            atRisk.add((name: name, attendancePct: pct, letterGrade: letterGrade));
+          }
+        }
+      }
+      atRisk.sort((a, b) => a.attendancePct.compareTo(b.attendancePct));
+
+      // Monthly attendance trend
+      final sortedKeys = byMonth.keys.toList()..sort();
+      final monthlyAttendance = sortedKeys.map((key) {
+        final monthNum = int.tryParse(key.length >= 7 ? key.substring(5, 7) : '0') ?? 0;
+        final d = byMonth[key]!;
+        return (
+          month: _monthAbbr(monthNum),
+          avgPct: d.total > 0 ? d.present / d.total : 0.0,
+        );
+      }).toList();
+
+      return CourseAnalyticsData(
+        gradeDistribution: gradeDistribution,
+        ranking: ranking.take(10).toList(),
+        atRiskStudents: atRisk,
+        monthlyAttendance: monthlyAttendance,
+      );
+    } catch (e, st) {
+      debugPrint('getCourseAnalytics error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  static String _monthAbbr(int month) {
+    const names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return month >= 1 && month <= 12 ? names[month] : '?';
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
