@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/database.types.dart';
@@ -215,7 +216,8 @@ class StudentService {
           .from('profiles')
           .select('id, email, first_name, last_name, phone, avatar_url')
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
       if (profile == null) return null;
 
       final student = await _db
@@ -225,7 +227,8 @@ class StudentService {
               'date_of_birth, gender, nationality, address, emergency_contact, '
               'faculty_id, major_id')
           .eq('id', userId)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
       if (student == null) return null;
 
       String? facultyName;
@@ -239,7 +242,8 @@ class StudentService {
             .from('faculties')
             .select('name')
             .eq('id', facultyId)
-            .maybeSingle();
+            .maybeSingle()
+            .timeout(const Duration(seconds: 8));
         facultyName = fac?['name'] as String?;
       }
       if (majorId != null) {
@@ -247,7 +251,8 @@ class StudentService {
             .from('majors')
             .select('name')
             .eq('id', majorId)
-            .maybeSingle();
+            .maybeSingle()
+            .timeout(const Duration(seconds: 8));
         majorName = major?['name'] as String?;
       }
 
@@ -270,9 +275,12 @@ class StudentService {
         nationality: student['nationality'] as String?,
         emergencyContact: student['emergency_contact'] as String?,
       );
+    } on TimeoutException catch (_) {
+      debugPrint('getStudentProfile timed out');
+      return null;
     } catch (e, st) {
       debugPrint('getStudentProfile error: $e\n$st');
-      rethrow;
+      return null;
     }
   }
 
@@ -280,7 +288,7 @@ class StudentService {
     try {
       final enrollments = await _db
           .from('enrollments')
-          .select('id, status, course_id')
+          .select('id, status, course_id, class_id, semester_id')
           .eq('student_id', studentId);
 
       if (enrollments.isEmpty) return [];
@@ -290,11 +298,30 @@ class StudentService {
 
       final courseRows = await _db
           .from('courses')
-          .select('id, code, name, credits, teacher_id, semester_id, schedule')
+          .select('id, code, name, credits, schedule')
           .inFilter('id', courseIds);
 
-      final semesterIds = courseRows
-          .map((c) => c['semester_id'] as String?)
+      // Teacher and semester are bound per-class (not on courses directly),
+      // so resolve them via the class each enrollment points to.
+      final classIds = enrollments
+          .map((e) => e['class_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      Map<String, String?> classTeacherIds = {};
+      if (classIds.isNotEmpty) {
+        final classRows = await _db
+            .from('classes')
+            .select('id, teacher_id')
+            .inFilter('id', classIds);
+        classTeacherIds = {
+          for (final c in classRows) c['id'] as String: c['teacher_id'] as String?
+        };
+      }
+
+      final semesterIds = enrollments
+          .map((e) => e['semester_id'] as String?)
           .whereType<String>()
           .toSet()
           .toList();
@@ -308,11 +335,7 @@ class StudentService {
         semesterMap = {for (final s in sems) s['id'] as String: s};
       }
 
-      final teacherIds = courseRows
-          .map((c) => c['teacher_id'] as String?)
-          .whereType<String>()
-          .toSet()
-          .toList();
+      final teacherIds = classTeacherIds.values.whereType<String>().toSet().toList();
 
       Map<String, String> teacherNames = {};
       if (teacherIds.isNotEmpty) {
@@ -356,9 +379,10 @@ class StudentService {
         final courseId = e['course_id'] as String;
         final course = courseMap[courseId];
         if (course == null) return null;
-        final semId = course['semester_id'] as String?;
+        final semId = e['semester_id'] as String?;
         final sem = semId != null ? semesterMap[semId] : null;
-        final teacherId = course['teacher_id'] as String?;
+        final classId = e['class_id'] as String?;
+        final teacherId = classId != null ? classTeacherIds[classId] : null;
         final rawSchedule = course['schedule'];
         final parsedSchedule = rawSchedule is List
             ? rawSchedule.whereType<Map<String, dynamic>>().toList()
@@ -764,7 +788,7 @@ class StudentService {
     required String endDate,
     String? docUrl,
   }) async {
-    await _db.from('leave_requests').insert({
+    final row = await _db.from('leave_requests').insert({
       'requester_id': studentId,
       'requester_type': 'student',
       'type': type,
@@ -773,7 +797,13 @@ class StudentService {
       'end_date': endDate,
       'status': 'pending',
       if (docUrl != null) 'doc_url': docUrl,
-    });
+    }).select('id').single();
+    try {
+      await _db.rpc('notify_teachers_of_leave_request',
+          params: {'p_leave_id': row['id']});
+    } catch (e, st) {
+      debugPrint('notify_teachers_of_leave_request error: $e\n$st');
+    }
   }
 
   Future<void> cancelLeaveRequest(String requestId) async {

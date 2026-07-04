@@ -7,6 +7,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final leavesAsync = ref.watch(studentLeaveRequestsProvider);
 
     return Scaffold(
@@ -47,7 +49,7 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
         onPressed: () => context.go('/student/leave/create'),
         backgroundColor: AppColors.primaryBlue,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text('New Request',
+        label: Text(l.leaveDashboardNewRequestButton,
             style: AppTextStyles.button.copyWith(fontSize: 14)),
       ),
       body: leavesAsync.when(
@@ -60,13 +62,13 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load leave requests',
+              Text(l.leaveDashboardLoadError,
                   style: AppTextStyles.bodyMedium),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(studentLeaveRequestsProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -76,15 +78,15 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTitle(),
+              _buildTitle(l),
               const SizedBox(height: AppSpacing.md),
-              _buildStatusChips(leaves),
+              _buildStatusChips(leaves, l),
               const SizedBox(height: AppSpacing.md),
               if (leaves.isEmpty)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Text('No leave requests yet.'),
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Text(l.leaveDashboardEmptyState),
                   ),
                 )
               else
@@ -92,6 +94,7 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _LeaveCard(
                         leave: leave,
+                        l: l,
                         onTap: () => context
                             .go('/student/leave/${leave.id}'),
                       ),
@@ -104,25 +107,25 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Leave Requests', style: AppTextStyles.h1),
+        Text(l.leaveDashboardTitle, style: AppTextStyles.h1),
         const SizedBox(height: 4),
-        Text('Manage and track your absence applications.',
+        Text(l.leaveDashboardSubtitle,
             style: AppTextStyles.caption),
       ],
     );
   }
 
-  Widget _buildStatusChips(List<LeaveRequestRow> leaves) {
+  Widget _buildStatusChips(List<LeaveRequestRow> leaves, AppLocalizations l) {
     final pending =
-        leaves.where((l) => l.status == LeaveStatus.pending).length;
+        leaves.where((r) => r.status == LeaveStatus.pending).length;
     final approved =
-        leaves.where((l) => l.status == LeaveStatus.approved).length;
+        leaves.where((r) => r.status == LeaveStatus.approved).length;
     final rejected =
-        leaves.where((l) => l.status == LeaveStatus.rejected).length;
+        leaves.where((r) => r.status == LeaveStatus.rejected).length;
 
     return Wrap(
       spacing: 8,
@@ -130,15 +133,15 @@ class LeaveRequestDashboardScreen extends ConsumerWidget {
       children: [
         _StatusChip(
             count: pending,
-            label: 'Pending',
+            label: l.leaveDashboardStatusPending,
             color: AppColors.statusAmber),
         _StatusChip(
             count: approved,
-            label: 'Approved',
+            label: l.leaveDashboardStatusApproved,
             color: AppColors.statusGreen),
         _StatusChip(
             count: rejected,
-            label: 'Rejected',
+            label: l.leaveDashboardStatusRejected,
             color: AppColors.statusRed),
       ],
     );
@@ -186,9 +189,10 @@ class _StatusChip extends StatelessWidget {
 // ── Leave card ─────────────────────────────────────────────────────────────────
 
 class _LeaveCard extends StatelessWidget {
-  const _LeaveCard({required this.leave, required this.onTap});
+  const _LeaveCard({required this.leave, required this.onTap, required this.l});
   final LeaveRequestRow leave;
   final VoidCallback onTap;
+  final AppLocalizations l;
 
   Color get _statusColor => switch (leave.status) {
         LeaveStatus.pending => AppColors.statusAmber,
@@ -197,9 +201,9 @@ class _LeaveCard extends StatelessWidget {
       };
 
   String get _statusLabel => switch (leave.status) {
-        LeaveStatus.pending => 'Pending',
-        LeaveStatus.approved => 'Approved',
-        LeaveStatus.rejected => 'Rejected',
+        LeaveStatus.pending => l.leaveDashboardStatusPending,
+        LeaveStatus.approved => l.leaveDashboardStatusApproved,
+        LeaveStatus.rejected => l.leaveDashboardStatusRejected,
       };
 
   @override

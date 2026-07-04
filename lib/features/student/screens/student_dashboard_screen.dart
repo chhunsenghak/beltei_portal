@@ -9,6 +9,7 @@ import '../../../core/providers/student_providers.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/student_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/section_header.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,20 +45,21 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [
-          _buildQuickActions(context),
+          _buildQuickActions(context, l),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAcademicSummary(ref),
+          _buildAcademicSummary(ref, l),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildAttendanceOverview(ref),
+          _buildAttendanceOverview(ref, l),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildFinancialSummary(context, ref),
+          _buildFinancialSummary(context, ref, l),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildRecentActivities(context, ref),
+          _buildRecentActivities(context, ref, l),
           const SizedBox(height: 24),
         ],
       ),
@@ -66,17 +68,17 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   // ── Quick actions ──────────────────────────────────────────────────────────
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions(BuildContext context, AppLocalizations l) {
     final actions = [
-      (icon: Icons.calendar_today_outlined, label: 'Attendance', route: AppRoutes.attendanceDashboard),
-      (icon: Icons.beach_access_outlined,   label: 'Leave',      route: AppRoutes.leaveRequestDashboard),
-      (icon: Icons.menu_book_outlined,      label: 'Courses',    route: AppRoutes.courseList),
-      (icon: Icons.grade_outlined,          label: 'Grades',     route: AppRoutes.gradesDashboard),
+      (icon: Icons.calendar_today_outlined, label: l.dashboardActionAttendance, route: AppRoutes.attendanceDashboard),
+      (icon: Icons.beach_access_outlined,   label: l.dashboardActionLeave,      route: AppRoutes.leaveRequestDashboard),
+      (icon: Icons.menu_book_outlined,      label: l.dashboardActionCourses,    route: AppRoutes.courseList),
+      (icon: Icons.grade_outlined,          label: l.dashboardActionGrades,     route: AppRoutes.gradesDashboard),
     ];
 
     return Column(
       children: [
-        SectionHeader(title: 'Quick Actions', actionLabel: 'SEE ALL', onAction: () {}),
+        SectionHeader(title: l.dashboardQuickActionsTitle, actionLabel: l.dashboardSeeAll, onAction: () {}),
         const SizedBox(height: 12),
         Row(
           children: actions.map((a) {
@@ -109,27 +111,27 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   // ── Academic summary ───────────────────────────────────────────────────────
 
-  Widget _buildAcademicSummary(WidgetRef ref) {
+  Widget _buildAcademicSummary(WidgetRef ref, AppLocalizations l) {
     final gradesAsync = ref.watch(studentGradesProvider);
     final coursesAsync = ref.watch(studentCoursesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'Academic Summary', icon: Icons.school_outlined),
+        SectionHeader(title: l.dashboardAcademicSummaryTitle, icon: Icons.school_outlined),
         const SizedBox(height: 12),
         gradesAsync.when(
           loading: () => _SummaryGrid(items: [
-            _SummaryItem(label: 'GPA (Current)', value: '—'),
-            _SummaryItem(label: 'CGPA', value: '—'),
-            _SummaryItem(label: 'Credits Done', value: '—'),
-            _SummaryItem(label: 'This Semester', value: '—'),
+            _SummaryItem(label: l.dashboardGpaCurrentLabel, value: '—'),
+            _SummaryItem(label: l.dashboardCgpaLabel, value: '—'),
+            _SummaryItem(label: l.dashboardCreditsDoneLabel, value: '—'),
+            _SummaryItem(label: l.dashboardThisSemesterLabel, value: '—'),
           ]),
           error: (_, _) => _SummaryGrid(items: [
-            _SummaryItem(label: 'GPA (Current)', value: 'N/A'),
-            _SummaryItem(label: 'CGPA', value: 'N/A'),
-            _SummaryItem(label: 'Credits Done', value: 'N/A'),
-            _SummaryItem(label: 'This Semester', value: 'N/A'),
+            _SummaryItem(label: l.dashboardGpaCurrentLabel, value: l.profileNa),
+            _SummaryItem(label: l.dashboardCgpaLabel, value: l.profileNa),
+            _SummaryItem(label: l.dashboardCreditsDoneLabel, value: l.profileNa),
+            _SummaryItem(label: l.dashboardThisSemesterLabel, value: l.profileNa),
           ]),
           data: (semesters) {
             final current = semesters.where((s) => s.isCurrent).firstOrNull
@@ -147,26 +149,26 @@ class StudentDashboardScreen extends ConsumerWidget {
 
             return coursesAsync.when(
               loading: () => _SummaryGrid(items: [
-                _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
-                _SummaryItem(label: 'CGPA', value: cgpa),
-                _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
-                _SummaryItem(label: 'This Semester', value: '—'),
+                _SummaryItem(label: l.dashboardGpaCurrentLabel, value: gpa, valueColor: AppColors.primaryNavy),
+                _SummaryItem(label: l.dashboardCgpaLabel, value: cgpa),
+                _SummaryItem(label: l.dashboardCreditsDoneLabel, value: '$creditsDone'),
+                _SummaryItem(label: l.dashboardThisSemesterLabel, value: '—'),
               ]),
               error: (_, _) => _SummaryGrid(items: [
-                _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
-                _SummaryItem(label: 'CGPA', value: cgpa),
-                _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
-                _SummaryItem(label: 'This Semester', value: '$currentCredits cr'),
+                _SummaryItem(label: l.dashboardGpaCurrentLabel, value: gpa, valueColor: AppColors.primaryNavy),
+                _SummaryItem(label: l.dashboardCgpaLabel, value: cgpa),
+                _SummaryItem(label: l.dashboardCreditsDoneLabel, value: '$creditsDone'),
+                _SummaryItem(label: l.dashboardThisSemesterLabel, value: l.dashboardCreditsUnit(currentCredits)),
               ]),
               data: (courses) {
                 final currentCourseCredits = courses
                     .where((c) => c.isCurrentSemester)
                     .fold(0, (sum, c) => sum + c.credits);
                 return _SummaryGrid(items: [
-                  _SummaryItem(label: 'GPA (Current)', value: gpa, valueColor: AppColors.primaryNavy),
-                  _SummaryItem(label: 'CGPA', value: cgpa),
-                  _SummaryItem(label: 'Credits Done', value: '$creditsDone'),
-                  _SummaryItem(label: 'This Semester', value: '$currentCourseCredits cr'),
+                  _SummaryItem(label: l.dashboardGpaCurrentLabel, value: gpa, valueColor: AppColors.primaryNavy),
+                  _SummaryItem(label: l.dashboardCgpaLabel, value: cgpa),
+                  _SummaryItem(label: l.dashboardCreditsDoneLabel, value: '$creditsDone'),
+                  _SummaryItem(label: l.dashboardThisSemesterLabel, value: l.dashboardCreditsUnit(currentCourseCredits)),
                 ]);
               },
             );
@@ -178,48 +180,48 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   // ── Attendance overview ────────────────────────────────────────────────────
 
-  Widget _buildAttendanceOverview(WidgetRef ref) {
+  Widget _buildAttendanceOverview(WidgetRef ref, AppLocalizations l) {
     final attendanceAsync = ref.watch(studentAttendanceProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'Attendance Overview', icon: Icons.person_outline),
+        SectionHeader(title: l.dashboardAttendanceOverviewTitle, icon: Icons.person_outline),
         const SizedBox(height: 12),
         attendanceAsync.when(
           loading: () => _SummaryGrid(items: [
-            _SummaryItem(label: 'Overall Rate', value: '—'),
-            _SummaryItem(label: 'Present', value: '—'),
-            _SummaryItem(label: 'Absent', value: '—'),
-            _SummaryItem(label: 'Leave', value: '—'),
+            _SummaryItem(label: l.dashboardOverallRateLabel, value: '—'),
+            _SummaryItem(label: l.statusPresent, value: '—'),
+            _SummaryItem(label: l.statusAbsent, value: '—'),
+            _SummaryItem(label: l.dashboardAttendanceLeaveLabel, value: '—'),
           ]),
           error: (_, _) => _SummaryGrid(items: [
-            _SummaryItem(label: 'Overall Rate', value: 'N/A'),
-            _SummaryItem(label: 'Present', value: 'N/A'),
-            _SummaryItem(label: 'Absent', value: 'N/A'),
-            _SummaryItem(label: 'Leave', value: 'N/A'),
+            _SummaryItem(label: l.dashboardOverallRateLabel, value: l.profileNa),
+            _SummaryItem(label: l.statusPresent, value: l.profileNa),
+            _SummaryItem(label: l.statusAbsent, value: l.profileNa),
+            _SummaryItem(label: l.dashboardAttendanceLeaveLabel, value: l.profileNa),
           ]),
           data: (att) => _SummaryGrid(items: [
             _SummaryItem(
-              label: 'Overall Rate',
+              label: l.dashboardOverallRateLabel,
               value: '${(att.overallRate * 100).toStringAsFixed(1)}%',
               valueColor: AppColors.primaryBlue,
             ),
             _SummaryItem(
-              label: 'Present',
+              label: l.statusPresent,
               value: '${att.present}',
               trailingIcon: Icons.check_circle_outline,
               trailingColor: AppColors.statusGreen,
             ),
             _SummaryItem(
-              label: 'Absent',
+              label: l.statusAbsent,
               value: '${att.absent}',
               valueColor: AppColors.statusRed,
               trailingIcon: Icons.cancel_outlined,
               trailingColor: AppColors.statusRed,
             ),
             _SummaryItem(
-              label: 'Leave',
+              label: l.dashboardAttendanceLeaveLabel,
               value: '${att.excused}',
               valueColor: AppColors.statusAmber,
               trailingIcon: Icons.watch_later_outlined,
@@ -233,23 +235,23 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   // ── Financial summary ──────────────────────────────────────────────────────
 
-  Widget _buildFinancialSummary(BuildContext context, WidgetRef ref) {
+  Widget _buildFinancialSummary(BuildContext context, WidgetRef ref, AppLocalizations l) {
     final financeAsync = ref.watch(studentFinanceProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Financial Summary',
+          title: l.dashboardFinancialSummaryTitle,
           icon: Icons.account_balance_wallet_outlined,
-          actionLabel: 'SEE ALL',
+          actionLabel: l.dashboardSeeAll,
           onAction: () => context.go(AppRoutes.financeDashboard),
         ),
         const SizedBox(height: 12),
         financeAsync.when(
           loading: () => const _FinanceLoadingCard(),
-          error: (_, _) => const _FinanceErrorCard(),
-          data: (fin) => _FinanceSummaryCard(finance: fin, context: context),
+          error: (_, _) => _FinanceErrorCard(l: l),
+          data: (fin) => _FinanceSummaryCard(finance: fin, context: context, l: l),
         ),
       ],
     );
@@ -257,13 +259,13 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   // ── Recent activities ──────────────────────────────────────────────────────
 
-  Widget _buildRecentActivities(BuildContext context, WidgetRef ref) {
+  Widget _buildRecentActivities(BuildContext context, WidgetRef ref, AppLocalizations l) {
     final notifAsync = ref.watch(studentNotificationsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'Recent Activities', icon: Icons.history),
+        SectionHeader(title: l.dashboardRecentActivitiesTitle, icon: Icons.history),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -276,16 +278,16 @@ class StudentDashboardScreen extends ConsumerWidget {
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
-            error: (_, _) => const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Could not load activities.'),
+            error: (_, _) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(l.dashboardActivitiesLoadError),
             ),
             data: (notifications) {
               final recent = notifications.take(3).toList();
               if (recent.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No recent activities.')),
+                return Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(child: Text(l.dashboardNoRecentActivities)),
                 );
               }
               return Column(
@@ -295,12 +297,13 @@ class StudentDashboardScreen extends ConsumerWidget {
                     return _NotifActivityItem(
                       notif: e.value,
                       showDivider: !isLast,
+                      l: l,
                     );
                   }),
                   Divider(height: 1, color: AppColors.border),
                   TextButton(
                     onPressed: () => context.go(AppRoutes.notificationCenter),
-                    child: Text('VIEW ALL NOTIFICATIONS',
+                    child: Text(l.dashboardViewAllNotifications,
                         style: AppTextStyles.label.copyWith(
                             color: AppColors.primaryBlue, letterSpacing: 1.0)),
                   ),
@@ -334,7 +337,8 @@ class _FinanceLoadingCard extends StatelessWidget {
 }
 
 class _FinanceErrorCard extends StatelessWidget {
-  const _FinanceErrorCard();
+  const _FinanceErrorCard({required this.l});
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -345,15 +349,16 @@ class _FinanceErrorCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Text('Could not load finance data.'),
+      child: Text(l.dashboardFinanceLoadError),
     );
   }
 }
 
 class _FinanceSummaryCard extends StatelessWidget {
-  const _FinanceSummaryCard({required this.finance, required this.context});
+  const _FinanceSummaryCard({required this.finance, required this.context, required this.l});
   final FinanceSummary finance;
   final BuildContext context;
+  final AppLocalizations l;
 
   Color get _statusColor => switch (finance.status) {
         'PAID' => AppColors.statusGreen,
@@ -386,7 +391,7 @@ class _FinanceSummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Semester Fee', style: AppTextStyles.label),
+                    Text(l.dashboardTotalSemesterFee, style: AppTextStyles.label),
                     const SizedBox(height: 4),
                     Text(
                       _currencyFmt.format(finance.totalFees),
@@ -417,7 +422,7 @@ class _FinanceSummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Paid', style: AppTextStyles.label),
+                    Text(l.dashboardPaidLabel, style: AppTextStyles.label),
                     const SizedBox(height: 2),
                     Text(
                       _currencyFmt.format(finance.totalPaid),
@@ -431,7 +436,7 @@ class _FinanceSummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Outstanding', style: AppTextStyles.label),
+                    Text(l.dashboardOutstandingLabel, style: AppTextStyles.label),
                     const SizedBox(height: 2),
                     Text(
                       _currencyFmt.format(finance.outstanding),
@@ -458,7 +463,7 @@ class _FinanceSummaryCard extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('DUE DATE REMINDER',
+                      Text(l.dashboardDueDateReminder,
                           style: AppTextStyles.label.copyWith(color: AppColors.statusAmber)),
                       Text(
                         _fmtDate(finance.nextDueDate!),
@@ -477,7 +482,7 @@ class _FinanceSummaryCard extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () => context.go(AppRoutes.onlinePayment),
               icon: const Icon(Icons.payment, size: 16),
-              label: Text('Pay Now', style: AppTextStyles.button),
+              label: Text(l.dashboardPayNow, style: AppTextStyles.button),
             ),
           ),
         ],
@@ -489,9 +494,10 @@ class _FinanceSummaryCard extends StatelessWidget {
 // ── Notification activity item ─────────────────────────────────────────────────
 
 class _NotifActivityItem extends StatelessWidget {
-  const _NotifActivityItem({required this.notif, required this.showDivider});
+  const _NotifActivityItem({required this.notif, required this.showDivider, required this.l});
   final NotificationRow notif;
   final bool showDivider;
+  final AppLocalizations l;
 
   IconData get _icon => switch (notif.type) {
         'grade' => Icons.grade_outlined,
@@ -522,9 +528,9 @@ class _NotifActivityItem extends StatelessWidget {
   String _timeAgo(DateTime? createdAt) {
     if (createdAt == null) return '';
     final diff = DateTime.now().difference(createdAt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inMinutes < 60) return l.timeAgoMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeAgoHours(diff.inHours);
+    if (diff.inDays == 1) return l.timeAgoYesterday;
     return DateFormat('MMM d').format(createdAt);
   }
 

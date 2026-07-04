@@ -9,6 +9,7 @@ import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
 import '../../../core/supabase/database.types.dart';
 import '../../../core/router/app_router.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/section_header.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final attendanceAsync = ref.watch(studentAttendanceProvider);
 
     return Scaffold(
@@ -31,13 +33,13 @@ class AttendanceDashboardScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load attendance',
+              Text(l.loadErrorAttendance,
                   style: AppTextStyles.bodyMedium),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(studentAttendanceProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -47,17 +49,17 @@ class AttendanceDashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTitle(),
+              _buildTitle(l),
               const SizedBox(height: AppSpacing.md),
-              _buildStatCards(att),
+              _buildStatCards(att, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildAttendanceRateCard(att),
+              _buildAttendanceRateCard(att, l),
               const SizedBox(height: AppSpacing.sectionGap),
               if (att.courseBreakdown.isNotEmpty)
-                _buildCourseBreakdown(att.courseBreakdown),
+                _buildCourseBreakdown(att.courseBreakdown, l),
               if (att.courseBreakdown.isNotEmpty)
                 const SizedBox(height: AppSpacing.sectionGap),
-              _buildRecentLogs(context, att.recentRecords),
+              _buildRecentLogs(context, att.recentRecords, l),
               const SizedBox(height: 24),
             ],
           ),
@@ -66,25 +68,25 @@ class AttendanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Attendance Overview', style: AppTextStyles.h1),
+        Text(l.attendanceDashboardTitle, style: AppTextStyles.h1),
         const SizedBox(height: 4),
-        Text('All recorded attendance across your enrolled courses',
+        Text(l.attendanceDashboardSubtitle,
             style: AppTextStyles.caption),
       ],
     );
   }
 
-  Widget _buildStatCards(AttendanceSummary att) {
+  Widget _buildStatCards(AttendanceSummary att, AppLocalizations l) {
     final items = [
-      (label: 'TOTAL DAYS', value: '${att.totalDays}', color: AppColors.textPrimary),
-      (label: 'PRESENT', value: '${att.present}', color: AppColors.textPrimary),
-      (label: 'ABSENT', value: '${att.absent}', color: AppColors.statusRed),
-      (label: 'LEAVE', value: '${att.excused}', color: AppColors.statusAmber),
-      (label: 'LATE', value: '${att.late}', color: AppColors.statusAmber),
+      (label: l.attendanceDashboardTotalDaysLabel, value: '${att.totalDays}', color: AppColors.textPrimary),
+      (label: l.statusPresent, value: '${att.present}', color: AppColors.textPrimary),
+      (label: l.statusAbsent, value: '${att.absent}', color: AppColors.statusRed),
+      (label: l.attendanceDashboardLeaveLabel, value: '${att.excused}', color: AppColors.statusAmber),
+      (label: l.statusLate, value: '${att.late}', color: AppColors.statusAmber),
     ];
 
     return GridView.count(
@@ -104,7 +106,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAttendanceRateCard(AttendanceSummary att) {
+  Widget _buildAttendanceRateCard(AttendanceSummary att, AppLocalizations l) {
     final rate = att.overallRate;
     final color = rate >= 0.85
         ? AppColors.statusGreen
@@ -116,7 +118,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Attendance Rate', style: AppTextStyles.h2),
+          Text(l.attendanceDashboardRateTitle, style: AppTextStyles.h2),
           const SizedBox(height: 20),
           Center(
             child: CircularPercentIndicator(
@@ -131,7 +133,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
                     style:
                         AppTextStyles.metric.copyWith(color: color),
                   ),
-                  Text('Current Rate', style: AppTextStyles.caption),
+                  Text(l.attendanceDashboardCurrentRateLabel, style: AppTextStyles.caption),
                 ],
               ),
               progressColor: color,
@@ -155,7 +157,7 @@ class AttendanceDashboardScreen extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Attendance below 75%. Risk of academic penalty.',
+                      l.attendanceDashboardLowAttendanceWarning,
                       style: AppTextStyles.caption.copyWith(
                           color: AppColors.statusRed),
                     ),
@@ -169,12 +171,12 @@ class AttendanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCourseBreakdown(List<CourseAttendance> courses) {
+  Widget _buildCourseBreakdown(List<CourseAttendance> courses, AppLocalizations l) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Course Breakdown', style: AppTextStyles.h2),
+          Text(l.attendanceDashboardCourseBreakdownTitle, style: AppTextStyles.h2),
           const SizedBox(height: 16),
           ...courses.map((c) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -186,28 +188,28 @@ class AttendanceDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildRecentLogs(
-      BuildContext context, List<AttendanceRecord> records) {
+      BuildContext context, List<AttendanceRecord> records, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          title: 'Recent Attendance Logs',
-          actionLabel: 'View Full History',
+          title: l.attendanceDashboardRecentLogsTitle,
+          actionLabel: l.attendanceDashboardViewFullHistory,
           onAction: () => context.go(AppRoutes.attendanceHistory),
         ),
         const SizedBox(height: 12),
         _Card(
           child: Column(
             children: [
-              _buildLogTableHeader(),
+              _buildLogTableHeader(l),
               Divider(color: AppColors.border, height: 16),
               if (records.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: Text('No attendance records yet.')),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(child: Text(l.attendanceDashboardNoRecords)),
                 )
               else
-                ...records.map((log) => _buildLogRow(log)),
+                ...records.map((log) => _buildLogRow(log, l)),
             ],
           ),
         ),
@@ -215,15 +217,19 @@ class AttendanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogTableHeader() {
+  Widget _buildLogTableHeader(AppLocalizations l) {
     return Row(
-      children: ['DATE', 'COURSE', 'STATUS']
+      children: [
+        l.attendanceDashboardDateColumn,
+        l.attendanceDashboardCourseColumn,
+        l.attendanceDashboardStatusColumn
+      ]
           .map((h) => Expanded(child: Text(h, style: AppTextStyles.label)))
           .toList(),
     );
   }
 
-  Widget _buildLogRow(AttendanceRecord log) {
+  Widget _buildLogRow(AttendanceRecord log, AppLocalizations l) {
     final Color statusColor;
     final Color statusBg;
     final String statusLabel;
@@ -232,19 +238,19 @@ class AttendanceDashboardScreen extends ConsumerWidget {
       case AttendanceStatus.present:
         statusColor = AppColors.statusGreen;
         statusBg = AppColors.statusGreenBg;
-        statusLabel = 'Present';
+        statusLabel = l.statusPresent;
       case AttendanceStatus.absent:
         statusColor = AppColors.statusRed;
         statusBg = AppColors.statusRedBg;
-        statusLabel = 'Absent';
+        statusLabel = l.statusAbsent;
       case AttendanceStatus.late:
         statusColor = AppColors.statusAmber;
         statusBg = AppColors.statusAmberBg;
-        statusLabel = 'Late';
+        statusLabel = l.statusLate;
       case AttendanceStatus.excused:
         statusColor = AppColors.statusAmber;
         statusBg = AppColors.statusAmberBg;
-        statusLabel = 'Excused';
+        statusLabel = l.statusExcused;
     }
 
     return Padding(

@@ -8,13 +8,14 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _fmtDateRange(String start, String end) {
+String _fmtDateRange(String start, String end, String locale) {
   try {
-    final s = DateFormat('MMM d').format(DateTime.parse(start));
-    final e = DateFormat('MMM d').format(DateTime.parse(end));
+    final s = DateFormat('MMM d', locale).format(DateTime.parse(start));
+    final e = DateFormat('MMM d', locale).format(DateTime.parse(end));
     return s == e ? s : '$s – $e';
   } catch (_) {
     return '$start – $end';
@@ -28,6 +29,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final profileAsync = ref.watch(teacherProfileProvider);
     final coursesAsync = ref.watch(teacherCoursesProvider);
     final leavesAsync = ref.watch(teacherStudentLeavesProvider);
@@ -40,9 +42,9 @@ class TeacherDashboardScreen extends ConsumerWidget {
           // Header
           profileAsync.when(
             loading: () => _buildHeaderSkeleton(),
-            error: (_, _) => _buildHeaderPlaceholder(),
+            error: (_, _) => _buildHeaderPlaceholder(l),
             data: (p) =>
-                p == null ? _buildHeaderPlaceholder() : _buildHeader(p),
+                p == null ? _buildHeaderPlaceholder(l) : _buildHeader(p, l),
           ),
           const SizedBox(height: AppSpacing.sectionGap),
           // Stats
@@ -59,16 +61,17 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   .where((l) => l.status == LeaveStatus.pending)
                   .length,
               courses.where((c) => c.hasTodayClass()).length,
+              l,
             );
           }),
           const SizedBox(height: AppSpacing.sectionGap),
-          _buildQuickActions(context),
+          _buildQuickActions(context, l),
           const SizedBox(height: AppSpacing.sectionGap),
           // Today's schedule
           coursesAsync.when(
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
-            data: (courses) => _buildTodaySchedule(context, courses),
+            data: (courses) => _buildTodaySchedule(context, courses, l),
           ),
           const SizedBox(height: AppSpacing.sectionGap),
           // Pending leaves (view-only)
@@ -81,6 +84,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   .where((l) => l.status == LeaveStatus.pending)
                   .take(3)
                   .toList(),
+              l,
             ),
           ),
           const SizedBox(height: 24),
@@ -91,7 +95,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(TeacherProfile profile) {
+  Widget _buildHeader(TeacherProfile profile, AppLocalizations l) {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -118,8 +122,8 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   profile.departmentName != null
-                      ? 'Dept: ${profile.departmentName}'
-                      : profile.position ?? 'Teacher',
+                      ? l.teacherDashboardDeptLabel(profile.departmentName!)
+                      : profile.position ?? l.teacherDashboardDefaultPosition,
                   style:
                       AppTextStyles.captionWhite.copyWith(fontSize: 12),
                 ),
@@ -138,7 +142,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                           color: Colors.white, size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        'ID: ${profile.employeeCode}',
+                        l.profileIdLabel(profile.employeeCode),
                         style: AppTextStyles.label.copyWith(
                             color: Colors.white, letterSpacing: 0.6),
                       ),
@@ -169,13 +173,15 @@ class TeacherDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderPlaceholder() {
-    return _buildHeader(const TeacherProfile(
-      id: '',
-      employeeCode: '---',
-      fullName: 'Teacher',
-      email: '',
-    ));
+  Widget _buildHeaderPlaceholder(AppLocalizations l) {
+    return _buildHeader(
+        TeacherProfile(
+          id: '',
+          employeeCode: '---',
+          fullName: l.teacherDashboardDefaultPosition,
+          email: '',
+        ),
+        l);
   }
 
   // ── Stats grid ─────────────────────────────────────────────────────────────
@@ -187,30 +193,30 @@ class TeacherDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsGrid(
-      int courses, int students, int pendingLeaves, int todayClasses) {
+  Widget _buildStatsGrid(int courses, int students, int pendingLeaves,
+      int todayClasses, AppLocalizations l) {
     final items = [
       (
         icon: Icons.menu_book_outlined,
-        label: 'Total Courses',
+        label: l.teacherDashboardStatTotalCourses,
         value: '$courses',
         color: AppColors.primaryNavy
       ),
       (
         icon: Icons.people_outline,
-        label: 'Total Students',
+        label: l.teacherDashboardStatTotalStudents,
         value: '$students',
         color: AppColors.primaryBlue
       ),
       (
         icon: Icons.pending_actions_outlined,
-        label: 'Pending Leaves',
+        label: l.teacherDashboardStatPendingLeaves,
         value: '$pendingLeaves',
         color: AppColors.statusAmber
       ),
       (
         icon: Icons.today_outlined,
-        label: "Today's Classes",
+        label: l.teacherDashboardStatTodayClasses,
         value: '$todayClasses',
         color: AppColors.statusGreen
       ),
@@ -235,43 +241,43 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
   // ── Quick actions ──────────────────────────────────────────────────────────
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions(BuildContext context, AppLocalizations l) {
     final actions = [
       (
         icon: Icons.how_to_reg_outlined,
-        label: 'Mark\nAttendance',
+        label: l.teacherDashboardQuickActionMarkAttendance,
         route: '/teacher/courses'
       ),
       (
         icon: Icons.grade_outlined,
-        label: 'Grades',
+        label: l.dashboardActionGrades,
         route: '/teacher/courses'
       ),
       (
         icon: Icons.assignment_outlined,
-        label: 'Assignments',
+        label: l.teacherDashboardQuickActionAssignments,
         route: '/teacher/courses'
       ),
       (
         icon: Icons.folder_outlined,
-        label: 'Materials',
+        label: l.teacherDashboardQuickActionMaterials,
         route: '/teacher/courses'
       ),
       (
         icon: Icons.bar_chart_outlined,
-        label: 'Reports',
-        route: '/teacher/courses'
+        label: l.teacherDashboardQuickActionReports,
+        route: '/teacher/analytics'
       ),
       (
         icon: Icons.campaign_outlined,
-        label: 'Announcements',
+        label: l.teacherDashboardQuickActionAnnouncements,
         route: '/teacher/alerts/announcement'
       ),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Quick Actions', style: AppTextStyles.h2),
+        Text(l.dashboardQuickActionsTitle, style: AppTextStyles.h2),
         const SizedBox(height: 12),
         GridView.count(
           crossAxisCount: 3,
@@ -320,8 +326,8 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
   // ── Today's schedule ───────────────────────────────────────────────────────
 
-  Widget _buildTodaySchedule(
-      BuildContext context, List<TeacherCourse> courses) {
+  Widget _buildTodaySchedule(BuildContext context, List<TeacherCourse> courses,
+      AppLocalizations l) {
     final todayCourses = courses.where((c) => c.hasTodayClass()).toList();
 
     return Column(
@@ -330,10 +336,10 @@ class TeacherDashboardScreen extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Today's Schedule", style: AppTextStyles.h2),
+            Text(l.teacherDashboardTodayScheduleTitle, style: AppTextStyles.h2),
             GestureDetector(
               onTap: () => context.push('/teacher/schedule'),
-              child: Text('Full Schedule', style: AppTextStyles.link),
+              child: Text(l.teacherDashboardFullScheduleLink, style: AppTextStyles.link),
             ),
           ],
         ),
@@ -351,7 +357,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 Icon(Icons.event_available_outlined,
                     color: AppColors.textLabel, size: 22),
                 const SizedBox(width: 12),
-                Text('No classes scheduled today',
+                Text(l.teacherDashboardNoClassesScheduledToday,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textSecondary)),
               ],
@@ -365,7 +371,8 @@ class TeacherDashboardScreen extends ConsumerWidget {
             final now = DateTime.now();
             final startStr = slot?['start'] as String? ?? '';
             bool isCurrent = false;
-            String statusLabel = i == 0 ? 'NEXT' : 'LATER';
+            String statusLabel =
+                i == 0 ? l.teacherDashboardStatusNext : l.teacherDashboardStatusLater;
             Color statusColor = AppColors.primaryNavy;
 
             if (startStr.isNotEmpty) {
@@ -383,10 +390,10 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 if (now.isAfter(slotStart) &&
                     (slotEnd == null || now.isBefore(slotEnd))) {
                   isCurrent = true;
-                  statusLabel = 'NOW';
+                  statusLabel = l.teacherDashboardStatusNow;
                   statusColor = AppColors.statusGreen;
                 } else if (now.isBefore(slotStart) && i == 0) {
-                  statusLabel = 'NEXT';
+                  statusLabel = l.teacherDashboardStatusNext;
                   statusColor = AppColors.primaryNavy;
                 }
               } catch (_) {}
@@ -400,6 +407,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 statusLabel: statusLabel,
                 statusColor: statusColor,
                 isCurrent: isCurrent,
+                l: l,
               ),
             );
           }),
@@ -409,18 +417,18 @@ class TeacherDashboardScreen extends ConsumerWidget {
 
   // ── Pending leaves (view-only) ─────────────────────────────────────────────
 
-  Widget _buildPendingLeaves(
-      BuildContext context, List<StudentLeaveDetail> leaves) {
+  Widget _buildPendingLeaves(BuildContext context,
+      List<StudentLeaveDetail> leaves, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Pending Leave Requests', style: AppTextStyles.h2),
+            Text(l.teacherDashboardPendingLeaveRequestsTitle, style: AppTextStyles.h2),
             GestureDetector(
               onTap: () => context.go('/teacher/students'),
-              child: Text('View All', style: AppTextStyles.link),
+              child: Text(l.teacherDashboardViewAllLink, style: AppTextStyles.link),
             ),
           ],
         ),
@@ -438,7 +446,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                 Icon(Icons.inbox_outlined,
                     color: AppColors.textLabel, size: 22),
                 const SizedBox(width: 12),
-                Text('No pending requests',
+                Text(l.teacherDashboardNoPendingRequests,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textSecondary)),
               ],
@@ -455,7 +463,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
               children: leaves.asMap().entries.map((entry) {
                 final isLast = entry.key == leaves.length - 1;
                 return _buildLeaveRow(
-                    context, entry.value,
+                    context, entry.value, l,
                     showDivider: !isLast);
               }).toList(),
             ),
@@ -465,7 +473,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildLeaveRow(BuildContext context, StudentLeaveDetail leave,
-      {required bool showDivider}) {
+      AppLocalizations l, {required bool showDivider}) {
     return Column(
       children: [
         InkWell(
@@ -492,7 +500,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                       Text(leave.studentName,
                           style: AppTextStyles.bodyMedium),
                       Text(
-                        '${leave.type} • ${_fmtDateRange(leave.startDate, leave.endDate)}',
+                        '${leave.type} • ${_fmtDateRange(leave.startDate, leave.endDate, l.localeName)}',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -577,6 +585,7 @@ class _ScheduleTodayCard extends StatelessWidget {
     required this.statusLabel,
     required this.statusColor,
     required this.isCurrent,
+    required this.l,
   });
 
   final TeacherCourse course;
@@ -584,6 +593,7 @@ class _ScheduleTodayCard extends StatelessWidget {
   final String statusLabel;
   final Color statusColor;
   final bool isCurrent;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -641,7 +651,7 @@ class _ScheduleTodayCard extends StatelessWidget {
                     Icon(Icons.people_outline,
                         size: 12, color: AppColors.textSecondary),
                     const SizedBox(width: 3),
-                    Text('${course.studentCount} Students',
+                    Text(l.studentsCountLabel(course.studentCount),
                         style: AppTextStyles.caption),
                   ],
                 ),

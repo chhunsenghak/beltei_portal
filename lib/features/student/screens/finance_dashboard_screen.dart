@@ -8,6 +8,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final financeAsync = ref.watch(studentFinanceProvider);
 
     return Scaffold(
@@ -37,7 +39,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
         onPressed: () => context.go('/student/finance/payment'),
         backgroundColor: AppColors.primaryBlue,
         icon: const Icon(Icons.payment, color: Colors.white),
-        label: Text('PAY NOW',
+        label: Text(l.financePayNowButton,
             style: AppTextStyles.button.copyWith(fontSize: 13)),
       ),
       body: financeAsync.when(
@@ -50,13 +52,13 @@ class FinanceDashboardScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load finance data',
+              Text(l.financeLoadError,
                   style: AppTextStyles.bodyMedium),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(studentFinanceProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -66,13 +68,13 @@ class FinanceDashboardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTitle(),
+              _buildTitle(l),
               const SizedBox(height: AppSpacing.md),
-              _buildSummaryCards(fin),
+              _buildSummaryCards(fin, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildPaymentProgressCard(fin),
+              _buildPaymentProgressCard(fin, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildPaymentHistory(context, fin.invoices),
+              _buildPaymentHistory(context, fin.invoices, l),
               const SizedBox(height: 80),
             ],
           ),
@@ -81,49 +83,49 @@ class FinanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Finance Overview', style: AppTextStyles.h1),
+        Text(l.financeOverviewTitle, style: AppTextStyles.h1),
         const SizedBox(height: 4),
         Text(
-          'Manage your tuition fees and payment history.',
+          l.financeOverviewSubtitle,
           style: AppTextStyles.caption.copyWith(height: 1.4),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCards(FinanceSummary fin) {
+  Widget _buildSummaryCards(FinanceSummary fin, AppLocalizations l) {
     final paidPct = fin.totalFees > 0
         ? (fin.paidPercent * 100).toStringAsFixed(1)
         : '0.0';
-    final dueDateLabel = fin.nextDueName ?? 'No pending fees';
+    final dueDateLabel = fin.nextDueName ?? l.financeNoPendingFees;
 
     final items = [
       (
-        label: 'TOTAL FEE',
+        label: l.financeTotalFeeLabel,
         value: _currencyFmt.format(fin.totalFees),
-        sub: 'Total across all invoices',
+        sub: l.financeTotalFeeSub,
         icon: Icons.receipt_outlined,
         iconColor: AppColors.primaryNavy,
         valueColor: AppColors.textPrimary,
       ),
       (
-        label: 'TOTAL PAID',
+        label: l.financeTotalPaidLabel,
         value: _currencyFmt.format(fin.totalPaid),
-        sub: '$paidPct% of total completed',
+        sub: l.financeTotalPaidSub(paidPct),
         icon: Icons.check_circle_outline,
         iconColor: AppColors.statusGreen,
         valueColor: AppColors.statusGreen,
       ),
       (
-        label: 'OUTSTANDING',
+        label: l.financeOutstandingLabel,
         value: _currencyFmt.format(fin.outstanding),
         sub: fin.outstanding > 0
-            ? 'Action required'
-            : 'All fees cleared',
+            ? l.financeActionRequired
+            : l.financeAllFeesCleared,
         icon: Icons.warning_amber_outlined,
         iconColor: fin.outstanding > 0
             ? AppColors.statusRed
@@ -133,7 +135,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
             : AppColors.statusGreen,
       ),
       (
-        label: 'NEXT DUE DATE',
+        label: l.financeNextDueDateLabel,
         value: fin.nextDueDate != null
             ? _fmtDate(fin.nextDueDate!)
             : '—',
@@ -161,7 +163,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentProgressCard(FinanceSummary fin) {
+  Widget _buildPaymentProgressCard(FinanceSummary fin, AppLocalizations l) {
     final statusColor = switch (fin.status) {
       'PAID' => AppColors.statusGreen,
       'OVERDUE' => AppColors.statusRed,
@@ -178,7 +180,7 @@ class FinanceDashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Payment Progress',
+          Text(l.financePaymentProgressTitle,
               style: AppTextStyles.h2
                   .copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 14),
@@ -217,10 +219,10 @@ class FinanceDashboardScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           _legendRow(AppColors.primaryNavy,
-              'Paid: ${_currencyFmt.format(fin.totalPaid)}'),
+              l.financePaidLegend(_currencyFmt.format(fin.totalPaid))),
           const SizedBox(height: 6),
           _legendRow(AppColors.border,
-              'Remaining: ${_currencyFmt.format(fin.outstanding)}'),
+              l.financeRemainingLegend(_currencyFmt.format(fin.outstanding))),
         ],
       ),
     );
@@ -245,14 +247,14 @@ class FinanceDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildPaymentHistory(
-      BuildContext context, List<InvoiceRow> invoices) {
+      BuildContext context, List<InvoiceRow> invoices, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Payment History',
+            Text(l.financePaymentHistoryTitle,
                 style: AppTextStyles.h2
                     .copyWith(color: AppColors.primaryNavy)),
           ],
@@ -267,20 +269,20 @@ class FinanceDashboardScreen extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              _buildTableHeader(),
+              _buildTableHeader(l),
               Divider(color: AppColors.border, height: 1),
               if (invoices.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
+                Padding(
+                  padding: const EdgeInsets.all(24),
                   child:
-                      Center(child: Text('No invoices found.')),
+                      Center(child: Text(l.financeNoInvoicesFound)),
                 )
               else
                 ...invoices.asMap().entries.map((e) {
                   final isLast = e.key == invoices.length - 1;
                   return Column(
                     children: [
-                      _buildInvoiceRow(context, e.value),
+                      _buildInvoiceRow(context, e.value, l),
                       if (!isLast)
                         Divider(
                             color: AppColors.divider, height: 1),
@@ -294,11 +296,15 @@ class FinanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTableHeader() {
+  Widget _buildTableHeader(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
-        children: ['DESCRIPTION', 'DUE DATE', 'STATUS']
+        children: [
+          l.financeTableHeaderDescription,
+          l.financeTableHeaderDueDate,
+          l.financeTableHeaderStatus
+        ]
             .map((h) => Expanded(
                   child: Text(h, style: AppTextStyles.label),
                 ))
@@ -307,7 +313,8 @@ class FinanceDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInvoiceRow(BuildContext context, InvoiceRow inv) {
+  Widget _buildInvoiceRow(
+      BuildContext context, InvoiceRow inv, AppLocalizations l) {
     final statusColor = switch (inv.status) {
       InvoiceStatus.paid => AppColors.statusGreen,
       InvoiceStatus.overdue => AppColors.statusRed,
@@ -315,10 +322,10 @@ class FinanceDashboardScreen extends ConsumerWidget {
       InvoiceStatus.unpaid => AppColors.statusAmber,
     };
     final statusLabel = switch (inv.status) {
-      InvoiceStatus.paid => 'Paid',
-      InvoiceStatus.overdue => 'Overdue',
-      InvoiceStatus.partial => 'Partial',
-      InvoiceStatus.unpaid => 'Unpaid',
+      InvoiceStatus.paid => l.financeStatusPaid,
+      InvoiceStatus.overdue => l.financeStatusOverdue,
+      InvoiceStatus.partial => l.financeStatusPartial,
+      InvoiceStatus.unpaid => l.financeStatusUnpaid,
     };
 
     return GestureDetector(

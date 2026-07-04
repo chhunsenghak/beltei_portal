@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -28,9 +30,10 @@ class _UploadMaterialsScreenState
   }
 
   void _upload() {
+    final l = AppLocalizations.of(context)!;
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please enter a material title.',
+        content: Text(l.uploadMaterialsValidationError,
             style: AppTextStyles.body.copyWith(color: Colors.white)),
         backgroundColor: AppColors.statusRed,
         behavior: SnackBarBehavior.floating,
@@ -40,7 +43,8 @@ class _UploadMaterialsScreenState
     }
     // File picking requires a device file-picker plugin — placeholder UX only.
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('"${_titleController.text.trim()}" — select a file to upload.',
+      content: Text(
+          l.uploadMaterialsFilePlaceholderSnackbar(_titleController.text.trim()),
           style: AppTextStyles.body.copyWith(color: Colors.white)),
       backgroundColor: AppColors.primaryNavy,
       behavior: SnackBarBehavior.floating,
@@ -52,6 +56,7 @@ class _UploadMaterialsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final materialsAsync = ref.watch(courseMaterialsProvider(widget.courseId));
     final courseAsync = ref.watch(courseInfoProvider(widget.courseId));
     final course = courseAsync.valueOrNull;
@@ -63,15 +68,15 @@ class _UploadMaterialsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(course?.name),
+            _buildHeader(course?.name, l),
             const SizedBox(height: AppSpacing.md),
-            _buildUploadZone(),
+            _buildUploadZone(l),
             const SizedBox(height: AppSpacing.md),
-            _buildTitleField(),
+            _buildTitleField(l),
             const SizedBox(height: AppSpacing.md),
-            _buildUploadButton(),
+            _buildUploadButton(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildMaterialsList(materialsAsync),
+            _buildMaterialsList(materialsAsync, l),
             const SizedBox(height: 24),
           ],
         ),
@@ -81,11 +86,11 @@ class _UploadMaterialsScreenState
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(String? courseName) {
+  Widget _buildHeader(String? courseName, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Course Materials', style: AppTextStyles.h1),
+        Text(l.courseDetailMaterialsTitle, style: AppTextStyles.h1),
         if (courseName != null)
           Text(courseName,
               style: AppTextStyles.caption
@@ -96,7 +101,7 @@ class _UploadMaterialsScreenState
 
   // ── Upload zone ────────────────────────────────────────────────────────────
 
-  Widget _buildUploadZone() {
+  Widget _buildUploadZone(AppLocalizations l) {
     return GestureDetector(
       onTap: () {},
       child: Container(
@@ -120,10 +125,10 @@ class _UploadMaterialsScreenState
                   color: AppColors.primaryBlue, size: 28),
             ),
             const SizedBox(height: 12),
-            Text('Drag and drop or tap to upload',
+            Text(l.uploadMaterialsDropzoneText,
                 style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 4),
-            Text('Supported formats: PDF, MP4, PPTX, DOCX\n(Max 100MB)',
+            Text(l.uploadMaterialsSupportedFormatsText,
                 style: AppTextStyles.caption, textAlign: TextAlign.center),
           ],
         ),
@@ -133,17 +138,17 @@ class _UploadMaterialsScreenState
 
   // ── Title field ────────────────────────────────────────────────────────────
 
-  Widget _buildTitleField() {
+  Widget _buildTitleField(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Material Title', style: AppTextStyles.caption),
+        Text(l.uploadMaterialsTitleFieldLabel, style: AppTextStyles.caption),
         const SizedBox(height: 6),
         TextField(
           controller: _titleController,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: 'Enter title for this material...',
+          decoration: InputDecoration(
+            hintText: l.uploadMaterialsTitleHint,
           ),
         ),
       ],
@@ -152,14 +157,14 @@ class _UploadMaterialsScreenState
 
   // ── Upload button ──────────────────────────────────────────────────────────
 
-  Widget _buildUploadButton() {
+  Widget _buildUploadButton(AppLocalizations l) {
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: ElevatedButton.icon(
         onPressed: _upload,
         icon: const Icon(Icons.upload_outlined, size: 18),
-        label: Text('Upload', style: AppTextStyles.button),
+        label: Text(l.uploadMaterialsUploadButton, style: AppTextStyles.button),
       ),
     );
   }
@@ -167,14 +172,14 @@ class _UploadMaterialsScreenState
   // ── Materials list ─────────────────────────────────────────────────────────
 
   Widget _buildMaterialsList(
-      AsyncValue<List<CourseMaterialItem>> materialsAsync) {
+      AsyncValue<List<CourseMaterialItem>> materialsAsync, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Uploaded Materials', style: AppTextStyles.h2),
+            Text(l.uploadMaterialsListTitle, style: AppTextStyles.h2),
             materialsAsync.when(
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),
@@ -186,7 +191,7 @@ class _UploadMaterialsScreenState
                   borderRadius:
                       BorderRadius.circular(AppSpacing.chipRadius),
                 ),
-                child: Text('${list.length} Files',
+                child: Text(l.courseDetailFilesCountValue(list.length),
                     style: AppTextStyles.label
                         .copyWith(color: AppColors.primaryBlue)),
               ),
@@ -210,12 +215,12 @@ class _UploadMaterialsScreenState
                   Icon(Icons.error_outline,
                       color: AppColors.statusRed),
                   const SizedBox(height: 8),
-                  Text('Could not load materials',
+                  Text(l.courseDetailMaterialsLoadError,
                       style: AppTextStyles.body),
                   TextButton(
                     onPressed: () => ref.invalidate(
                         courseMaterialsProvider(widget.courseId)),
-                    child: const Text('Retry'),
+                    child: Text(l.retry),
                   ),
                 ],
               ),
@@ -233,7 +238,7 @@ class _UploadMaterialsScreenState
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Text('No materials uploaded yet.',
+                      child: Text(l.courseDetailNoMaterialsUploaded,
                           style: AppTextStyles.body.copyWith(
                               color: AppColors.textSecondary)),
                     ),
@@ -251,7 +256,7 @@ class _UploadMaterialsScreenState
                       final isLast = e.key == materials.length - 1;
                       return Column(
                         children: [
-                          _MaterialRow(item: e.value),
+                          _MaterialRow(item: e.value, locale: l.localeName),
                           if (!isLast)
                             Divider(
                                 height: 1, color: AppColors.divider),
@@ -269,8 +274,9 @@ class _UploadMaterialsScreenState
 // ── Material row ───────────────────────────────────────────────────────────────
 
 class _MaterialRow extends StatelessWidget {
-  const _MaterialRow({required this.item});
+  const _MaterialRow({required this.item, required this.locale});
   final CourseMaterialItem item;
+  final String locale;
 
   IconData get _icon {
     final t = (item.fileType ?? '').toLowerCase();
@@ -299,11 +305,7 @@ class _MaterialRow extends StatelessWidget {
   String get _dateLabel {
     final d = item.uploadedAt;
     if (d == null) return '';
-    const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[d.month]} ${d.day}, ${d.year}';
+    return DateFormat.yMMMd(locale).format(d);
   }
 
   @override

@@ -1161,6 +1161,7 @@ class AdminService {
       'reviewed_at': DateTime.now().toIso8601String(),
       if (notes != null && notes.isNotEmpty) 'review_notes': notes,
     }).eq('id', id);
+    await _notifyStudentOfDecision(id);
   }
 
   Future<void> rejectLeaveRequest(String id, String adminId, {String? notes}) async {
@@ -1170,6 +1171,16 @@ class AdminService {
       'reviewed_at': DateTime.now().toIso8601String(),
       if (notes != null && notes.isNotEmpty) 'review_notes': notes,
     }).eq('id', id);
+    await _notifyStudentOfDecision(id);
+  }
+
+  Future<void> _notifyStudentOfDecision(String leaveId) async {
+    try {
+      await _db.rpc('notify_student_of_leave_decision',
+          params: {'p_leave_id': leaveId});
+    } catch (e, st) {
+      debugPrint('notify_student_of_leave_decision error: $e\n$st');
+    }
   }
 
   Future<List<AdminSemester>> getSemesters() async {

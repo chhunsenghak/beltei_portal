@@ -5,6 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ class AttendanceReportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final courseAsync = ref.watch(courseInfoProvider(courseId));
     final summaryAsync = ref.watch(attendanceSummaryProvider(courseId));
 
@@ -28,11 +30,11 @@ class AttendanceReportScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load report', style: AppTextStyles.body),
+              Text(l.attendanceReportLoadError, style: AppTextStyles.body),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(attendanceSummaryProvider(courseId)),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -44,13 +46,13 @@ class AttendanceReportScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTitle(course?.name),
+                _buildTitle(course?.name, l),
                 const SizedBox(height: AppSpacing.md),
-                _buildExportButton(),
+                _buildExportButton(l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildStatCards(summary),
+                _buildStatCards(summary, l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildStudentRecords(summary),
+                _buildStudentRecords(summary, l),
                 const SizedBox(height: 24),
               ],
             ),
@@ -62,17 +64,17 @@ class AttendanceReportScreen extends ConsumerWidget {
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle(String? courseName) {
+  Widget _buildTitle(String? courseName, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Attendance Report', style: AppTextStyles.h1),
+        Text(l.attendanceReportTitle, style: AppTextStyles.h1),
         if (courseName != null)
           Text(courseName,
               style: AppTextStyles.caption
                   .copyWith(color: AppColors.primaryNavy)),
         if (courseName == null)
-          Text('Analyze student participation and attendance patterns.',
+          Text(l.attendanceReportSubtitle,
               style: AppTextStyles.caption.copyWith(height: 1.4)),
       ],
     );
@@ -80,20 +82,20 @@ class AttendanceReportScreen extends ConsumerWidget {
 
   // ── Export button ──────────────────────────────────────────────────────────
 
-  Widget _buildExportButton() {
+  Widget _buildExportButton(AppLocalizations l) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {},
         icon: const Icon(Icons.download_outlined, size: 18),
-        label: Text('Export Report', style: AppTextStyles.button),
+        label: Text(l.attendanceReportExportButton, style: AppTextStyles.button),
       ),
     );
   }
 
   // ── Stat cards ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatCards(AttendanceSummaryData summary) {
+  Widget _buildStatCards(AttendanceSummaryData summary, AppLocalizations l) {
     final presentRate = summary.avgPresentRate;
     final absentRate =
         summary.students.isNotEmpty && summary.totalSessions > 0
@@ -105,15 +107,15 @@ class AttendanceReportScreen extends ConsumerWidget {
       children: [
         _AccentCard(
           accentColor: AppColors.primaryNavy,
-          label: 'TOTAL SESSIONS',
-          value: '${summary.totalSessions} Sessions',
-          subLabel: '${summary.students.length} Students',
+          label: l.attendanceReportTotalSessionsLabel,
+          value: l.attendanceReportSessionsValue(summary.totalSessions),
+          subLabel: l.studentsCountLabel(summary.students.length),
           subIcon: Icons.people_outline,
         ),
         const SizedBox(height: 10),
         _AccentCard(
           accentColor: AppColors.statusGreen,
-          label: 'PRESENT AVG',
+          label: l.attendanceReportPresentAvgLabel,
           value: '${(presentRate * 100).toStringAsFixed(1)}%',
           progress: presentRate.clamp(0, 1),
           progressColor: AppColors.statusGreen,
@@ -121,7 +123,7 @@ class AttendanceReportScreen extends ConsumerWidget {
         const SizedBox(height: 10),
         _AccentCard(
           accentColor: AppColors.statusRed,
-          label: 'ABSENT AVG',
+          label: l.attendanceReportAbsentAvgLabel,
           value: '${(absentRate * 100).toStringAsFixed(1)}%',
           progress: absentRate.clamp(0, 1),
           progressColor: AppColors.statusRed,
@@ -132,11 +134,11 @@ class AttendanceReportScreen extends ConsumerWidget {
 
   // ── Student records ────────────────────────────────────────────────────────
 
-  Widget _buildStudentRecords(AttendanceSummaryData summary) {
+  Widget _buildStudentRecords(AttendanceSummaryData summary, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Student Records', style: AppTextStyles.h2),
+        Text(l.attendanceReportStudentRecordsTitle, style: AppTextStyles.h2),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -146,13 +148,13 @@ class AttendanceReportScreen extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              _buildTableHeader(),
+              _buildTableHeader(l),
               Divider(height: 1, color: AppColors.border),
               if (summary.students.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Center(
-                    child: Text('No attendance data yet.',
+                    child: Text(l.attendanceReportNoDataMessage,
                         style: AppTextStyles.body.copyWith(
                             color: AppColors.textSecondary)),
                   ),
@@ -171,7 +173,7 @@ class AttendanceReportScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    'Showing all ${summary.students.length} students',
+                    l.attendanceReportShowingAllLabel(summary.students.length),
                     style: AppTextStyles.caption,
                   ),
                 ),
@@ -183,28 +185,29 @@ class AttendanceReportScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTableHeader() {
+  Widget _buildTableHeader(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           Expanded(
               flex: 3,
-              child: Text('STUDENT\nNAME',
+              child: Text(l.attendanceReportStudentNameHeader,
                   style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textLabel,
                       letterSpacing: 0.5))),
-          ...['PRESENT', 'ABSENT'].map((h) => Expanded(
-                child: Text(h,
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textLabel,
-                        letterSpacing: 0.5),
-                    textAlign: TextAlign.center),
-              )),
+          ...[l.attendanceReportPresentHeader, l.attendanceReportAbsentHeader]
+              .map((h) => Expanded(
+                    child: Text(h,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textLabel,
+                            letterSpacing: 0.5),
+                        textAlign: TextAlign.center),
+                  )),
         ],
       ),
     );

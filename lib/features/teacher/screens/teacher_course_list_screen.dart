@@ -6,93 +6,220 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class TeacherCourseListScreen extends ConsumerWidget {
+class TeacherCourseListScreen extends ConsumerStatefulWidget {
   const TeacherCourseListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TeacherCourseListScreen> createState() =>
+      _TeacherCourseListScreenState();
+}
+
+class _TeacherCourseListScreenState
+    extends ConsumerState<TeacherCourseListScreen> {
+  int _filterIndex = 0;
+  String _search = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<TeacherCourse> _applyFilter(List<TeacherCourse> courses) {
+    var result = courses;
+    switch (_filterIndex) {
+      case 1:
+        result = result.where((c) => c.isCurrentSemester).toList();
+      case 2:
+        result = result.where((c) => !c.isCurrentSemester).toList();
+      default:
+        break;
+    }
+    if (_search.isNotEmpty) {
+      final q = _search.toLowerCase();
+      result = result
+          .where((c) =>
+              c.name.toLowerCase().contains(q) ||
+              c.code.toLowerCase().contains(q))
+          .toList();
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final coursesAsync = ref.watch(teacherCoursesProvider);
+    final filters = [
+      l.courseListFilterAll,
+      l.courseListFilterCurrent,
+      l.teacherCourseListFilterPast,
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: coursesAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline,
-                  color: AppColors.statusRed, size: 40),
-              const SizedBox(height: 8),
-              Text('Could not load courses',
-                  style: AppTextStyles.bodyMedium),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () =>
-                    ref.invalidate(teacherCoursesProvider),
-                child: const Text('Retry'),
+      body: Column(
+        children: [
+          _buildTitle(coursesAsync.valueOrNull ?? const [], l),
+          _buildSearchBar(l),
+          _buildFilterChips(filters),
+          Expanded(
+            child: coursesAsync.when(
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline,
+                        color: AppColors.statusRed, size: 40),
+                    const SizedBox(height: 8),
+                    Text(l.courseListLoadError,
+                        style: AppTextStyles.bodyMedium),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(teacherCoursesProvider),
+                      child: Text(l.retry),
+                    ),
+                  ],
+                ),
               ),
-            ],
+              data: (courses) {
+                final filtered = _applyFilter(courses);
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(teacherCoursesProvider.future),
+                  child: filtered.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height:
+                                  MediaQuery.of(context).size.height * 0.5,
+                              child: _buildEmpty(l),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.screenPadding,
+                              0,
+                              AppSpacing.screenPadding,
+                              24),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, i) =>
+                              _CourseCard(course: filtered[i], l: l),
+                        ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTitle(List<TeacherCourse> courses, AppLocalizations l) {
+    final currentSemCourses =
+        courses.where((c) => c.isCurrentSemester).toList();
+    final semLabel = currentSemCourses.isNotEmpty
+        ? '${currentSemCourses.first.semesterName ?? ''} ${currentSemCourses.first.semesterAcademicYear ?? ''}'
+        : '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenPadding, AppSpacing.sm, AppSpacing.screenPadding, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l.teacherCourseListTitle, style: AppTextStyles.h1),
+          Text(
+            semLabel.trim().isNotEmpty
+                ? l.teacherCourseListSubtitleWithSemester(semLabel)
+                : l.teacherCourseListSubtitle,
+            style: AppTextStyles.caption.copyWith(height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(AppLocalizations l) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (v) => setState(() => _search = v),
+        decoration: InputDecoration(
+          hintText: l.teacherCourseListSearchHint,
+          prefixIcon:
+              Icon(Icons.search, color: AppColors.textLabel, size: 20),
+          fillColor: AppColors.bgCard,
+          filled: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(List<String> filters) {
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        itemCount: filters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => _buildFilterChip(i, filters[i]),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(int index, String label) {
+    final isActive = _filterIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _filterIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primaryNavy : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+          border: Border.all(
+            color: isActive ? AppColors.primaryNavy : AppColors.border,
           ),
         ),
-        data: (courses) => SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.screenPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTitle(courses),
-              const SizedBox(height: AppSpacing.sectionGap),
-              if (courses.isEmpty)
-                _buildEmpty()
-              else
-                ...courses.map((c) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _CourseCard(course: c),
-                    )),
-              const SizedBox(height: 24),
-            ],
+        child: Text(
+          label,
+          style: AppTextStyles.bodySemiBold.copyWith(
+            color: isActive ? Colors.white : AppColors.textSecondary,
+            fontSize: 13,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTitle(List<TeacherCourse> courses) {
-    final currentSemCourses =
-        courses.where((c) => c.isCurrentSemester).toList();
-    final semLabel = currentSemCourses.isNotEmpty
-        ? '${currentSemCourses.first.semesterName ?? ''} ${currentSemCourses.first.semesterAcademicYear ?? ''}'
-        : '';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('My Courses', style: AppTextStyles.h1),
-        Text(
-          'Manage your assigned courses${semLabel.trim().isNotEmpty ? ' for $semLabel' : ''}.',
-          style: AppTextStyles.caption.copyWith(height: 1.4),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEmpty() {
+  Widget _buildEmpty(AppLocalizations l) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 60),
-        child: Column(
-          children: [
-            Icon(Icons.menu_book_outlined,
-                color: AppColors.textLabel, size: 48),
-            const SizedBox(height: 12),
-            Text('No courses assigned yet.',
-                style: AppTextStyles.body
-                    .copyWith(color: AppColors.textSecondary)),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.menu_book_outlined,
+              color: AppColors.textLabel, size: 48),
+          const SizedBox(height: 12),
+          Text(l.teacherCourseListEmptyState,
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.textSecondary)),
+        ],
       ),
     );
   }
@@ -101,8 +228,9 @@ class TeacherCourseListScreen extends ConsumerWidget {
 // ── Course card ────────────────────────────────────────────────────────────────
 
 class _CourseCard extends StatelessWidget {
-  const _CourseCard({required this.course});
+  const _CourseCard({required this.course, required this.l});
   final TeacherCourse course;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +306,7 @@ class _CourseCard extends StatelessWidget {
         _MetaRow(Icons.calendar_today_outlined, course.scheduleDisplay),
         const SizedBox(height: 4),
         _MetaRow(Icons.people_outline,
-            '${course.studentCount} Students Enrolled'),
+            l.teacherCourseListStudentsEnrolled(course.studentCount)),
         if (course.room != null) ...[
           const SizedBox(height: 4),
           _MetaRow(Icons.meeting_room_outlined, course.room!),
@@ -195,7 +323,7 @@ class _CourseCard extends StatelessWidget {
             onPressed: () => context
                 .push('/teacher/courses/${course.courseId}/attendance'),
             icon: const Icon(Icons.how_to_reg_outlined, size: 16),
-            label: const Text('Attendance'),
+            label: Text(l.dashboardActionAttendance),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryNavy,
               side: BorderSide(color: AppColors.primaryNavy),
@@ -209,7 +337,7 @@ class _CourseCard extends StatelessWidget {
             onPressed: () => context
                 .push('/teacher/courses/${course.courseId}/grades'),
             icon: const Icon(Icons.grade_outlined, size: 16),
-            label: const Text('Grades'),
+            label: Text(l.dashboardActionGrades),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryBlue,
               side: BorderSide(color: AppColors.primaryBlue),

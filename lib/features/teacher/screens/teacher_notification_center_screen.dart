@@ -4,49 +4,38 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../core/providers/student_providers.dart';
+import '../../../core/providers/teacher_providers.dart';
 import '../../../core/supabase/database.types.dart';
 import '../../../l10n/app_localizations.dart';
 
 List<String> _kFilters(AppLocalizations l) => [
       l.notificationsFilterAll,
-      l.notificationsFilterGrades,
-      l.notificationsFilterAttendance,
-      l.notificationsFilterPayment,
       l.notificationsFilterLeave,
     ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class NotificationCenterScreen extends ConsumerStatefulWidget {
-  const NotificationCenterScreen({super.key});
+class TeacherNotificationCenterScreen extends ConsumerStatefulWidget {
+  const TeacherNotificationCenterScreen({super.key});
 
   @override
-  ConsumerState<NotificationCenterScreen> createState() =>
-      _NotificationCenterScreenState();
+  ConsumerState<TeacherNotificationCenterScreen> createState() =>
+      _TeacherNotificationCenterScreenState();
 }
 
-class _NotificationCenterScreenState
-    extends ConsumerState<NotificationCenterScreen> {
+class _TeacherNotificationCenterScreenState
+    extends ConsumerState<TeacherNotificationCenterScreen> {
   int _filterIndex = 0;
 
   List<NotificationRow> _applyFilter(List<NotificationRow> all) {
     if (_filterIndex == 0) return all;
-    final typeMap = {
-      1: 'grade',
-      2: 'attendance',
-      3: 'payment',
-      4: 'leave',
-    };
-    final type = typeMap[_filterIndex];
-    if (type == null) return all;
-    return all.where((n) => n.type == type).toList();
+    return all.where((n) => n.type == 'leave').toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final notifsAsync = ref.watch(studentNotificationsProvider);
+    final notifsAsync = ref.watch(teacherNotificationsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -68,8 +57,8 @@ class _NotificationCenterScreenState
                         style: AppTextStyles.bodyMedium),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => ref
-                          .invalidate(studentNotificationsProvider),
+                      onPressed: () =>
+                          ref.invalidate(teacherNotificationsProvider),
                       child: Text(l.retry),
                     ),
                   ],
@@ -147,9 +136,8 @@ class _NotificationCenterScreenState
         notif: notifications[i],
         l: l,
         onTap: () {
-          // Mark as read on tap
           ref
-              .read(studentServiceProvider)
+              .read(teacherServiceProvider)
               .markNotificationRead(notifications[i].id);
         },
       ),
@@ -166,32 +154,22 @@ class _NotifTile extends StatelessWidget {
   final AppLocalizations l;
 
   IconData get _icon => switch (notif.type) {
-        'grade' => Icons.grade_outlined,
-        'attendance' => Icons.calendar_today_outlined,
-        'payment' => Icons.payment_outlined,
-        'announcement' => Icons.campaign_outlined,
         'leave' => Icons.event_busy_outlined,
+        'announcement' => Icons.campaign_outlined,
         _ => Icons.notifications_outlined,
       };
 
   Color get _iconColor => switch (notif.type) {
-        'grade' => AppColors.primaryBlue,
-        'attendance' => AppColors.textSecondary,
-        'payment' => AppColors.statusAmber,
         'leave' => AppColors.statusRed,
         _ => AppColors.primaryNavy,
       };
 
   Color get _iconBg => switch (notif.type) {
-        'grade' => AppColors.statusBlueBg,
-        'payment' => AppColors.statusAmberBg,
         'leave' => AppColors.statusRedBg,
         _ => AppColors.statusGrayBg,
       };
 
   Color? get _accentColor => switch (notif.type) {
-        'grade' => AppColors.primaryNavy,
-        'payment' => AppColors.statusAmber,
         'leave' => AppColors.statusRed,
         _ => null,
       };

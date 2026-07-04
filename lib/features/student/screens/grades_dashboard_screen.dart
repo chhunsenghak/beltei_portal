@@ -7,6 +7,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ class GradesDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final gradesAsync = ref.watch(studentGradesProvider);
     final profileAsync = ref.watch(studentProfileProvider);
 
@@ -49,12 +51,12 @@ class GradesDashboardScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load grades',
+              Text(l.loadErrorGrades,
                   style: AppTextStyles.bodyMedium),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => ref.invalidate(studentGradesProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -73,15 +75,15 @@ class GradesDashboardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(profileAsync.valueOrNull, current, creditsEarned),
+                _buildHeader(profileAsync.valueOrNull, current, creditsEarned, l),
                 const SizedBox(height: AppSpacing.md),
-                _buildGradeOverviewCard(gpa, cgpa),
+                _buildGradeOverviewCard(gpa, cgpa, l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildDegreeProgressCard(creditsEarned, semesters),
+                _buildDegreeProgressCard(creditsEarned, semesters, l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildSemesterHistory(context, semesters),
+                _buildSemesterHistory(context, semesters, l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildHonorsBanner(cgpa),
+                _buildHonorsBanner(cgpa, l),
                 const SizedBox(height: 24),
               ],
             ),
@@ -97,17 +99,20 @@ class GradesDashboardScreen extends ConsumerWidget {
     StudentProfile? profile,
     SemesterGrades? current,
     int creditsEarned,
+    AppLocalizations l,
   ) {
-    final studentCode = profile?.studentCode ?? '—';
-    final yearLevel = profile != null ? 'Year ${profile.yearLevel}' : '';
-    final standing = creditsEarned >= 0 ? 'GOOD STANDING' : 'AT RISK';
+    final studentCode = profile?.studentCode ?? l.profileNa;
+    final standing = creditsEarned >= 0 ? l.gradesStandingGood : l.gradesStandingAtRisk;
+    final studentIdLine = profile != null
+        ? l.gradesStudentIdWithYearLabel(studentCode, profile.yearLevel)
+        : l.gradesStudentIdLabel(studentCode);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Academic Performance', style: AppTextStyles.h1),
+        Text(l.gradesPageTitle, style: AppTextStyles.h1),
         const SizedBox(height: 4),
-        Text('Student ID: $studentCode${yearLevel.isNotEmpty ? ' • $yearLevel' : ''}',
+        Text(studentIdLine,
             style: AppTextStyles.caption),
         const SizedBox(height: 8),
         Container(
@@ -136,26 +141,26 @@ class GradesDashboardScreen extends ConsumerWidget {
 
   // ── GPA circles ────────────────────────────────────────────────────────────
 
-  Widget _buildGradeOverviewCard(double gpa, double cgpa) {
+  Widget _buildGradeOverviewCard(double gpa, double cgpa, AppLocalizations l) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Grade Overview', style: AppTextStyles.h2),
+          Text(l.gradesOverviewTitle, style: AppTextStyles.h2),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _GpaCircle(
                 value: gpa,
-                label: 'GPA',
-                subtitle: 'Current Term',
+                label: l.gradesGpaLabel,
+                subtitle: l.gradesCurrentTermLabel,
                 color: AppColors.primaryNavy,
               ),
               _GpaCircle(
                 value: cgpa,
-                label: 'CGPA',
-                subtitle: 'Cumulative',
+                label: l.gradesCgpaLabel,
+                subtitle: l.gradesCumulativeLabel,
                 color: AppColors.primaryBlue,
               ),
             ],
@@ -168,7 +173,7 @@ class GradesDashboardScreen extends ConsumerWidget {
   // ── Degree progress ────────────────────────────────────────────────────────
 
   Widget _buildDegreeProgressCard(
-      int creditsEarned, List<SemesterGrades> semesters) {
+      int creditsEarned, List<SemesterGrades> semesters, AppLocalizations l) {
     const creditsTotal = 120;
     final progress = (creditsEarned / creditsTotal).clamp(0.0, 1.0);
 
@@ -176,16 +181,16 @@ class GradesDashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Degree Progress', style: AppTextStyles.h2),
+          Text(l.gradesDegreeProgressTitle, style: AppTextStyles.h2),
           const SizedBox(height: 4),
-          Text('Bachelor\'s Degree Program',
+          Text(l.gradesDegreeProgramSubtitle,
               style: AppTextStyles.caption),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total Credits', style: AppTextStyles.bodyMedium),
-              Text('$creditsEarned / $creditsTotal',
+              Text(l.gradesTotalCreditsLabel, style: AppTextStyles.bodyMedium),
+              Text(l.gradesCreditsProgressValue(creditsEarned, creditsTotal),
                   style: AppTextStyles.bodySemiBold
                       .copyWith(color: AppColors.primaryBlue)),
             ],
@@ -202,7 +207,7 @@ class GradesDashboardScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text('${(progress * 100).round()}% completed',
+          Text(l.gradesProgressCompletedLabel((progress * 100).round()),
               style: AppTextStyles.caption),
         ],
       ),
@@ -212,7 +217,7 @@ class GradesDashboardScreen extends ConsumerWidget {
   // ── Semester history ───────────────────────────────────────────────────────
 
   Widget _buildSemesterHistory(
-      BuildContext context, List<SemesterGrades> semesters) {
+      BuildContext context, List<SemesterGrades> semesters, AppLocalizations l) {
     if (semesters.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -220,12 +225,13 @@ class GradesDashboardScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Semester History', style: AppTextStyles.h2),
+        Text(l.gradesSemesterHistoryTitle, style: AppTextStyles.h2),
         const SizedBox(height: 12),
         ...semesters.map((s) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _SemesterRow(
                 semester: s,
+                l: l,
                 onTap: () =>
                     context.go('/student/grades/${s.semesterId}'),
               ),
@@ -236,7 +242,7 @@ class GradesDashboardScreen extends ConsumerWidget {
 
   // ── Honors banner ──────────────────────────────────────────────────────────
 
-  Widget _buildHonorsBanner(double cgpa) {
+  Widget _buildHonorsBanner(double cgpa, AppLocalizations l) {
     final onTrack = cgpa >= 3.5;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -247,12 +253,12 @@ class GradesDashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Honors Eligibility', style: AppTextStyles.h2White),
+          Text(l.gradesHonorsEligibilityTitle, style: AppTextStyles.h2White),
           const SizedBox(height: 8),
           Text(
             onTrack
-                ? 'You are on track for the Dean\'s List! Maintain a CGPA above 3.50 for the upcoming graduation.'
-                : 'Maintain a CGPA above 3.50 to qualify for the Dean\'s List for the upcoming graduation.',
+                ? l.gradesHonorsOnTrackMessage
+                : l.gradesHonorsNotOnTrackMessage,
             style: AppTextStyles.bodyWhite.copyWith(height: 1.5),
           ),
           const SizedBox(height: 12),
@@ -269,8 +275,8 @@ class GradesDashboardScreen extends ConsumerWidget {
               const SizedBox(width: 4),
               Text(
                 onTrack
-                    ? 'Current CGPA: ${cgpa.toStringAsFixed(2)} ✓'
-                    : 'Current CGPA: ${cgpa.toStringAsFixed(2)}',
+                    ? l.gradesCurrentCgpaCheckmark(cgpa.toStringAsFixed(2))
+                    : l.gradesCurrentCgpaLabel(cgpa.toStringAsFixed(2)),
                 style:
                     AppTextStyles.link.copyWith(color: AppColors.accentGold),
               ),
@@ -330,20 +336,24 @@ class _GpaCircle extends StatelessWidget {
 // ── Semester row ───────────────────────────────────────────────────────────────
 
 class _SemesterRow extends StatelessWidget {
-  const _SemesterRow({required this.semester, required this.onTap});
+  const _SemesterRow(
+      {required this.semester, required this.onTap, required this.l});
 
   final SemesterGrades semester;
   final VoidCallback onTap;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
     final color = semester.isCurrent
         ? AppColors.primaryNavy
         : AppColors.primaryBlue;
-    final label = semester.isCurrent ? 'NOW' : 'Y${semester.startDate.substring(2, 4)}';
+    final label = semester.isCurrent
+        ? l.gradesSemesterNowLabel
+        : 'Y${semester.startDate.substring(2, 4)}';
     final gpaText = semester.semesterGpa > 0
-        ? 'GPA ${semester.semesterGpa.toStringAsFixed(2)}'
-        : 'No grades yet';
+        ? l.gradesSemesterGpaValue(semester.semesterGpa.toStringAsFixed(2))
+        : l.gradesNoGradesYetLabel;
 
     return GestureDetector(
       onTap: onTap,

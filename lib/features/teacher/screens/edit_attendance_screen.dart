@@ -5,6 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/teacher_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 // Maps DB status values ↔ display abbreviations
 const _kStatusToLabel = {
@@ -96,8 +97,9 @@ class _EditAttendanceScreenState
           (courseId: widget.courseId, date: _date)));
 
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Attendance updated.',
+          content: Text(l.editAttendanceUpdatedMessage,
               style: AppTextStyles.body.copyWith(color: Colors.white)),
           backgroundColor: AppColors.statusGreen,
           behavior: SnackBarBehavior.floating,
@@ -108,8 +110,9 @@ class _EditAttendanceScreenState
       }
     } catch (e) {
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Save failed: $e',
+          content: Text(l.editAttendanceSaveFailedError(e),
               style: AppTextStyles.body.copyWith(color: Colors.white)),
           backgroundColor: AppColors.statusRed,
           behavior: SnackBarBehavior.floating,
@@ -127,6 +130,7 @@ class _EditAttendanceScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final courseAsync = ref.watch(courseInfoProvider(widget.courseId));
     final studentsAsync = ref.watch(courseStudentsProvider(widget.courseId));
     final existingAsync = ref.watch(
@@ -134,7 +138,7 @@ class _EditAttendanceScreenState
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(l),
       body: studentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -144,11 +148,11 @@ class _EditAttendanceScreenState
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load students', style: AppTextStyles.body),
+              Text(l.loadErrorStudents, style: AppTextStyles.body),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(courseStudentsProvider(widget.courseId)),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -161,8 +165,8 @@ class _EditAttendanceScreenState
           }
           return Column(
             children: [
-              _buildSessionCard(courseAsync.valueOrNull),
-              _buildStatsRow(students.length),
+              _buildSessionCard(courseAsync.valueOrNull, l),
+              _buildStatsRow(students.length, l),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -177,11 +181,12 @@ class _EditAttendanceScreenState
                       status: label,
                       changed: _changed.contains(s.studentId),
                       onStatus: (v) => _setStatus(s.studentId, v),
+                      changedLabel: l.editAttendanceChangedBadge,
                     );
                   },
                 ),
               ),
-              _buildUpdateButton(students),
+              _buildUpdateButton(students, l),
             ],
           );
         },
@@ -191,7 +196,7 @@ class _EditAttendanceScreenState
 
   // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(AppLocalizations l) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -200,14 +205,14 @@ class _EditAttendanceScreenState
         icon: const Icon(Icons.arrow_back_ios, size: 18),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text('Edit Attendance', style: AppTextStyles.h3),
+      title: Text(l.editAttendanceAppBarTitle, style: AppTextStyles.h3),
     );
   }
 
   // ── Session card ───────────────────────────────────────────────────────────
 
-  Widget _buildSessionCard(dynamic course) {
-    final courseName = course?.name as String? ?? 'Loading…';
+  Widget _buildSessionCard(dynamic course, AppLocalizations l) {
+    final courseName = course?.name as String? ?? l.editAttendanceLoadingCourseName;
     final room = course?.room as String? ?? '';
     final parts = _date.split('-');
     final dateLabel = parts.length == 3
@@ -255,20 +260,21 @@ class _EditAttendanceScreenState
 
   // ── Stats row ──────────────────────────────────────────────────────────────
 
-  Widget _buildStatsRow(int total) {
+  Widget _buildStatsRow(int total, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.screenPadding, vertical: 10),
       color: AppColors.bgCard,
       child: Row(
         children: [
-          _StatBadge('Total', '$total', AppColors.textPrimary),
+          _StatBadge(l.courseDetailTotalLabel, '$total', AppColors.textPrimary),
           const SizedBox(width: 20),
-          _StatBadge('Present', '${_count('P')}', AppColors.statusGreen),
+          _StatBadge(
+              l.statusPresent, '${_count('P')}', AppColors.statusGreen),
           const SizedBox(width: 20),
-          _StatBadge('Late', '${_count('L')}', AppColors.statusAmber),
+          _StatBadge(l.statusLate, '${_count('L')}', AppColors.statusAmber),
           const SizedBox(width: 20),
-          _StatBadge('Absent', '${_count('A')}', AppColors.statusRed),
+          _StatBadge(l.statusAbsent, '${_count('A')}', AppColors.statusRed),
         ],
       ),
     );
@@ -276,7 +282,7 @@ class _EditAttendanceScreenState
 
   // ── Update button ──────────────────────────────────────────────────────────
 
-  Widget _buildUpdateButton(List<dynamic> students) {
+  Widget _buildUpdateButton(List<dynamic> students, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       color: AppColors.bgCard,
@@ -292,7 +298,7 @@ class _EditAttendanceScreenState
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.save_outlined, size: 18),
-          label: Text('Update Attendance', style: AppTextStyles.button),
+          label: Text(l.editAttendanceUpdateButton, style: AppTextStyles.button),
         ),
       ),
     );
@@ -308,10 +314,12 @@ class _EditStudentCard extends StatelessWidget {
     required this.status,
     required this.changed,
     required this.onStatus,
+    required this.changedLabel,
   });
   final String name, code, status;
   final bool changed;
   final ValueChanged<String> onStatus;
+  final String changedLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +405,7 @@ class _EditStudentCard extends StatelessWidget {
                 color: AppColors.statusAmber,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text('CHANGED',
+              child: Text(changedLabel,
                   style: AppTextStyles.label.copyWith(
                       color: Colors.white,
                       fontSize: 8,

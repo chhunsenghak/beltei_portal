@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 final _kGradeColors = [
   AppColors.primaryNavy,
@@ -31,6 +32,7 @@ class _TeacherStudentAnalyticsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final coursesAsync = ref.watch(teacherCoursesProvider);
     final courses = coursesAsync.valueOrNull ?? [];
     final currentCourses =
@@ -56,9 +58,9 @@ class _TeacherStudentAnalyticsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTitle(),
+            _buildTitle(l),
             const SizedBox(height: AppSpacing.md),
-            _buildCourseDropdown(currentCourses, selectedCourse),
+            _buildCourseDropdown(currentCourses, selectedCourse, l),
             const SizedBox(height: AppSpacing.sectionGap),
             if (analyticsAsync == null)
               const Center(child: CircularProgressIndicator())
@@ -73,12 +75,12 @@ class _TeacherStudentAnalyticsScreenState
                       Icon(Icons.error_outline,
                           color: AppColors.statusRed, size: 40),
                       const SizedBox(height: 8),
-                      Text('Could not load analytics',
+                      Text(l.teacherAnalyticsLoadError,
                           style: AppTextStyles.body),
                       TextButton(
                         onPressed: () => ref.invalidate(
                             courseAnalyticsProvider(_selectedCourseId!)),
-                        child: const Text('Retry'),
+                        child: Text(l.retry),
                       ),
                     ],
                   ),
@@ -86,13 +88,13 @@ class _TeacherStudentAnalyticsScreenState
                 data: (analytics) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPerformanceRanking(analytics),
+                    _buildPerformanceRanking(analytics, l),
                     const SizedBox(height: AppSpacing.sectionGap),
-                    _buildGradeDistribution(analytics),
+                    _buildGradeDistribution(analytics, l),
                     const SizedBox(height: AppSpacing.sectionGap),
-                    _buildAttendanceTrend(analytics),
+                    _buildAttendanceTrend(analytics, l),
                     const SizedBox(height: AppSpacing.sectionGap),
-                    _buildAtRiskSection(analytics),
+                    _buildAtRiskSection(analytics, l),
                   ],
                 ),
               ),
@@ -105,12 +107,12 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Student Analytics', style: AppTextStyles.h1),
-        Text('Performance overview for enrolled students.',
+        Text(l.teacherAnalyticsTitle, style: AppTextStyles.h1),
+        Text(l.teacherAnalyticsSubtitle,
             style: AppTextStyles.caption),
       ],
     );
@@ -118,8 +120,8 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── Course dropdown ────────────────────────────────────────────────────────
 
-  Widget _buildCourseDropdown(
-      List<TeacherCourse> courses, TeacherCourse? selected) {
+  Widget _buildCourseDropdown(List<TeacherCourse> courses,
+      TeacherCourse? selected, AppLocalizations l) {
     if (courses.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -128,7 +130,7 @@ class _TeacherStudentAnalyticsScreenState
           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text('No current courses',
+        child: Text(l.teacherAnalyticsNoCurrentCourses,
             style:
                 AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
       );
@@ -145,7 +147,8 @@ class _TeacherStudentAnalyticsScreenState
           children: [
             const SizedBox(height: 16),
             ...courses.map((c) => ListTile(
-                  title: Text('${c.name} (${c.code})',
+                  title: Text(
+                      l.teacherAnalyticsCourseNameWithCode(c.name, c.code),
                       style: AppTextStyles.body),
                   trailing: c.courseId == _selectedCourseId
                       ? Icon(Icons.check, color: AppColors.primaryNavy)
@@ -171,8 +174,9 @@ class _TeacherStudentAnalyticsScreenState
             Expanded(
               child: Text(
                 selected != null
-                    ? '${selected.name} (${selected.code})'
-                    : 'Select a course',
+                    ? l.teacherAnalyticsCourseNameWithCode(
+                        selected.name, selected.code)
+                    : l.teacherAnalyticsSelectCourse,
                 style: AppTextStyles.body,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -187,14 +191,15 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── Performance ranking ────────────────────────────────────────────────────
 
-  Widget _buildPerformanceRanking(CourseAnalyticsData analytics) {
+  Widget _buildPerformanceRanking(
+      CourseAnalyticsData analytics, AppLocalizations l) {
     return _Card(
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Student Performance\nRanking',
+              Text(l.teacherAnalyticsPerformanceRankingTitle,
                   style: AppTextStyles.h2.copyWith(height: 1.3)),
             ],
           ),
@@ -202,7 +207,7 @@ class _TeacherStudentAnalyticsScreenState
           if (analytics.ranking.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('No grade data yet.',
+              child: Text(l.teacherAnalyticsNoGradeData,
                   style: AppTextStyles.body
                       .copyWith(color: AppColors.textSecondary)),
             )
@@ -247,7 +252,8 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── Grade distribution ─────────────────────────────────────────────────────
 
-  Widget _buildGradeDistribution(CourseAnalyticsData analytics) {
+  Widget _buildGradeDistribution(
+      CourseAnalyticsData analytics, AppLocalizations l) {
     final grades = analytics.gradeDistribution;
     final total = grades.fold<int>(1, (s, g) => s + g.count);
 
@@ -274,7 +280,7 @@ class _TeacherStudentAnalyticsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Grade Distribution', style: AppTextStyles.h2),
+          Text(l.teacherAnalyticsGradeDistributionTitle, style: AppTextStyles.h2),
           const SizedBox(height: 16),
           SizedBox(
             height: 180,
@@ -286,7 +292,7 @@ class _TeacherStudentAnalyticsScreenState
           ),
           const SizedBox(height: 16),
           if (grades.isEmpty)
-            Text('No grades recorded yet.',
+            Text(l.courseDetailNoGradesRecorded,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary))
           else
@@ -298,8 +304,8 @@ class _TeacherStudentAnalyticsScreenState
                   .entries
                   .map((e) => _LegendDot(
                         _kGradeColors[e.key % _kGradeColors.length],
-                        '${e.value.grade} '
-                            '(${(e.value.count / total * 100).toInt()}%)',
+                        l.teacherAnalyticsGradeLegendLabel(e.value.grade,
+                            (e.value.count / total * 100).toInt()),
                       ))
                   .toList(),
             ),
@@ -310,7 +316,8 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── Attendance trend ───────────────────────────────────────────────────────
 
-  Widget _buildAttendanceTrend(CourseAnalyticsData analytics) {
+  Widget _buildAttendanceTrend(
+      CourseAnalyticsData analytics, AppLocalizations l) {
     final monthly = analytics.monthlyAttendance;
     final spots = monthly.isEmpty
         ? [const FlSpot(0, 0)]
@@ -328,7 +335,7 @@ class _TeacherStudentAnalyticsScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Attendance Trends', style: AppTextStyles.h2),
+              Text(l.teacherAnalyticsAttendanceTrendsTitle, style: AppTextStyles.h2),
               Row(
                 children: [
                   Container(
@@ -340,7 +347,7 @@ class _TeacherStudentAnalyticsScreenState
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Text('Average %', style: AppTextStyles.caption),
+                  Text(l.teacherAnalyticsAveragePercentLegend, style: AppTextStyles.caption),
                 ],
               ),
             ],
@@ -400,7 +407,7 @@ class _TeacherStudentAnalyticsScreenState
 
   // ── At-risk students ───────────────────────────────────────────────────────
 
-  Widget _buildAtRiskSection(CourseAnalyticsData analytics) {
+  Widget _buildAtRiskSection(CourseAnalyticsData analytics, AppLocalizations l) {
     final atRisk = analytics.atRiskStudents;
 
     return Column(
@@ -411,7 +418,7 @@ class _TeacherStudentAnalyticsScreenState
             Icon(Icons.warning_amber_rounded,
                 color: AppColors.statusRed, size: 20),
             const SizedBox(width: 6),
-            Text('At-Risk Students',
+            Text(l.teacherAnalyticsAtRiskStudentsTitle,
                 style:
                     AppTextStyles.h2.copyWith(color: AppColors.statusRed)),
           ],
@@ -432,7 +439,7 @@ class _TeacherStudentAnalyticsScreenState
                     color: AppColors.statusGreen),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text('All students are above the 75% threshold.',
+                  child: Text(l.teacherAnalyticsAllStudentsAboveThreshold,
                       style: AppTextStyles.body
                           .copyWith(color: AppColors.statusGreen)),
                 ),
@@ -446,6 +453,7 @@ class _TeacherStudentAnalyticsScreenState
                   name: s.name,
                   attendancePct: s.attendancePct,
                   letterGrade: s.letterGrade,
+                  l: l,
                 ),
               )),
           const SizedBox(height: 8),
@@ -456,7 +464,7 @@ class _TeacherStudentAnalyticsScreenState
               onPressed: () {},
               icon: Icon(Icons.send_outlined,
                   size: 16, color: AppColors.statusRed),
-              label: Text('Send Alert to Guardians',
+              label: Text(l.teacherAnalyticsSendAlertButton,
                   style: AppTextStyles.button
                       .copyWith(color: AppColors.statusRed)),
               style: OutlinedButton.styleFrom(
@@ -477,9 +485,11 @@ class _AtRiskCard extends StatelessWidget {
     required this.name,
     required this.attendancePct,
     required this.letterGrade,
+    required this.l,
   });
   final String name, letterGrade;
   final int attendancePct;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -505,7 +515,7 @@ class _AtRiskCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: AppTextStyles.bodyMedium),
-                Text('Attendance: $attendancePct%',
+                Text(l.teacherAnalyticsAttendancePercentLabel(attendancePct),
                     style: AppTextStyles.caption
                         .copyWith(color: AppColors.statusRed)),
               ],

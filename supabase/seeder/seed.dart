@@ -29,44 +29,19 @@ void main() async {
         firstName: 'Dara',
         lastName: 'Kem',
         role: 'teacher');
-    final chandaId = await _createUser(supabase,
-        email: 'chanda@beltei.edu.kh',
-        firstName: 'Chanda',
-        lastName: 'Prum',
-        role: 'teacher');
 
-    final minaId = await _createUser(supabase,
-        email: 'mina@beltei.edu.kh',
-        firstName: 'Mina',
-        lastName: 'Sok',
+    final nitaId = await _createUser(supabase,
+        email: 'nita@beltei.edu.kh',
+        firstName: 'Nita',
+        lastName: 'Meng',
         role: 'student');
     final rithId = await _createUser(supabase,
         email: 'rith@beltei.edu.kh',
         firstName: 'Rith',
         lastName: 'Heng',
         role: 'student');
-    final bophaId = await _createUser(supabase,
-        email: 'bopha@beltei.edu.kh',
-        firstName: 'Bopha',
-        lastName: 'Lim',
-        role: 'student');
-    final vicheaId = await _createUser(supabase,
-        email: 'vichea@beltei.edu.kh',
-        firstName: 'Vichea',
-        lastName: 'Tan',
-        role: 'student');
-    final sreymomId = await _createUser(supabase,
-        email: 'sreymom@beltei.edu.kh',
-        firstName: 'Sreymom',
-        lastName: 'Ouk',
-        role: 'student');
-    final pisethId = await _createUser(supabase,
-        email: 'piseth@beltei.edu.kh',
-        firstName: 'Piseth',
-        lastName: 'Neak',
-        role: 'student');
 
-    print('  ✓ 10 users created');
+    print('  ✓ 5 users created');
 
     // ── 2. Update profiles with phone numbers ───────────────────────────────
     print('\n📝 Updating profiles...');
@@ -74,13 +49,8 @@ void main() async {
       adminId: '012 345 678',
       sokhaId: '012 111 222',
       daraId: '012 333 444',
-      chandaId: '012 555 666',
-      minaId: '096 100 001',
+      nitaId: '096 100 001',
       rithId: '096 100 002',
-      bophaId: '096 100 003',
-      vicheaId: '096 100 004',
-      sreymomId: '096 100 005',
-      pisethId: '096 100 006',
     };
     for (final e in phones.entries) {
       await supabase
@@ -246,9 +216,6 @@ void main() async {
         majors.firstWhere((m) => m['name'] == name)['id'] as String;
     final seId = mid('Software Engineering');
     final netSecId = mid('Networking & Cybersecurity');
-    final finMgmtId = mid('Financial Management');
-    final mktMgmtId = mid('Marketing Management');
-    final busMgmtId = mid('Business Management');
     final dataSciId = mid('Data Science & AI');
     print('  ✓ ${majors.length} majors');
 
@@ -316,23 +283,14 @@ void main() async {
         'hire_date': '2020-06-01',
         'status': 'active',
       },
-      {
-        'id': chandaId,
-        'employee_code': 'EMP-1003',
-        'department_id': finDeptId,
-        'position': 'Associate Professor',
-        'specialization': 'Financial Accounting',
-        'hire_date': '2019-03-10',
-        'status': 'active',
-      },
     ]);
-    print('  ✓ 3 teachers');
+    print('  ✓ 2 teachers');
 
     // ── 9. Students (major_id instead of department_id) ──────────────────
     print('\n👨‍🎓 Inserting student records...');
     await supabase.from('students').insert([
       {
-        'id': minaId,
+        'id': nitaId,
         'student_code': 'STU-2301',
         'faculty_id': fitsId,
         'major_id': seId,
@@ -357,60 +315,8 @@ void main() async {
         'address': 'Siem Reap',
         'emergency_contact': '097 654 321',
       },
-      {
-        'id': bophaId,
-        'student_code': 'STU-2302',
-        'faculty_id': ffbId,
-        'major_id': finMgmtId,
-        'enrollment_year': 2023,
-        'year_level': 2,
-        'status': 'active',
-        'date_of_birth': '2003-12-05',
-        'gender': 'female',
-        'address': 'Battambang',
-        'emergency_contact': '098 111 222',
-      },
-      {
-        'id': vicheaId,
-        'student_code': 'STU-2402',
-        'faculty_id': fitsId,
-        'major_id': dataSciId,
-        'enrollment_year': 2024,
-        'year_level': 1,
-        'status': 'active',
-        'date_of_birth': '2005-03-17',
-        'gender': 'male',
-        'address': 'Kandal',
-        'emergency_contact': '096 333 444',
-      },
-      {
-        'id': sreymomId,
-        'student_code': 'STU-2201',
-        'faculty_id': fbaId,
-        'major_id': mktMgmtId,
-        'enrollment_year': 2022,
-        'year_level': 3,
-        'status': 'active',
-        'date_of_birth': '2003-07-25',
-        'gender': 'female',
-        'address': 'Phnom Penh',
-        'emergency_contact': '095 555 666',
-      },
-      {
-        'id': pisethId,
-        'student_code': 'STU-2303',
-        'faculty_id': fbaId,
-        'major_id': busMgmtId,
-        'enrollment_year': 2023,
-        'year_level': 2,
-        'status': 'active',
-        'date_of_birth': '2004-01-08',
-        'gender': 'male',
-        'address': 'Phnom Penh',
-        'emergency_contact': '094 777 888',
-      },
     ]);
-    print('  ✓ 6 students');
+    print('  ✓ 2 students');
 
     // ── 10. Courses ──────────────────────────────────────────────────────────
     print('\n📚 Inserting courses...');
@@ -483,24 +389,6 @@ void main() async {
         'status': 'active',
       },
       {
-        'code': 'FIN101',
-        'name': 'Principles of Financial Management',
-        'credits': 3,
-        'teacher_id': chandaId,
-        'semester_id': sem1Id,
-        'faculty_id': ffbId,
-        'department_id': finDeptId,
-        'major_id': finMgmtId,
-        'max_students': 45,
-        'schedule': [
-          {'day': 'Tue', 'start': '08:00', 'end': '09:30', 'room': 'C301'},
-          {'day': 'Thu', 'start': '08:00', 'end': '09:30', 'room': 'C301'},
-        ],
-        'description':
-            'Financial statements, investment analysis, and corporate finance.',
-        'status': 'active',
-      },
-      {
         'code': 'CS102',
         'name': 'Programming Fundamentals',
         'credits': 3,
@@ -526,37 +414,60 @@ void main() async {
         courses.firstWhere((c) => c['code'] == 'CS301')['id'] as String;
     final net101Id =
         courses.firstWhere((c) => c['code'] == 'NET101')['id'] as String;
-    final fin101Id =
-        courses.firstWhere((c) => c['code'] == 'FIN101')['id'] as String;
     final cs102Id =
         courses.firstWhere((c) => c['code'] == 'CS102')['id'] as String;
-    print('  ✓ 6 courses');
+    print('  ✓ 5 courses');
+
+    // ── 10b. Classes ─────────────────────────────────────────────────────────
+    // Teacher/semester shown to students is resolved via the class an
+    // enrollment points to (not courses.teacher_id/semester_id, which admin-
+    // created courses never set) — one class per seeded course, reusing that
+    // course's own teacher/semester so seed data matches the real data model.
+    print('\n🏫 Inserting classes...');
+    final classes = await supabase.from('classes').insert([
+      for (final c in courses)
+        {
+          'course_id': c['id'],
+          'semester_id': c['semester_id'],
+          'teacher_id': c['teacher_id'],
+          'shift': 'morning',
+          'class_code': '${c['code']}-A',
+        },
+    ]).select();
+    final classIdByCourseId = {
+      for (final cls in classes) cls['course_id'] as String: cls['id'] as String
+    };
+    print('  ✓ ${classes.length} classes');
 
     // ── 11. Enrollments ─────────────────────────────────────────────────────
     print('\n📋 Inserting enrollments...');
     await supabase.from('enrollments').insert([
-      // Mina (SE) — CS101, CS201, CS301 + CS102 past
+      // Nita (SE) — CS101, CS201, CS301 + CS102 past
       {
-        'student_id': minaId,
+        'student_id': nitaId,
         'course_id': cs101Id,
+        'class_id': classIdByCourseId[cs101Id],
         'semester_id': sem1Id,
         'status': 'enrolled'
       },
       {
-        'student_id': minaId,
+        'student_id': nitaId,
         'course_id': cs201Id,
+        'class_id': classIdByCourseId[cs201Id],
         'semester_id': sem1Id,
         'status': 'enrolled'
       },
       {
-        'student_id': minaId,
+        'student_id': nitaId,
         'course_id': cs301Id,
+        'class_id': classIdByCourseId[cs301Id],
         'semester_id': sem1Id,
         'status': 'enrolled'
       },
       {
-        'student_id': minaId,
+        'student_id': nitaId,
         'course_id': cs102Id,
+        'class_id': classIdByCourseId[cs102Id],
         'semester_id': sem2Id,
         'status': 'completed'
       },
@@ -564,62 +475,24 @@ void main() async {
       {
         'student_id': rithId,
         'course_id': cs101Id,
+        'class_id': classIdByCourseId[cs101Id],
         'semester_id': sem1Id,
         'status': 'enrolled'
       },
       {
         'student_id': rithId,
         'course_id': net101Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      // Bopha (Finance) — FIN101
-      {
-        'student_id': bophaId,
-        'course_id': fin101Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      // Vichea (Data Science) — CS101, CS201
-      {
-        'student_id': vicheaId,
-        'course_id': cs101Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      {
-        'student_id': vicheaId,
-        'course_id': cs201Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      // Sreymom (Marketing) — FIN101
-      {
-        'student_id': sreymomId,
-        'course_id': fin101Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      // Piseth (Business Mgmt) — CS101, CS201
-      {
-        'student_id': pisethId,
-        'course_id': cs101Id,
-        'semester_id': sem1Id,
-        'status': 'enrolled'
-      },
-      {
-        'student_id': pisethId,
-        'course_id': cs201Id,
+        'class_id': classIdByCourseId[net101Id],
         'semester_id': sem1Id,
         'status': 'enrolled'
       },
     ]);
-    print('  ✓ 12 enrollments');
+    print('  ✓ 6 enrollments');
 
     // ── 12. Grades ──────────────────────────────────────────────────────────
     print('\n🎓 Inserting grades...');
     await supabase.from('grades').insert([
-      _grade(minaId, cs101Id, sem1Id,
+      _grade(nitaId, cs101Id, sem1Id,
           mid: 85,
           fin: 88,
           asgn: 90,
@@ -627,7 +500,7 @@ void main() async {
           total: 87.75,
           letter: 'A',
           gpa: 4.00),
-      _grade(minaId, cs201Id, sem1Id,
+      _grade(nitaId, cs201Id, sem1Id,
           mid: 78,
           fin: 82,
           asgn: 85,
@@ -636,7 +509,7 @@ void main() async {
           letter: 'B+',
           gpa: 3.50,
           remarks: 'Good improvement'),
-      _grade(minaId, cs301Id, sem1Id,
+      _grade(nitaId, cs301Id, sem1Id,
           mid: 92,
           fin: 95,
           asgn: 93,
@@ -645,7 +518,7 @@ void main() async {
           letter: 'A+',
           gpa: 4.00,
           remarks: 'Excellent work'),
-      _grade(minaId, cs102Id, sem2Id,
+      _grade(nitaId, cs102Id, sem2Id,
           mid: 80,
           fin: 85,
           asgn: 88,
@@ -670,58 +543,8 @@ void main() async {
           total: 83.75,
           letter: 'A-',
           gpa: 3.70),
-      _grade(bophaId, fin101Id, sem1Id,
-          mid: 88,
-          fin: 90,
-          asgn: 92,
-          part: 85,
-          total: 89.00,
-          letter: 'A',
-          gpa: 4.00),
-      _grade(vicheaId, cs101Id, sem1Id,
-          mid: 65,
-          fin: 70,
-          asgn: 72,
-          part: 68,
-          total: 68.75,
-          letter: 'C+',
-          gpa: 2.30,
-          remarks: 'Needs improvement'),
-      _grade(vicheaId, cs201Id, sem1Id,
-          mid: 74,
-          fin: 78,
-          asgn: 80,
-          part: 75,
-          total: 76.75,
-          letter: 'B',
-          gpa: 3.00),
-      _grade(sreymomId, fin101Id, sem1Id,
-          mid: 82,
-          fin: 85,
-          asgn: 87,
-          part: 80,
-          total: 83.50,
-          letter: 'A-',
-          gpa: 3.70),
-      _grade(pisethId, cs101Id, sem1Id,
-          mid: 90,
-          fin: 92,
-          asgn: 94,
-          part: 90,
-          total: 91.50,
-          letter: 'A',
-          gpa: 4.00,
-          remarks: 'Excellent'),
-      _grade(pisethId, cs201Id, sem1Id,
-          mid: 86,
-          fin: 88,
-          asgn: 90,
-          part: 85,
-          total: 87.25,
-          letter: 'A',
-          gpa: 4.00),
     ]);
-    print('  ✓ 12 grade records');
+    print('  ✓ 6 grade records');
 
     // ── 13. Attendance ──────────────────────────────────────────────────────
     print('\n📆 Inserting attendance...');
@@ -734,8 +557,7 @@ void main() async {
       '2025-09-29',
       '2025-10-06'
     ]) {
-      attendanceRows.add(_att(minaId, cs101Id, date, 'present', sokhaId));
-      attendanceRows.add(_att(pisethId, cs101Id, date, 'present', sokhaId));
+      attendanceRows.add(_att(nitaId, cs101Id, date, 'present', sokhaId));
       attendanceRows.add(_att(
           rithId,
           cs101Id,
@@ -743,35 +565,9 @@ void main() async {
           date == '2025-09-29' ? 'absent' : 'present',
           sokhaId,
           date == '2025-09-29' ? 'Absent without notice' : null));
-      attendanceRows.add(_att(
-          vicheaId,
-          cs101Id,
-          date,
-          date == '2025-09-22'
-              ? 'late'
-              : date == '2025-10-06'
-                  ? 'absent'
-                  : 'present',
-          sokhaId,
-          date == '2025-09-22' ? 'Arrived 20 minutes late' : null));
     }
     for (final date in ['2025-09-10', '2025-09-17', '2025-09-24']) {
       attendanceRows.add(_att(rithId, net101Id, date, 'present', daraId));
-    }
-    for (final date in [
-      '2025-09-09',
-      '2025-09-16',
-      '2025-09-23',
-      '2025-09-30'
-    ]) {
-      attendanceRows.add(_att(bophaId, fin101Id, date, 'present', chandaId));
-      attendanceRows.add(_att(
-          sreymomId,
-          fin101Id,
-          date,
-          date == '2025-09-23' ? 'excused' : 'present',
-          chandaId,
-          date == '2025-09-23' ? 'Family event approved' : null));
     }
 
     await supabase.from('attendance').insert(attendanceRows);
@@ -781,7 +577,7 @@ void main() async {
     print('\n🏖️  Inserting leave requests...');
     await supabase.from('leave_requests').insert([
       {
-        'requester_id': minaId,
+        'requester_id': nitaId,
         'requester_type': 'student',
         'type': 'Sick Leave',
         'reason': 'Fever and flu symptoms',
@@ -802,30 +598,6 @@ void main() async {
         'review_notes': 'Approved. Please catch up on missed materials.',
       },
       {
-        'requester_id': bophaId,
-        'requester_type': 'student',
-        'type': 'Medical',
-        'reason': 'Dental appointment',
-        'start_date': '2025-09-20',
-        'end_date': '2025-09-20',
-        'status': 'approved',
-        'reviewed_by': adminId,
-        'reviewed_at': '2025-09-18T10:00:00+07:00',
-        'review_notes': 'Approved.',
-      },
-      {
-        'requester_id': vicheaId,
-        'requester_type': 'student',
-        'type': 'Personal',
-        'reason': 'National sports competition',
-        'start_date': '2025-10-22',
-        'end_date': '2025-10-24',
-        'status': 'rejected',
-        'reviewed_by': adminId,
-        'reviewed_at': '2025-10-20T11:00:00+07:00',
-        'review_notes': 'Clashes with midterm week.',
-      },
-      {
         'requester_id': sokhaId,
         'requester_type': 'teacher',
         'type': 'Conference',
@@ -835,13 +607,13 @@ void main() async {
         'status': 'pending',
       },
     ]);
-    print('  ✓ 5 leave requests');
+    print('  ✓ 3 leave requests');
 
     // ── 15. Invoices & payments ─────────────────────────────────────────────
     print('\n💰 Inserting invoices & payments...');
     final invoices = await supabase.from('invoices').insert([
       {
-        'student_id': minaId,
+        'student_id': nitaId,
         'semester_id': sem1Id,
         'description': 'Tuition Fee — Semester 1, 2025–2026',
         'amount': 450.00,
@@ -857,100 +629,36 @@ void main() async {
         'due_date': '2025-09-30',
         'status': 'overdue'
       },
-      {
-        'student_id': bophaId,
-        'semester_id': sem1Id,
-        'description': 'Tuition Fee — Semester 1, 2025–2026',
-        'amount': 450.00,
-        'due_date': '2025-09-30',
-        'status': 'paid',
-        'paid_at': '2025-09-12T14:00:00+07:00'
-      },
-      {
-        'student_id': vicheaId,
-        'semester_id': sem1Id,
-        'description': 'Tuition Fee — Semester 1, 2025–2026',
-        'amount': 450.00,
-        'due_date': '2025-09-30',
-        'status': 'partial'
-      },
-      {
-        'student_id': sreymomId,
-        'semester_id': sem1Id,
-        'description': 'Tuition Fee — Semester 1, 2025–2026',
-        'amount': 450.00,
-        'due_date': '2025-09-30',
-        'status': 'paid',
-        'paid_at': '2025-09-08T09:00:00+07:00'
-      },
-      {
-        'student_id': pisethId,
-        'semester_id': sem1Id,
-        'description': 'Tuition Fee — Semester 1, 2025–2026',
-        'amount': 450.00,
-        'due_date': '2025-09-30',
-        'status': 'unpaid'
-      },
     ]).select();
 
-    final minaInvId =
-        invoices.firstWhere((i) => i['student_id'] == minaId)['id'] as String;
-    final bophaInvId =
-        invoices.firstWhere((i) => i['student_id'] == bophaId)['id'] as String;
-    final vicheaInvId =
-        invoices.firstWhere((i) => i['student_id'] == vicheaId)['id'] as String;
-    final sreymomInvId = invoices
-        .firstWhere((i) => i['student_id'] == sreymomId)['id'] as String;
+    final nitaInvId =
+        invoices.firstWhere((i) => i['student_id'] == nitaId)['id'] as String;
 
     await supabase.from('payments').insert([
       {
-        'invoice_id': minaInvId,
-        'student_id': minaId,
+        'invoice_id': nitaInvId,
+        'student_id': nitaId,
         'amount': 450.00,
         'payment_method': 'Bank Transfer',
         'reference_number': 'TXN-20250905-001',
         'verified_by': adminId,
         'notes': 'Full payment received'
       },
-      {
-        'invoice_id': bophaInvId,
-        'student_id': bophaId,
-        'amount': 450.00,
-        'payment_method': 'Bank Transfer',
-        'reference_number': 'TXN-20250912-002',
-        'verified_by': adminId
-      },
-      {
-        'invoice_id': vicheaInvId,
-        'student_id': vicheaId,
-        'amount': 200.00,
-        'payment_method': 'Cash',
-        'reference_number': 'CASH-20250920-001',
-        'notes': 'Partial payment — balance \$250 due'
-      },
-      {
-        'invoice_id': sreymomInvId,
-        'student_id': sreymomId,
-        'amount': 450.00,
-        'payment_method': 'ABA Pay',
-        'reference_number': 'ABA-20250908-001',
-        'verified_by': adminId
-      },
     ]);
-    print('  ✓ 6 invoices, 4 payments');
+    print('  ✓ 2 invoices, 1 payment');
 
     // ── 16. Notifications ───────────────────────────────────────────────────
     print('\n🔔 Inserting notifications...');
     await supabase.from('notifications').insert([
       {
-        'user_id': minaId,
+        'user_id': nitaId,
         'title': 'Grade Posted',
         'body': 'Your grade for Data Structures & Algorithms has been posted.',
         'type': 'grade',
         'is_read': false
       },
       {
-        'user_id': minaId,
+        'user_id': nitaId,
         'title': 'Tuition Fee Paid',
         'body': 'Your Semester 1 tuition payment of \$450 has been confirmed.',
         'type': 'finance',
@@ -972,23 +680,9 @@ void main() async {
         'is_read': false
       },
       {
-        'user_id': vicheaId,
-        'title': 'Partial Payment Received',
-        'body': 'We received \$200. Remaining balance: \$250 due by Sep 30.',
-        'type': 'finance',
-        'is_read': false
-      },
-      {
-        'user_id': vicheaId,
-        'title': 'Leave Request Rejected',
-        'body': 'Your leave request for Oct 22–24 was rejected (midterm week).',
-        'type': 'leave',
-        'is_read': false
-      },
-      {
         'user_id': adminId,
         'title': 'New Student Leave Request',
-        'body': 'Mina Sok submitted a sick leave request (Oct 1–3).',
+        'body': 'Nita Lim submitted a sick leave request (Oct 1–3).',
         'type': 'leave',
         'is_read': false
       },
@@ -1000,7 +694,7 @@ void main() async {
         'is_read': false
       },
     ]);
-    print('  ✓ 8 notifications');
+    print('  ✓ 6 notifications');
 
     // ── 17. Course materials ────────────────────────────────────────────────
     print('\n📄 Inserting course materials...');
@@ -1041,17 +735,8 @@ void main() async {
         'file_type': 'pptx',
         'file_size': 5120
       },
-      {
-        'course_id': fin101Id,
-        'teacher_id': chandaId,
-        'title': 'Financial Management Reference Sheet',
-        'description': 'Time value of money, NPV, IRR, and ratio analysis.',
-        'file_url': 'https://files.beltei.edu.kh/fin101/reference.pdf',
-        'file_type': 'pdf',
-        'file_size': 1024
-      },
     ]);
-    print('  ✓ 5 course materials');
+    print('  ✓ 4 course materials');
 
     // ── 18. Announcements ───────────────────────────────────────────────────
     print('\n📢 Inserting announcements...');
@@ -1081,14 +766,6 @@ void main() async {
         'is_pinned': false
       },
       {
-        'teacher_id': chandaId,
-        'course_id': fin101Id,
-        'title': 'Chapter 2 Reading Required',
-        'body':
-            'Please read Chapter 2 (Capital Budgeting) before Thursday\'s class.',
-        'is_pinned': false
-      },
-      {
         'teacher_id': sokhaId,
         'course_id': cs301Id,
         'title': 'Semester Project — Team Formation',
@@ -1097,25 +774,24 @@ void main() async {
         'is_pinned': false
       },
     ]);
-    print('  ✓ 5 announcements');
+    print('  ✓ 4 announcements');
 
     // ── Summary ─────────────────────────────────────────────────────────────
     print('''
 
 ✅ Seeding complete!
-   • 10 users  (1 admin · 3 teachers · 6 students)
+   • 5 users  (1 admin · 2 teachers · 2 students)
    • 13 faculties · ${departments.length} departments · ${majors.length} majors
-   • 2 semesters · 6 courses
-   • 12 enrollments · 12 grade records
+   • 2 semesters · 5 courses
+   • 6 enrollments · 6 grade records
    • ${attendanceRows.length} attendance records
-   • 5 leave requests · 6 invoices · 4 payments
-   • 8 notifications · 5 course materials · 5 announcements
+   • 3 leave requests · 2 invoices · 1 payment
+   • 6 notifications · 4 course materials · 4 announcements
 
 📧 Credentials — password: $kPassword
    admin@beltei.edu.kh
-   sokha@beltei.edu.kh  ·  dara@beltei.edu.kh  ·  chanda@beltei.edu.kh
-   mina@beltei.edu.kh   ·  rith@beltei.edu.kh   ·  bopha@beltei.edu.kh
-   vichea@beltei.edu.kh ·  sreymom@beltei.edu.kh ·  piseth@beltei.edu.kh
+   sokha@beltei.edu.kh  ·  dara@beltei.edu.kh
+   nita@beltei.edu.kh   ·  rith@beltei.edu.kh
 ''');
   } catch (e, st) {
     print('\n❌ Seeding failed: $e');

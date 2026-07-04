@@ -8,13 +8,14 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _fmtDateRange(String start, String end) {
+String _fmtDateRange(String start, String end, String locale) {
   try {
-    final s = DateFormat('MMM d').format(DateTime.parse(start));
-    final e = DateFormat('MMM d, yyyy').format(DateTime.parse(end));
+    final s = DateFormat('MMM d', locale).format(DateTime.parse(start));
+    final e = DateFormat('MMM d, yyyy', locale).format(DateTime.parse(end));
     return s == e ? s : '$s – $e';
   } catch (_) {
     return '$start – $end';
@@ -42,14 +43,15 @@ class _LeaveManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final leavesAsync = ref.watch(teacherStudentLeavesProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: Column(
         children: [
-          _buildHeader(),
-          _buildFilterChips(),
+          _buildHeader(l),
+          _buildFilterChips(l),
           Expanded(
             child: leavesAsync.when(
               loading: () =>
@@ -61,19 +63,19 @@ class _LeaveManagementScreenState
                     Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
-                    Text('Could not load leave requests',
+                    Text(l.leaveDashboardLoadError,
                         style: AppTextStyles.bodyMedium),
                     TextButton(
                       onPressed: () =>
                           ref.invalidate(teacherStudentLeavesProvider),
-                      child: const Text('Retry'),
+                      child: Text(l.retry),
                     ),
                   ],
                 ),
               ),
               data: (all) {
                 final items = _filtered(all);
-                if (items.isEmpty) return _buildEmpty();
+                if (items.isEmpty) return _buildEmpty(l);
                 return ListView.separated(
                   padding:
                       const EdgeInsets.all(AppSpacing.screenPadding),
@@ -82,6 +84,7 @@ class _LeaveManagementScreenState
                       const SizedBox(height: 12),
                   itemBuilder: (_, i) => _LeaveCard(
                     request: items[i],
+                    l: l,
                     onTap: () => context.push(
                         '/teacher/students/leave/${items[i].id}'),
                   ),
@@ -96,40 +99,14 @@ class _LeaveManagementScreenState
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Leave Requests', style: AppTextStyles.h1),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.statusAmberBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppColors.statusAmber.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.visibility_outlined,
-                        size: 14, color: AppColors.statusAmber),
-                    const SizedBox(width: 4),
-                    Text('View Only',
-                        style: AppTextStyles.label.copyWith(
-                            color: AppColors.statusAmber)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Text('Student absence submissions for your courses.',
+          Text(l.leaveDashboardTitle, style: AppTextStyles.h1),
+          Text(l.leaveManagementSubtitle,
               style: AppTextStyles.caption),
         ],
       ),
@@ -138,12 +115,12 @@ class _LeaveManagementScreenState
 
   // ── Filter chips ───────────────────────────────────────────────────────────
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(AppLocalizations l) {
     final chips = [
-      (value: 'all', label: 'All Requests', dot: null),
-      (value: 'pending', label: 'Pending', dot: AppColors.statusAmber),
-      (value: 'approved', label: 'Approved', dot: AppColors.statusGreen),
-      (value: 'rejected', label: 'Rejected', dot: AppColors.statusRed),
+      (value: 'all', label: l.leaveManagementFilterAll, dot: null),
+      (value: 'pending', label: l.leaveDashboardStatusPending, dot: AppColors.statusAmber),
+      (value: 'approved', label: l.leaveDashboardStatusApproved, dot: AppColors.statusGreen),
+      (value: 'rejected', label: l.leaveDashboardStatusRejected, dot: AppColors.statusRed),
     ];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -205,7 +182,7 @@ class _LeaveManagementScreenState
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(AppLocalizations l) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -213,7 +190,7 @@ class _LeaveManagementScreenState
           Icon(Icons.inbox_outlined,
               color: AppColors.textLabel, size: 48),
           const SizedBox(height: 12),
-          Text('No requests found',
+          Text(l.leaveManagementEmptyState,
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textSecondary)),
         ],
@@ -225,9 +202,10 @@ class _LeaveManagementScreenState
 // ── Leave card ────────────────────────────────────────────────────────────────
 
 class _LeaveCard extends StatelessWidget {
-  const _LeaveCard({required this.request, required this.onTap});
+  const _LeaveCard({required this.request, required this.l, required this.onTap});
 
   final StudentLeaveDetail request;
+  final AppLocalizations l;
   final VoidCallback onTap;
 
   Color get _statusColor => switch (request.status) {
@@ -243,9 +221,9 @@ class _LeaveCard extends StatelessWidget {
       };
 
   String get _statusLabel => switch (request.status) {
-        LeaveStatus.approved => 'Approved',
-        LeaveStatus.rejected => 'Rejected',
-        _ => 'Pending',
+        LeaveStatus.approved => l.leaveDashboardStatusApproved,
+        LeaveStatus.rejected => l.leaveDashboardStatusRejected,
+        _ => l.leaveDashboardStatusPending,
       };
 
   @override
@@ -265,10 +243,11 @@ class _LeaveCard extends StatelessWidget {
             _buildCardHeader(),
             const SizedBox(height: 12),
             _buildMeta(Icons.beach_access_outlined,
-                'Type: ${request.type}'),
+                l.leaveManagementTypeLabel(request.type)),
             const SizedBox(height: 4),
             _buildMeta(Icons.calendar_today_outlined,
-                'Dates: ${_fmtDateRange(request.startDate, request.endDate)}'),
+                l.leaveManagementDatesLabel(_fmtDateRange(
+                    request.startDate, request.endDate, l.localeName))),
             const SizedBox(height: 4),
             _buildMeta(Icons.notes_outlined,
                 request.reason,
@@ -291,7 +270,7 @@ class _LeaveCard extends StatelessWidget {
                       Icon(Icons.visibility_outlined,
                           size: 12, color: AppColors.primaryBlue),
                       const SizedBox(width: 4),
-                      Text('View Details',
+                      Text(l.leaveManagementViewDetailsButton,
                           style: AppTextStyles.label.copyWith(
                               color: AppColors.primaryBlue)),
                     ],
@@ -325,7 +304,7 @@ class _LeaveCard extends StatelessWidget {
             children: [
               Text(request.studentName,
                   style: AppTextStyles.bodyMedium),
-              Text('ID: ${request.studentCode}',
+              Text(l.profileIdLabel(request.studentCode),
                   style: AppTextStyles.caption),
             ],
           ),

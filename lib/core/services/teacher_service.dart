@@ -467,12 +467,6 @@ class TeacherService {
     required String date,
     required Map<String, String> statuses,
   }) async {
-    await _db
-        .from('attendance')
-        .delete()
-        .eq('course_id', courseId)
-        .eq('date', date);
-
     if (statuses.isEmpty) return;
 
     final rows = statuses.entries.map((entry) {
@@ -491,7 +485,14 @@ class TeacherService {
       };
     }).toList();
 
-    await _db.from('attendance').insert(rows);
+    // Upsert on the table's (student_id, course_id, date) unique constraint
+    // instead of delete-then-insert: the old two-step approach left a window
+    // where a failed insert (RLS denial, network error, etc.) would have
+    // already wiped that day's previously-saved attendance with nothing to
+    // show for it.
+    await _db
+        .from('attendance')
+        .upsert(rows, onConflict: 'student_id,course_id,date');
   }
 
   Future<List<StudentLeaveDetail>> getStudentLeaveRequests(
@@ -922,5 +923,57 @@ class TeacherService {
   String? _extractRoom(List<Map<String, dynamic>> schedule) {
     if (schedule.isEmpty) return null;
     return schedule.first['room'] as String?;
+  }
+
+  Future<void> approveLeaveRequest(String id, String teacherId,
+      {String? notes}) async {
+    await _db.from('leave_requests').update({
+      'status': 'approved',
+      'reviewed_by': teacherId,
+      'reviewed_at': DateTime.now().toIso8601String(),
+      if (notes != null && notes.isNotEmpty) 'review_notes': notes,
+    }).eq('id', id);
+    await _notifyStudentOfDecision(id);
+  }
+
+  Future<void> rejectLeaveRequest(String id, String teacherId,
+      {String? notes}) async {
+    await _db.from('leave_requests').update({
+      'status': 'rejected',
+      'reviewed_by': teacherId,
+      'reviewed_at': DateTime.now().toIso8601String(),
+      if (notes != null && notes.isNotEmpty) 'review_notes': notes,
+    }).eq('id', id);
+    await _notifyStudentOfDecision(id);
+  }
+
+  Future<void> _notifyStudentOfDecision(String leaveId) async {
+    try {
+      await _db.rpc('notify_student_of_leave_decision',
+          params: {'p_leave_id': leaveId});
+    } catch (e, st) {
+      debugPrint('notify_student_of_leave_decision error: $e\n$st');
+    }
+  }
+
+  Future<List<NotificationRow>> getNotifications(String userId) async {
+    try {
+      final data = await _db
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      return data.map(NotificationRow.fromMap).toList();
+    } catch (e, st) {
+      debugPrint('getNotifications error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _db
+        .from('notifications')
+        .update({'is_read': true}).eq('id', notificationId);
   }
 }

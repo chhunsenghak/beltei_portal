@@ -92,7 +92,7 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
                       Icons.notifications_outlined,
                       color: AppColors.textSecondary,
                     ),
-                    onPressed: () {},
+                    onPressed: () => context.go('/teacher/alerts'),
                   ),
                 ],
               ),

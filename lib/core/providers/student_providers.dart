@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import '../services/student_service.dart';
@@ -6,10 +7,15 @@ import '../supabase/database.types.dart';
 final studentServiceProvider =
     Provider<StudentService>((ref) => StudentService());
 
-final studentProfileProvider = FutureProvider<StudentProfile?>((ref) async {
-  final user = await ref.watch(currentUserProvider.future);
-  if (user == null) return null;
-  return ref.read(studentServiceProvider).getStudentProfile(user.id);
+final studentProfileProvider = FutureProvider.autoDispose<StudentProfile?>((ref) async {
+  try {
+    final user = await ref.watch(currentUserProvider.future);
+    if (user == null) return null;
+    return await ref.read(studentServiceProvider).getStudentProfile(user.id);
+  } catch (e, st) {
+    debugPrint('studentProfileProvider error: $e\n$st');
+    return null;
+  }
 });
 
 final studentCoursesProvider =

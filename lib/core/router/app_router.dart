@@ -37,6 +37,7 @@ import '../../features/teacher/screens/leave_management_screen.dart';
 import '../../features/teacher/screens/leave_request_review_screen.dart';
 import '../../features/teacher/screens/teacher_student_analytics_screen.dart';
 import '../../features/teacher/screens/create_announcement_screen.dart';
+import '../../features/teacher/screens/teacher_notification_center_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
 import '../../features/admin/screens/admin_shell.dart';
 import '../../features/admin/screens/admin_dashboard_screen.dart';
@@ -94,6 +95,7 @@ class AppRoutes {
   static const teacherSchedule = '/teacher/schedule';
   static const teacherStudents = '/teacher/students';
   static const teacherAlerts = '/teacher/alerts';
+  static const teacherAnalytics = '/teacher/analytics';
   static const teacherProfile = '/teacher/profile';
   static const teacherAnnouncement = '/teacher/alerts/announcement';
 
@@ -290,13 +292,17 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.teacherAlerts,
-          builder: (context, state) => const TeacherStudentAnalyticsScreen(),
+          builder: (context, state) => const TeacherNotificationCenterScreen(),
           routes: [
             GoRoute(
               path: 'announcement',
               builder: (context, state) => const CreateAnnouncementScreen(),
             ),
           ],
+        ),
+        GoRoute(
+          path: AppRoutes.teacherAnalytics,
+          builder: (context, state) => const TeacherStudentAnalyticsScreen(),
         ),
         GoRoute(
           path: AppRoutes.teacherProfile,
