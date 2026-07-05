@@ -40,11 +40,11 @@ class _TeacherStudentAnalyticsScreenState
 
     // Default to first current course if none selected
     if (_selectedCourseId == null && currentCourses.isNotEmpty) {
-      _selectedCourseId = currentCourses.first.courseId;
+      _selectedCourseId = currentCourses.first.classTermCourseId;
     }
 
     final selectedCourse = currentCourses
-        .where((c) => c.courseId == _selectedCourseId)
+        .where((c) => c.classTermCourseId == _selectedCourseId)
         .firstOrNull;
 
     final analyticsAsync = _selectedCourseId != null
@@ -150,11 +150,11 @@ class _TeacherStudentAnalyticsScreenState
                   title: Text(
                       l.teacherAnalyticsCourseNameWithCode(c.name, c.code),
                       style: AppTextStyles.body),
-                  trailing: c.courseId == _selectedCourseId
+                  trailing: c.classTermCourseId == _selectedCourseId
                       ? Icon(Icons.check, color: AppColors.primaryNavy)
                       : null,
                   onTap: () {
-                    setState(() => _selectedCourseId = c.courseId);
+                    setState(() => _selectedCourseId = c.classTermCourseId);
                     Navigator.pop(context);
                   },
                 )),

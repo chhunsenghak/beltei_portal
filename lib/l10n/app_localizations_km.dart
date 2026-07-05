@@ -356,6 +356,9 @@ class AppLocalizationsKm extends AppLocalizations {
   String get noClassesToday => 'គ្មានថ្នាក់រៀននៅថ្ងៃនេះ';
 
   @override
+  String get scheduleNoTimeslotYet => 'មិនទាន់មានកាលវិភាគ';
+
+  @override
   String get dayMon => 'ចន្ទ';
 
   @override
@@ -372,6 +375,17 @@ class AppLocalizationsKm extends AppLocalizations {
 
   @override
   String get daySat => 'សៅរ៍';
+
+  @override
+  String get daySun => 'អាទិត្យ';
+
+  @override
+  String get leaveSessionFullDay => 'ពេញមួយថ្ងៃ';
+
+  @override
+  String leaveSessionNumbered(int n) {
+    return 'សម័យទី $n';
+  }
 
   @override
   String get dashboardQuickActionsTitle => 'សកម្មភាពរហ័ស';
@@ -982,6 +996,9 @@ class AppLocalizationsKm extends AppLocalizations {
   String get leaveDetailLeaveTypeLabel => 'ប្រភេទច្បាប់ឈប់សម្រាក';
 
   @override
+  String get leaveDetailSessionLabel => 'សម័យ';
+
+  @override
   String get leaveDetailDatesLabel => 'កាលបរិច្ឆេទ';
 
   @override
@@ -1062,6 +1079,9 @@ class AppLocalizationsKm extends AppLocalizations {
 
   @override
   String get createLeaveTypeOther => 'ផ្សេងទៀត';
+
+  @override
+  String get createLeaveSessionSectionLabel => 'សម័យ';
 
   @override
   String get createLeaveStartDateLabel => 'ថ្ងៃចាប់ផ្តើម';
@@ -1147,6 +1167,9 @@ class AppLocalizationsKm extends AppLocalizations {
 
   @override
   String get createLeaveSummaryCoursesLabel => 'មុខវិជ្ជា';
+
+  @override
+  String get createLeaveSummarySessionLabel => 'សម័យ';
 
   @override
   String get financePayNowButton => 'បង់ប្រាក់ឥឡូវនេះ';
@@ -1728,6 +1751,10 @@ class AppLocalizationsKm extends AppLocalizations {
   String get editAttendanceChangedBadge => 'បានផ្លាស់ប្តូរ';
 
   @override
+  String get editAttendanceViewOnlyBanner =>
+      'នេះជាសម័យសិក្សាកន្លងមកហើយ។ វត្តមានអាចកែសម្រួលបានតែនៅថ្ងៃដែលបានកត់ត្រាប៉ុណ្ណោះ។';
+
+  @override
   String get attendanceReportLoadError => 'មិនអាចផ្ទុករបាយការណ៍បានទេ';
 
   @override
@@ -1900,7 +1927,10 @@ class AppLocalizationsKm extends AppLocalizations {
 
   @override
   String get leaveManagementSubtitle =>
-      'ពិនិត្យ និងសម្រេចចិត្តលើសំណើអវត្តមានរបស់សិស្សអ្នក។';
+      'សំណើអវត្តមានរបស់សិស្សសម្រាប់វគ្គសិក្សារបស់អ្នក។';
+
+  @override
+  String get leaveManagementViewOnlyBadge => 'មើលបានតែប៉ុណ្ណោះ';
 
   @override
   String get leaveManagementFilterAll => 'សំណើទាំងអស់';
@@ -1970,6 +2000,9 @@ class AppLocalizationsKm extends AppLocalizations {
   String get leaveReviewCategoryLabel => 'ប្រភេទច្បាប់សម្រាក';
 
   @override
+  String get leaveReviewSessionLabel => 'សម័យ';
+
+  @override
   String get leaveReviewSubmittedLabel => 'បានដាក់ស្នើ';
 
   @override
@@ -1998,7 +2031,11 @@ class AppLocalizationsKm extends AppLocalizations {
 
   @override
   String get leaveReviewAwaitingReviewText =>
-      'កំពុងរង់ចាំការត្រួតពិនិត្យរបស់អ្នក។';
+      'កំពុងរង់ចាំការត្រួតពិនិត្យពីអ្នកគ្រប់គ្រង។';
+
+  @override
+  String get leaveReviewViewOnlyBanner =>
+      'មានតែអ្នកគ្រប់គ្រងប៉ុណ្ណោះដែលអាចអនុម័ត ឬបដិសេធសំណើច្បាប់សម្រាករបស់សិស្ស។';
 
   @override
   String get leaveReviewReviewerNotesLabel => 'កំណត់ចំណាំអ្នកត្រួតពិនិត្យ';

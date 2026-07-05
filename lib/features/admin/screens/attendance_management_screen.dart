@@ -813,11 +813,12 @@ class _AttendanceManagementScreenState
         return y != 0 ? y : a.name.compareTo(b.name);
       });
 
-    // Courses cascade: filtered by year, faculty, semester (all by ID)
+    // Courses cascade: filtered by faculty (courses have no semester of their
+    // own anymore — a course can be taught in many semesters via different
+    // class terms, so year/semester filtering happens on the attendance
+    // records themselves below, not on the course list).
     final filteredCourses = allCourses.where((c) {
-      if (_yearFilter != null && c.semesterAcademicYear != _yearFilter) return false;
       if (_facultyFilter != null && c.facultyId != _facultyFilter) return false;
-      if (_semesterFilter != null && c.semesterId != _semesterFilter) return false;
       return true;
     }).toList()
       ..sort((a, b) => a.name.compareTo(b.name));

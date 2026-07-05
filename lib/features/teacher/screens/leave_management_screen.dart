@@ -105,7 +105,33 @@ class _LeaveManagementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.leaveDashboardTitle, style: AppTextStyles.h1),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l.leaveDashboardTitle, style: AppTextStyles.h1),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.statusAmberBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.statusAmber.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.visibility_outlined,
+                        size: 14, color: AppColors.statusAmber),
+                    const SizedBox(width: 4),
+                    Text(l.leaveManagementViewOnlyBadge,
+                        style: AppTextStyles.label.copyWith(
+                            color: AppColors.statusAmber)),
+                  ],
+                ),
+              ),
+            ],
+          ),
           Text(l.leaveManagementSubtitle,
               style: AppTextStyles.caption),
         ],

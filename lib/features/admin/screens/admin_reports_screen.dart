@@ -275,8 +275,11 @@ class AdminReportsScreen extends ConsumerWidget {
                   children: top.asMap().entries.map((entry) {
                     final i = entry.key;
                     final c = entry.value;
-                    final pct = c.maxStudents > 0
-                        ? c.enrolledCount / c.maxStudents
+                    final maxEnrolled = top
+                        .map((x) => x.enrolledCount)
+                        .fold(0, (a, b) => a > b ? a : b);
+                    final pct = maxEnrolled > 0
+                        ? c.enrolledCount / maxEnrolled
                         : 0.0;
                     return Padding(
                       padding: EdgeInsets.only(
@@ -312,7 +315,7 @@ class AdminReportsScreen extends ConsumerWidget {
                                         .copyWith(fontSize: 13)),
                               ),
                               Text(
-                                  '${c.enrolledCount}/${c.maxStudents}',
+                                  '${c.enrolledCount} enrolled',
                                   style: AppTextStyles.caption
                                       .copyWith(fontSize: 11)),
                             ],

@@ -749,6 +749,20 @@ class _LeaveCard extends StatelessWidget {
                     style:
                         AppTextStyles.caption.copyWith(fontSize: 11)),
               ),
+              if (request.sessionNumber != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.statusBlueBg,
+                    borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
+                  ),
+                  child: Text(request.sessionLabel,
+                      style: AppTextStyles.label
+                          .copyWith(color: AppColors.primaryBlue, fontSize: 9)),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

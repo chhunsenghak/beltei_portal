@@ -752,6 +752,12 @@ abstract class AppLocalizations {
   /// **'No classes today'**
   String get noClassesToday;
 
+  /// No description provided for @scheduleNoTimeslotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No timeslot yet'**
+  String get scheduleNoTimeslotYet;
+
   /// No description provided for @dayMon.
   ///
   /// In en, this message translates to:
@@ -787,6 +793,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sat'**
   String get daySat;
+
+  /// No description provided for @daySun.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get daySun;
+
+  /// No description provided for @leaveSessionFullDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Day'**
+  String get leaveSessionFullDay;
+
+  /// No description provided for @leaveSessionNumbered.
+  ///
+  /// In en, this message translates to:
+  /// **'Session {n}'**
+  String leaveSessionNumbered(int n);
 
   /// No description provided for @dashboardQuickActionsTitle.
   ///
@@ -1874,6 +1898,12 @@ abstract class AppLocalizations {
   /// **'LEAVE TYPE'**
   String get leaveDetailLeaveTypeLabel;
 
+  /// No description provided for @leaveDetailSessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SESSION'**
+  String get leaveDetailSessionLabel;
+
   /// No description provided for @leaveDetailDatesLabel.
   ///
   /// In en, this message translates to:
@@ -2011,6 +2041,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get createLeaveTypeOther;
+
+  /// No description provided for @createLeaveSessionSectionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SESSION'**
+  String get createLeaveSessionSectionLabel;
 
   /// No description provided for @createLeaveStartDateLabel.
   ///
@@ -2155,6 +2191,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Course(s)'**
   String get createLeaveSummaryCoursesLabel;
+
+  /// No description provided for @createLeaveSummarySessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get createLeaveSummarySessionLabel;
 
   /// No description provided for @financePayNowButton.
   ///
@@ -3170,6 +3212,12 @@ abstract class AppLocalizations {
   /// **'CHANGED'**
   String get editAttendanceChangedBadge;
 
+  /// No description provided for @editAttendanceViewOnlyBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a past session. Attendance can only be edited on the day it was taken.'**
+  String get editAttendanceViewOnlyBanner;
+
   /// No description provided for @attendanceReportLoadError.
   ///
   /// In en, this message translates to:
@@ -3467,8 +3515,14 @@ abstract class AppLocalizations {
   /// No description provided for @leaveManagementSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Review and decide on absence submissions for your students.'**
+  /// **'Student absence submissions for your courses.'**
   String get leaveManagementSubtitle;
+
+  /// No description provided for @leaveManagementViewOnlyBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'View Only'**
+  String get leaveManagementViewOnlyBadge;
 
   /// No description provided for @leaveManagementFilterAll.
   ///
@@ -3578,6 +3632,12 @@ abstract class AppLocalizations {
   /// **'LEAVE CATEGORY'**
   String get leaveReviewCategoryLabel;
 
+  /// No description provided for @leaveReviewSessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SESSION'**
+  String get leaveReviewSessionLabel;
+
   /// No description provided for @leaveReviewSubmittedLabel.
   ///
   /// In en, this message translates to:
@@ -3617,8 +3677,14 @@ abstract class AppLocalizations {
   /// No description provided for @leaveReviewAwaitingReviewText.
   ///
   /// In en, this message translates to:
-  /// **'Awaiting your review.'**
+  /// **'Awaiting admin review.'**
   String get leaveReviewAwaitingReviewText;
+
+  /// No description provided for @leaveReviewViewOnlyBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Only administrators can approve or reject student leave requests.'**
+  String get leaveReviewViewOnlyBanner;
 
   /// No description provided for @leaveReviewReviewerNotesLabel.
   ///

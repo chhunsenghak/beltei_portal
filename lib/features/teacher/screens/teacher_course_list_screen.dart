@@ -321,7 +321,7 @@ class _CourseCard extends StatelessWidget {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () => context
-                .push('/teacher/courses/${course.courseId}/attendance'),
+                .push('/teacher/courses/${course.classTermCourseId}/attendance'),
             icon: const Icon(Icons.how_to_reg_outlined, size: 16),
             label: Text(l.dashboardActionAttendance),
             style: OutlinedButton.styleFrom(
@@ -335,7 +335,7 @@ class _CourseCard extends StatelessWidget {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: () => context
-                .push('/teacher/courses/${course.courseId}/grades'),
+                .push('/teacher/courses/${course.classTermCourseId}/grades'),
             icon: const Icon(Icons.grade_outlined, size: 16),
             label: Text(l.dashboardActionGrades),
             style: OutlinedButton.styleFrom(

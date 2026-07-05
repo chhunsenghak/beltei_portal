@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
@@ -28,133 +27,14 @@ String _fmtDateTime(DateTime? dt, String locale) {
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class LeaveRequestReviewScreen extends ConsumerStatefulWidget {
+class LeaveRequestReviewScreen extends ConsumerWidget {
   const LeaveRequestReviewScreen({super.key, required this.requestId});
   final String requestId;
 
   @override
-  ConsumerState<LeaveRequestReviewScreen> createState() =>
-      _LeaveRequestReviewScreenState();
-}
-
-class _LeaveRequestReviewScreenState
-    extends ConsumerState<LeaveRequestReviewScreen> {
-  bool _isProcessing = false;
-
-  Future<void> _decide(StudentLeaveDetail leave, bool approve) async {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context)!;
-    final user = ref.read(currentUserProvider).valueOrNull;
-    if (user == null) return;
-
-    final notesController = TextEditingController();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          approve ? l.leaveReviewApproveDialogTitle : l.leaveReviewRejectDialogTitle,
-          style: AppTextStyles.h3,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RichText(
-              text: TextSpan(
-                style: AppTextStyles.body,
-                children: [
-                  TextSpan(
-                      text: leave.studentName,
-                      style: AppTextStyles.bodyMedium),
-                  TextSpan(text: ' – ${leave.type}'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: notesController,
-              decoration: InputDecoration(
-                hintText: l.leaveReviewNotesHint,
-                hintStyle: AppTextStyles.caption,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  approve ? AppColors.statusGreen : AppColors.statusRed,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(approve ? l.leaveReviewApproveButton : l.leaveReviewRejectButton,
-                style: AppTextStyles.button),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) {
-      notesController.dispose();
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-    final notes = notesController.text.trim();
-    notesController.dispose();
-
-    try {
-      final service = ref.read(teacherServiceProvider);
-      if (approve) {
-        await service.approveLeaveRequest(leave.id, user.id,
-            notes: notes.isEmpty ? null : notes);
-      } else {
-        await service.rejectLeaveRequest(leave.id, user.id,
-            notes: notes.isEmpty ? null : notes);
-      }
-      ref.invalidate(leaveDetailProvider(widget.requestId));
-      ref.invalidate(teacherStudentLeavesProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(approve
-                ? l.leaveReviewApprovedSnackbar
-                : l.leaveReviewRejectedSnackbar),
-            backgroundColor:
-                approve ? AppColors.statusGreen : AppColors.statusRed,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l.leaveReviewSubmitError),
-            backgroundColor: AppColors.statusRed,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final leaveAsync = ref.watch(leaveDetailProvider(widget.requestId));
+    final leaveAsync = ref.watch(leaveDetailProvider(requestId));
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -182,7 +62,7 @@ class _LeaveRequestReviewScreenState
                   style: AppTextStyles.bodyMedium),
               TextButton(
                 onPressed: () =>
-                    ref.invalidate(leaveDetailProvider(widget.requestId)),
+                    ref.invalidate(leaveDetailProvider(requestId)),
                 child: Text(l.retry),
               ),
             ],
@@ -190,13 +70,7 @@ class _LeaveRequestReviewScreenState
         ),
         data: (leave) => leave == null
             ? Center(child: Text(l.leaveDetailNotFound))
-            : _LeaveDetailBody(
-                leave: leave,
-                l: l,
-                isProcessing: _isProcessing,
-                onApprove: () => _decide(leave, true),
-                onReject: () => _decide(leave, false),
-              ),
+            : _LeaveDetailBody(leave: leave, l: l),
       ),
     );
   }
@@ -205,18 +79,9 @@ class _LeaveRequestReviewScreenState
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _LeaveDetailBody extends StatelessWidget {
-  const _LeaveDetailBody({
-    required this.leave,
-    required this.l,
-    required this.isProcessing,
-    required this.onApprove,
-    required this.onReject,
-  });
+  const _LeaveDetailBody({required this.leave, required this.l});
   final StudentLeaveDetail leave;
   final AppLocalizations l;
-  final bool isProcessing;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -225,6 +90,8 @@ class _LeaveDetailBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildViewOnlyBanner(),
+          const SizedBox(height: AppSpacing.sectionGap),
           _buildStudentCard(),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildAttendanceSummary(),
@@ -239,6 +106,34 @@ class _LeaveDetailBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.sectionGap),
           _buildStatusPanel(),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── View-only banner ───────────────────────────────────────────────────────
+
+  Widget _buildViewOnlyBanner() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      decoration: BoxDecoration(
+        color: AppColors.statusAmberBg,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(
+            color: AppColors.statusAmber.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline,
+              color: AppColors.statusAmber, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              l.leaveReviewViewOnlyBanner,
+              style: AppTextStyles.body.copyWith(
+                  color: AppColors.statusAmber, height: 1.4),
+            ),
+          ),
         ],
       ),
     );
@@ -441,6 +336,18 @@ class _LeaveDetailBody extends StatelessWidget {
               ),
             ],
           ),
+          if (leave.sessionNumber != null) ...[
+            const SizedBox(height: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.leaveReviewSessionLabel, style: AppTextStyles.label),
+                const SizedBox(height: 2),
+                Text(l.leaveSessionNumbered(leave.sessionNumber!),
+                    style: AppTextStyles.bodyMedium),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -529,39 +436,6 @@ class _LeaveDetailBody extends StatelessWidget {
                     l.leaveReviewAwaitingReviewText,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textSecondary, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: isProcessing ? null : onReject,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.statusRed,
-                      side: BorderSide(color: AppColors.statusRed),
-                    ),
-                    child: Text(l.leaveReviewRejectButton),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: isProcessing ? null : onApprove,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.statusGreen,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: isProcessing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(l.leaveReviewApproveButton),
                   ),
                 ),
               ],

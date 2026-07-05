@@ -22,7 +22,6 @@ class _CourseManagementScreenState
     extends ConsumerState<CourseManagementScreen> {
   String _searchQuery = '';
   String _selectedFaculty = 'All Faculties';
-  String _selectedTeacher = 'All Teachers';
 
   List<AdminCourse> _applyFilters(List<AdminCourse> all) {
     return all.where((c) {
@@ -33,8 +32,6 @@ class _CourseManagementScreenState
       }
       if (_selectedFaculty != 'All Faculties' &&
           c.facultyName != _selectedFaculty) return false;
-      if (_selectedTeacher != 'All Teachers' &&
-          c.teacherName != _selectedTeacher) return false;
       return true;
     }).toList();
   }
@@ -76,17 +73,14 @@ class _CourseManagementScreenState
           final facultyNamesFromCourses = all.map((c) => c.facultyName ?? '').where((s) => s.isNotEmpty).toSet();
           final mergedFaculties = {...facultyNamesFromProvider, ...facultyNamesFromCourses}.toList()..sort();
           final faculties = ['All Faculties', ...mergedFaculties];
-          final teachers = ['All Teachers'] +
-              (all.map((c) => c.teacherName ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort());
 
           if (!faculties.contains(_selectedFaculty)) _selectedFaculty = 'All Faculties';
-          if (!teachers.contains(_selectedTeacher)) _selectedTeacher = 'All Teachers';
 
           final filtered = _applyFilters(all);
 
           return Column(
             children: [
-              _buildFilters(faculties, teachers),
+              _buildFilters(faculties),
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -110,7 +104,7 @@ class _CourseManagementScreenState
     );
   }
 
-  Widget _buildFilters(List<String> faculties, List<String> teachers) {
+  Widget _buildFilters(List<String> faculties) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -142,26 +136,11 @@ class _CourseManagementScreenState
             ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _FilterDropdown(
-                  label: 'Faculty',
-                  value: _selectedFaculty,
-                  items: faculties,
-                  onChanged: (v) => setState(() => _selectedFaculty = v!),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _FilterDropdown(
-                  label: 'Teacher',
-                  value: _selectedTeacher,
-                  items: teachers,
-                  onChanged: (v) => setState(() => _selectedTeacher = v!),
-                ),
-              ),
-            ],
+          _FilterDropdown(
+            label: 'Faculty',
+            value: _selectedFaculty,
+            items: faculties,
+            onChanged: (v) => setState(() => _selectedFaculty = v!),
           ),
         ],
       ),
@@ -529,17 +508,6 @@ class _CourseCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(course.name, style: AppTextStyles.bodyMedium),
-            if (course.teacherName != null) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(Icons.person_outline,
-                      size: 13, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(course.teacherName!, style: AppTextStyles.caption),
-                ],
-              ),
-            ],
             Divider(height: 20, color: AppColors.divider),
             Row(
               children: [
@@ -551,7 +519,7 @@ class _CourseCard extends StatelessWidget {
                 Icon(Icons.people_outline,
                     size: 13, color: AppColors.statusAmber),
                 const SizedBox(width: 4),
-                Text('${course.enrolledCount} / ${course.maxStudents}',
+                Text('${course.enrolledCount} enrolled',
                     style: AppTextStyles.caption.copyWith(
                         color: AppColors.statusAmber,
                         fontWeight: FontWeight.w600)),

@@ -57,9 +57,14 @@ class _UploadMaterialsScreenState
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
-    final materialsAsync = ref.watch(courseMaterialsProvider(widget.courseId));
     final courseAsync = ref.watch(courseInfoProvider(widget.courseId));
     final course = courseAsync.valueOrNull;
+    // widget.courseId is a class_term_course id; materials live on the
+    // catalog course, so resolve the real course id via the teaching
+    // assignment before looking materials up.
+    final materialsAsync = course != null
+        ? ref.watch(courseMaterialsProvider(course.courseId))
+        : const AsyncValue<List<CourseMaterialItem>>.loading();
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -218,8 +223,10 @@ class _UploadMaterialsScreenState
                   Text(l.courseDetailMaterialsLoadError,
                       style: AppTextStyles.body),
                   TextButton(
-                    onPressed: () => ref.invalidate(
-                        courseMaterialsProvider(widget.courseId)),
+                    onPressed: () {
+                      final c = ref.read(courseInfoProvider(widget.courseId)).valueOrNull;
+                      if (c != null) ref.invalidate(courseMaterialsProvider(c.courseId));
+                    },
                     child: Text(l.retry),
                   ),
                 ],

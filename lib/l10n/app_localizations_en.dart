@@ -356,6 +356,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noClassesToday => 'No classes today';
 
   @override
+  String get scheduleNoTimeslotYet => 'No timeslot yet';
+
+  @override
   String get dayMon => 'Mon';
 
   @override
@@ -372,6 +375,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get daySat => 'Sat';
+
+  @override
+  String get daySun => 'Sun';
+
+  @override
+  String get leaveSessionFullDay => 'Full Day';
+
+  @override
+  String leaveSessionNumbered(int n) {
+    return 'Session $n';
+  }
 
   @override
   String get dashboardQuickActionsTitle => 'Quick Actions';
@@ -978,6 +992,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveDetailLeaveTypeLabel => 'LEAVE TYPE';
 
   @override
+  String get leaveDetailSessionLabel => 'SESSION';
+
+  @override
   String get leaveDetailDatesLabel => 'DATES';
 
   @override
@@ -1064,6 +1081,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createLeaveTypeOther => 'Other';
+
+  @override
+  String get createLeaveSessionSectionLabel => 'SESSION';
 
   @override
   String get createLeaveStartDateLabel => 'START DATE';
@@ -1161,6 +1181,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get createLeaveSummaryCoursesLabel => 'Course(s)';
+
+  @override
+  String get createLeaveSummarySessionLabel => 'Session';
 
   @override
   String get financePayNowButton => 'PAY NOW';
@@ -1739,6 +1762,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editAttendanceChangedBadge => 'CHANGED';
 
   @override
+  String get editAttendanceViewOnlyBanner =>
+      'This is a past session. Attendance can only be edited on the day it was taken.';
+
+  @override
   String get attendanceReportLoadError => 'Could not load report';
 
   @override
@@ -1910,7 +1937,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get leaveManagementSubtitle =>
-      'Review and decide on absence submissions for your students.';
+      'Student absence submissions for your courses.';
+
+  @override
+  String get leaveManagementViewOnlyBadge => 'View Only';
 
   @override
   String get leaveManagementFilterAll => 'All Requests';
@@ -1980,6 +2010,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveReviewCategoryLabel => 'LEAVE CATEGORY';
 
   @override
+  String get leaveReviewSessionLabel => 'SESSION';
+
+  @override
   String get leaveReviewSubmittedLabel => 'SUBMITTED';
 
   @override
@@ -2008,7 +2041,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get leaveReviewDecisionTitle => 'Decision';
 
   @override
-  String get leaveReviewAwaitingReviewText => 'Awaiting your review.';
+  String get leaveReviewAwaitingReviewText => 'Awaiting admin review.';
+
+  @override
+  String get leaveReviewViewOnlyBanner =>
+      'Only administrators can approve or reject student leave requests.';
 
   @override
   String get leaveReviewReviewerNotesLabel => 'REVIEWER NOTES';

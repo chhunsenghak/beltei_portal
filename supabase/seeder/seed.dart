@@ -10,47 +10,91 @@ void main() async {
   final supabase = SupabaseClient(url, key);
 
   try {
+    // Real admins now sign up/get created through the app itself, but the
+    // seeder still creates a starter admin plus 5 teachers + 5 students for
+    // local/demo environments to have someone to log in as. All 5 students
+    // share one evening class term whose curriculum has 5 courses, one per
+    // weekday, each taught by its own teacher — this is the scenario that
+    // motivated the class/class_term/class_term_course split: one cohort,
+    // many courses, many teachers, all under a single enrollment per student.
+
     // ── 1. Auth users ───────────────────────────────────────────────────────
     print('\n👤 Creating auth users...');
 
     final adminId = await _createUser(supabase,
         email: 'admin@beltei.edu.kh',
-        firstName: 'Sopheap',
-        lastName: 'Meas',
+        firstName: 'Admin',
+        lastName: 'User',
         role: 'admin');
 
-    final sokhaId = await _createUser(supabase,
-        email: 'sokha@beltei.edu.kh',
+    final khanId = await _createUser(supabase,
+        email: 'sokha.khan@beltei.edu.kh',
         firstName: 'Sokha',
-        lastName: 'Chan',
+        lastName: 'Khan',
         role: 'teacher');
-    final daraId = await _createUser(supabase,
-        email: 'dara@beltei.edu.kh',
-        firstName: 'Dara',
-        lastName: 'Kem',
+    final chhaiId = await _createUser(supabase,
+        email: 'chivon.chhai@beltei.edu.kh',
+        firstName: 'Chivon',
+        lastName: 'Chhai',
+        role: 'teacher');
+    final sinId = await _createUser(supabase,
+        email: 'bunthoeurn.sin@beltei.edu.kh',
+        firstName: 'Bunthoeurn',
+        lastName: 'Sin',
+        role: 'teacher');
+    final chenId = await _createUser(supabase,
+        email: 'sovann.chen@beltei.edu.kh',
+        firstName: 'Sovann',
+        lastName: 'Chen',
+        role: 'teacher');
+    final chanthornId = await _createUser(supabase,
+        email: 'chanthorn@beltei.edu.kh',
+        firstName: 'Chanthorn',
+        lastName: '',
         role: 'teacher');
 
-    final nitaId = await _createUser(supabase,
-        email: 'nita@beltei.edu.kh',
-        firstName: 'Nita',
-        lastName: 'Meng',
+    final ranutId = await _createUser(supabase,
+        email: 'hort.ranut@beltei.edu.kh',
+        firstName: 'Hort',
+        lastName: 'Ranut',
         role: 'student');
-    final rithId = await _createUser(supabase,
-        email: 'rith@beltei.edu.kh',
-        firstName: 'Rith',
-        lastName: 'Heng',
+    final kimhengId = await _createUser(supabase,
+        email: 'chhim.kimheng@beltei.edu.kh',
+        firstName: 'Chhim',
+        lastName: 'Kimheng',
+        role: 'student');
+    final samornId = await _createUser(supabase,
+        email: 'mai.samorn@beltei.edu.kh',
+        firstName: 'Mai',
+        lastName: 'Samorn',
+        role: 'student');
+    final rathId = await _createUser(supabase,
+        email: 'samrith.rath@beltei.edu.kh',
+        firstName: 'Samrith',
+        lastName: 'Rath',
+        role: 'student');
+    final senghakId = await _createUser(supabase,
+        email: 'chhun.senghak@beltei.edu.kh',
+        firstName: 'Chhun',
+        lastName: 'Senghak',
         role: 'student');
 
-    print('  ✓ 5 users created');
+    print('  ✓ 11 users created');
 
     // ── 2. Update profiles with phone numbers ───────────────────────────────
     print('\n📝 Updating profiles...');
     final phones = {
       adminId: '012 345 678',
-      sokhaId: '012 111 222',
-      daraId: '012 333 444',
-      nitaId: '096 100 001',
-      rithId: '096 100 002',
+      khanId: '012 111 222',
+      chhaiId: '012 333 444',
+      sinId: '012 555 666',
+      chenId: '012 777 888',
+      chanthornId: '012 999 000',
+      ranutId: '096 100 001',
+      kimhengId: '096 100 002',
+      samornId: '096 100 003',
+      rathId: '096 100 004',
+      senghakId: '096 100 005',
     };
     for (final e in phones.entries) {
       await supabase
@@ -215,8 +259,6 @@ void main() async {
     String mid(String name) =>
         majors.firstWhere((m) => m['name'] == name)['id'] as String;
     final seId = mid('Software Engineering');
-    final netSecId = mid('Networking & Cybersecurity');
-    final dataSciId = mid('Data Science & AI');
     print('  ✓ ${majors.length} majors');
 
     // ── 6. Academic Years ───────────────────────────────────────────────────
@@ -263,39 +305,68 @@ void main() async {
     print('  ✓ 2 semesters');
 
     // ── 8. Teachers ─────────────────────────────────────────────────────────
+    // One teacher per course — each teaches their own weekday evening slot.
     print('\n👨‍🏫 Inserting teacher records...');
     await supabase.from('teachers').insert([
       {
-        'id': sokhaId,
+        'id': khanId,
         'employee_code': 'EMP-1001',
         'department_id': csDeptId,
         'position': 'Senior Lecturer',
-        'specialization': 'Software Engineering',
+        'specialization': 'Python Programming',
         'hire_date': '2022-01-15',
         'status': 'active',
       },
       {
-        'id': daraId,
+        'id': chhaiId,
         'employee_code': 'EMP-1002',
+        'department_id': did('DT'),
+        'position': 'Lecturer',
+        'specialization': 'Mobile Application Development',
+        'hire_date': '2021-03-01',
+        'status': 'active',
+      },
+      {
+        'id': sinId,
+        'employee_code': 'EMP-1003',
         'department_id': netDeptId,
         'position': 'Lecturer',
-        'specialization': 'Networking & Security',
+        'specialization': 'Cloud Computing',
         'hire_date': '2020-06-01',
         'status': 'active',
       },
+      {
+        'id': chenId,
+        'employee_code': 'EMP-1004',
+        'department_id': csDeptId,
+        'position': 'Senior Lecturer',
+        'specialization': 'Artificial Intelligence',
+        'hire_date': '2019-09-01',
+        'status': 'active',
+      },
+      {
+        'id': chanthornId,
+        'employee_code': 'EMP-1005',
+        'department_id': csDeptId,
+        'position': 'Lecturer',
+        'specialization': 'Research Methodology',
+        'hire_date': '2023-02-01',
+        'status': 'active',
+      },
     ]);
-    print('  ✓ 2 teachers');
+    print('  ✓ 5 teachers');
 
     // ── 9. Students (major_id instead of department_id) ──────────────────
+    // All 5 share one evening class term (see section 10c).
     print('\n👨‍🎓 Inserting student records...');
     await supabase.from('students').insert([
       {
-        'id': nitaId,
-        'student_code': 'STU-2301',
+        'id': ranutId,
+        'student_code': 'STU-2501',
         'faculty_id': fitsId,
         'major_id': seId,
-        'enrollment_year': 2023,
-        'year_level': 2,
+        'enrollment_year': 2025,
+        'year_level': 1,
         'status': 'active',
         'date_of_birth': '2004-06-10',
         'gender': 'female',
@@ -303,11 +374,37 @@ void main() async {
         'emergency_contact': '099 123 456',
       },
       {
-        'id': rithId,
-        'student_code': 'STU-2401',
+        'id': kimhengId,
+        'student_code': 'STU-2502',
         'faculty_id': fitsId,
-        'major_id': netSecId,
-        'enrollment_year': 2024,
+        'major_id': seId,
+        'enrollment_year': 2025,
+        'year_level': 1,
+        'status': 'active',
+        'date_of_birth': '2004-11-02',
+        'gender': 'male',
+        'address': 'Phnom Penh',
+        'emergency_contact': '099 234 567',
+      },
+      {
+        'id': samornId,
+        'student_code': 'STU-2503',
+        'faculty_id': fitsId,
+        'major_id': seId,
+        'enrollment_year': 2025,
+        'year_level': 1,
+        'status': 'active',
+        'date_of_birth': '2005-01-18',
+        'gender': 'female',
+        'address': 'Battambang',
+        'emergency_contact': '099 345 678',
+      },
+      {
+        'id': rathId,
+        'student_code': 'STU-2504',
+        'faculty_id': fitsId,
+        'major_id': seId,
+        'enrollment_year': 2025,
         'year_level': 1,
         'status': 'active',
         'date_of_birth': '2005-09-20',
@@ -315,179 +412,206 @@ void main() async {
         'address': 'Siem Reap',
         'emergency_contact': '097 654 321',
       },
+      {
+        'id': senghakId,
+        'student_code': 'STU-2505',
+        'faculty_id': fitsId,
+        'major_id': seId,
+        'enrollment_year': 2025,
+        'year_level': 1,
+        'status': 'active',
+        'date_of_birth': '2005-03-25',
+        'gender': 'male',
+        'address': 'Kandal',
+        'emergency_contact': '097 765 432',
+      },
     ]);
-    print('  ✓ 2 students');
+    print('  ✓ 5 students');
 
     // ── 10. Courses ──────────────────────────────────────────────────────────
+    // Pure catalog now — no teacher/semester/capacity here. Those live on
+    // classes/class_terms/class_term_courses below, since the same course can
+    // be taught to different cohorts by different teachers at different times.
     print('\n📚 Inserting courses...');
     final courses = await supabase.from('courses').insert([
       {
-        'code': 'CS101',
-        'name': 'Introduction to Programming',
+        'code': 'PY101',
+        'name': 'Python Programming',
         'credits': 3,
-        'teacher_id': sokhaId,
-        'semester_id': sem1Id,
         'faculty_id': fitsId,
         'department_id': csDeptId,
         'major_id': seId,
-        'max_students': 40,
-        'schedule': [
-          {'day': 'Mon', 'start': '08:00', 'end': '09:30', 'room': 'A101'},
-          {'day': 'Wed', 'start': '08:00', 'end': '09:30', 'room': 'A101'},
-        ],
-        'description': 'Foundational programming concepts using Dart.',
+        'description': 'Python syntax, data structures, and scripting fundamentals.',
         'status': 'active',
       },
       {
-        'code': 'CS201',
-        'name': 'Data Structures & Algorithms',
+        'code': 'MOB101',
+        'name': 'Mobile App Development',
         'credits': 3,
-        'teacher_id': sokhaId,
-        'semester_id': sem1Id,
-        'faculty_id': fitsId,
-        'department_id': csDeptId,
-        'major_id': dataSciId,
-        'max_students': 35,
-        'schedule': [
-          {'day': 'Tue', 'start': '10:00', 'end': '11:30', 'room': 'A102'},
-          {'day': 'Thu', 'start': '10:00', 'end': '11:30', 'room': 'A102'},
-        ],
-        'description': 'Arrays, linked lists, trees, and sorting algorithms.',
-        'status': 'active',
-      },
-      {
-        'code': 'CS301',
-        'name': 'Web Development',
-        'credits': 3,
-        'teacher_id': sokhaId,
-        'semester_id': sem1Id,
         'faculty_id': fitsId,
         'department_id': csDeptId,
         'major_id': seId,
-        'max_students': 30,
-        'schedule': [
-          {'day': 'Thu', 'start': '13:00', 'end': '14:30', 'room': 'Lab1'},
-        ],
-        'description': 'HTML, CSS, JavaScript and modern web frameworks.',
+        'description': 'Building cross-platform mobile applications.',
         'status': 'active',
       },
       {
-        'code': 'NET101',
-        'name': 'Computer Networks',
+        'code': 'CLD101',
+        'name': 'Cloud Computing',
         'credits': 3,
-        'teacher_id': daraId,
-        'semester_id': sem1Id,
         'faculty_id': fitsId,
         'department_id': netDeptId,
-        'major_id': netSecId,
-        'max_students': 30,
-        'schedule': [
-          {'day': 'Mon', 'start': '10:00', 'end': '11:30', 'room': 'B201'},
-          {'day': 'Fri', 'start': '08:00', 'end': '09:30', 'room': 'B201'},
-        ],
-        'description': 'TCP/IP, routing protocols, and network security.',
+        'major_id': seId,
+        'description': 'Cloud service models, deployment, and infrastructure basics.',
         'status': 'active',
       },
       {
-        'code': 'CS102',
-        'name': 'Programming Fundamentals',
+        'code': 'AI101',
+        'name': 'Artificial Intelligence',
         'credits': 3,
-        'teacher_id': sokhaId,
-        'semester_id': sem2Id,
         'faculty_id': fitsId,
         'department_id': csDeptId,
         'major_id': seId,
-        'max_students': 40,
-        'schedule': [
-          {'day': 'Mon', 'start': '08:00', 'end': '09:30', 'room': 'A101'},
-        ],
-        'description': 'Previous semester intro course (completed).',
-        'status': 'inactive',
+        'description': 'Search, knowledge representation, and machine learning foundations.',
+        'status': 'active',
+      },
+      {
+        'code': 'RES101',
+        'name': 'Research Methodology',
+        'credits': 3,
+        'faculty_id': fitsId,
+        'department_id': csDeptId,
+        'major_id': seId,
+        'description': 'Research design, data collection, and academic writing.',
+        'status': 'active',
       },
     ]).select();
 
-    final cs101Id =
-        courses.firstWhere((c) => c['code'] == 'CS101')['id'] as String;
-    final cs201Id =
-        courses.firstWhere((c) => c['code'] == 'CS201')['id'] as String;
-    final cs301Id =
-        courses.firstWhere((c) => c['code'] == 'CS301')['id'] as String;
-    final net101Id =
-        courses.firstWhere((c) => c['code'] == 'NET101')['id'] as String;
-    final cs102Id =
-        courses.firstWhere((c) => c['code'] == 'CS102')['id'] as String;
-    print('  ✓ 5 courses');
+    String cid(String code) =>
+        courses.firstWhere((c) => c['code'] == code)['id'] as String;
+    final pyId = cid('PY101');
+    final mobId = cid('MOB101');
+    final cldId = cid('CLD101');
+    final aiId = cid('AI101');
+    final resId = cid('RES101');
+    print('  ✓ ${courses.length} courses');
 
     // ── 10b. Classes ─────────────────────────────────────────────────────────
-    // Teacher/semester shown to students is resolved via the class an
-    // enrollment points to (not courses.teacher_id/semester_id, which admin-
-    // created courses never set) — one class per seeded course, reusing that
-    // course's own teacher/semester so seed data matches the real data model.
+    // One evening cohort — all 5 students share this single class, which
+    // persists across years as a stable identity.
     print('\n🏫 Inserting classes...');
     final classes = await supabase.from('classes').insert([
-      for (final c in courses)
-        {
-          'course_id': c['id'],
-          'semester_id': c['semester_id'],
-          'teacher_id': c['teacher_id'],
-          'shift': 'morning',
-          'class_code': '${c['code']}-A',
-        },
+      {
+        'class_code': 'EVENING-2025-A',
+        'faculty_id': fitsId,
+        'major_id': seId,
+        'program_type': 'national',
+        'status': 'active',
+      },
     ]).select();
-    final classIdByCourseId = {
-      for (final cls in classes) cls['course_id'] as String: cls['id'] as String
-    };
-    print('  ✓ ${classes.length} classes');
 
-    // ── 11. Enrollments ─────────────────────────────────────────────────────
-    print('\n📋 Inserting enrollments...');
-    await supabase.from('enrollments').insert([
-      // Nita (SE) — CS101, CS201, CS301 + CS102 past
+    final classId = classes.first['id'] as String;
+    print('  ✓ ${classes.length} class');
+
+    // ── 10c. Class terms ─────────────────────────────────────────────────────
+    // This class's offering for the current semester — evening shift, weekday
+    // schedule (Mon-Fri), one course per day.
+    print('\n🗂️  Inserting class term...');
+    final classTerms = await supabase.from('class_terms').insert([
       {
-        'student_id': nitaId,
-        'course_id': cs101Id,
-        'class_id': classIdByCourseId[cs101Id],
+        'class_id': classId,
         'semester_id': sem1Id,
-        'status': 'enrolled'
+        'year_level': 1,
+        'schedule_type': 'weekday',
+        'shift': 'evening',
+        'room': 'E101',
+        'max_students': 30,
+        'status': 'active',
+      },
+    ]).select();
+
+    final termId = classTerms.first['id'] as String;
+    print('  ✓ ${classTerms.length} class term');
+
+    // ── 10d. Class term courses (the curriculum) ────────────────────────────
+    // Each weekday is dedicated to one course, split into two sessions with
+    // a 20-minute break — everyone in the evening class takes all 5 courses,
+    // each with its own teacher.
+    print('\n📖 Inserting class term courses...');
+    await supabase.from('class_term_courses').insert([
+      {
+        'class_term_id': termId,
+        'course_id': pyId,
+        'teacher_id': khanId,
+        'status': 'active',
+        'schedule': [
+          {'day': 'Mon', 'start': '17:30', 'end': '19:00', 'room': 'E101'},
+          {'day': 'Mon', 'start': '19:20', 'end': '20:30', 'room': 'E101'},
+        ],
       },
       {
-        'student_id': nitaId,
-        'course_id': cs201Id,
-        'class_id': classIdByCourseId[cs201Id],
-        'semester_id': sem1Id,
-        'status': 'enrolled'
+        'class_term_id': termId,
+        'course_id': mobId,
+        'teacher_id': chhaiId,
+        'status': 'active',
+        'schedule': [
+          {'day': 'Tue', 'start': '17:30', 'end': '19:00', 'room': 'E101'},
+          {'day': 'Tue', 'start': '19:20', 'end': '20:30', 'room': 'E101'},
+        ],
       },
       {
-        'student_id': nitaId,
-        'course_id': cs301Id,
-        'class_id': classIdByCourseId[cs301Id],
-        'semester_id': sem1Id,
-        'status': 'enrolled'
+        'class_term_id': termId,
+        'course_id': cldId,
+        'teacher_id': sinId,
+        'status': 'active',
+        'schedule': [
+          {'day': 'Wed', 'start': '17:30', 'end': '19:00', 'room': 'E101'},
+          {'day': 'Wed', 'start': '19:20', 'end': '20:30', 'room': 'E101'},
+        ],
       },
       {
-        'student_id': nitaId,
-        'course_id': cs102Id,
-        'class_id': classIdByCourseId[cs102Id],
-        'semester_id': sem2Id,
-        'status': 'completed'
-      },
-      // Rith (Networking) — CS101, NET101
-      {
-        'student_id': rithId,
-        'course_id': cs101Id,
-        'class_id': classIdByCourseId[cs101Id],
-        'semester_id': sem1Id,
-        'status': 'enrolled'
+        'class_term_id': termId,
+        'course_id': aiId,
+        'teacher_id': chenId,
+        'status': 'active',
+        'schedule': [
+          {'day': 'Thu', 'start': '17:30', 'end': '19:00', 'room': 'E101'},
+          {'day': 'Thu', 'start': '19:20', 'end': '20:30', 'room': 'E101'},
+        ],
       },
       {
-        'student_id': rithId,
-        'course_id': net101Id,
-        'class_id': classIdByCourseId[net101Id],
-        'semester_id': sem1Id,
-        'status': 'enrolled'
+        'class_term_id': termId,
+        'course_id': resId,
+        'teacher_id': chanthornId,
+        'status': 'active',
+        'schedule': [
+          {'day': 'Fri', 'start': '17:30', 'end': '19:00', 'room': 'Online'},
+          {'day': 'Fri', 'start': '19:20', 'end': '20:30', 'room': 'Online'},
+        ],
       },
     ]);
-    print('  ✓ 6 enrollments');
+    print('  ✓ 5 class term courses');
+
+    // ── 11. Enrollments ─────────────────────────────────────────────────────
+    // One row per student for the evening class term — enrolling once gets
+    // each student all 5 courses in the curriculum automatically.
+    print('\n📋 Inserting enrollments...');
+    await supabase.from('enrollments').insert([
+      for (final studentId in [ranutId, kimhengId, samornId, rathId, senghakId])
+        {
+          'student_id': studentId,
+          'class_term_id': termId,
+          'status': 'enrolled',
+        },
+    ]);
+    print('  ✓ 5 enrollments');
+
+    /* Disabled: grades, attendance, leave requests, invoices/payments,
+       notifications, materials, and announcements all reference the old
+       5-course demo dataset (CS101/CS201/CS301/NET101/CS102) and its
+       enrollments — left disabled rather than rewritten against the new
+       AI/Web Design courses since they're demo-only content, not needed for
+       the app to function. Create these through the app's admin/teacher UI
+       instead, or rewrite this block by hand if you want richer demo data.
 
     // ── 12. Grades ──────────────────────────────────────────────────────────
     print('\n🎓 Inserting grades...');
@@ -606,8 +730,21 @@ void main() async {
         'end_date': '2025-11-12',
         'status': 'pending',
       },
+      {
+        // Nita's class term (BATCH-2025-A) has two sessions on Monday (AI101
+        // at 08:00, WD101 at 10:00) — this leave only covers the first one,
+        // demonstrating session_number instead of a full-day leave.
+        'requester_id': nitaId,
+        'requester_type': 'student',
+        'type': 'Personal',
+        'reason': 'Morning doctor appointment',
+        'start_date': '2025-10-06',
+        'end_date': '2025-10-06',
+        'session_number': 1,
+        'status': 'pending',
+      },
     ]);
-    print('  ✓ 3 leave requests');
+    print('  ✓ 4 leave requests');
 
     // ── 15. Invoices & payments ─────────────────────────────────────────────
     print('\n💰 Inserting invoices & payments...');
@@ -775,23 +912,27 @@ void main() async {
       },
     ]);
     print('  ✓ 4 announcements');
+    */
 
     // ── Summary ─────────────────────────────────────────────────────────────
     print('''
 
 ✅ Seeding complete!
-   • 5 users  (1 admin · 2 teachers · 2 students)
+   • 11 users  (1 admin · 5 teachers · 5 students)
    • 13 faculties · ${departments.length} departments · ${majors.length} majors
-   • 2 semesters · 5 courses
-   • 6 enrollments · 6 grade records
-   • ${attendanceRows.length} attendance records
-   • 3 leave requests · 2 invoices · 1 payment
-   • 6 notifications · 4 course materials · 4 announcements
+   • 2 academic years · 2 semesters
+   • ${courses.length} courses · ${classes.length} class · ${classTerms.length} class term · 5 enrollments
+   • Evening class (Mon-Fri, one course/day, 2 sessions/day, 20min break)
+
+   (Grades, attendance, leave requests, invoices, notifications, materials,
+   and announcements are disabled — create those through the app instead.)
 
 📧 Credentials — password: $kPassword
    admin@beltei.edu.kh
-   sokha@beltei.edu.kh  ·  dara@beltei.edu.kh
-   nita@beltei.edu.kh   ·  rith@beltei.edu.kh
+   sokha.khan@beltei.edu.kh · chivon.chhai@beltei.edu.kh · bunthoeurn.sin@beltei.edu.kh
+   sovann.chen@beltei.edu.kh · chanthorn@beltei.edu.kh
+   hort.ranut@beltei.edu.kh · chhim.kimheng@beltei.edu.kh · mai.samorn@beltei.edu.kh
+   samrith.rath@beltei.edu.kh · chhun.senghak@beltei.edu.kh
 ''');
   } catch (e, st) {
     print('\n❌ Seeding failed: $e');

@@ -98,8 +98,7 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
       }
 
       await ref.read(teacherServiceProvider).saveGrades(
-            courseId: widget.courseId,
-            semesterId: semesterId,
+            classTermCourseId: widget.courseId,
             grades: gradesToSave,
           );
 

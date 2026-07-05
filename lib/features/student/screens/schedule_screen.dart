@@ -8,7 +8,20 @@ import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
 import '../../../l10n/app_localizations.dart';
 
-const _kDayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const _kWeekdayDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const _kWeekendDays = ['Sat', 'Sun'];
+
+// A class's `scheduleType` ('weekday' | 'weekend') decides which days should
+// even be offered as tabs, independent of whether a slot has been added yet
+// for a given day — a day with no timeslot should still show up (with a
+// "No timeslot yet" state) rather than silently disappearing from the tab bar.
+List<String> _daysForCourses(List<EnrolledCourse> courses) {
+  final current = courses.where((c) => c.isCurrentSemester);
+  final hasWeekday = current.any((c) => c.scheduleType != 'weekend');
+  final hasWeekend = current.any((c) => c.scheduleType == 'weekend');
+  if (!hasWeekday && !hasWeekend) return _kWeekdayDays;
+  return [if (hasWeekday) ..._kWeekdayDays, if (hasWeekend) ..._kWeekendDays];
+}
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -107,16 +120,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ),
         data: (courses) {
           final scheduleMap = _buildScheduleMap(courses);
-
-          // Ordered list of days that have at least one slot
-          final activeDays = _kDayOrder
-              .where((d) => scheduleMap.containsKey(d))
-              .toList();
-
-          // If no days have classes, show all weekdays
-          final days = activeDays.isEmpty
-              ? _kDayOrder.sublist(0, 5)
-              : activeDays;
+          final days = _daysForCourses(courses);
 
           final safeIndex =
               _selectedDayIndex.clamp(0, days.length - 1);
@@ -184,6 +188,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         'Thu' => l.dayThu,
         'Fri' => l.dayFri,
         'Sat' => l.daySat,
+        'Sun' => l.daySun,
         _ => abbr,
       };
 
@@ -288,7 +293,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(top: 60),
-                child: Text(l.noClassesToday),
+                child: Text(l.scheduleNoTimeslotYet),
               ),
             ),
           ],
@@ -341,16 +346,17 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   Widget _buildSlotCard(_Slot slot, int firstHour) {
     final topOffset = (slot.startHour - firstHour) * 72.0;
-    final height = (slot.endHour - slot.startHour) * 72.0;
+    final durationHeight = (slot.endHour - slot.startHour) * 72.0;
 
     return Positioned(
       top: topOffset,
       left: 0,
       right: 0,
-      height: height.clamp(36.0, double.infinity),
+      // height: height.clamp(36.0, double.infinity),
       child: Container(
         margin: const EdgeInsets.only(right: 4, bottom: 2),
         padding: const EdgeInsets.all(10),
+        constraints: BoxConstraints(minHeight: durationHeight.clamp(36.0, double.infinity)),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
@@ -366,6 +372,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           ],
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
@@ -387,6 +394,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                         Expanded(
                           child: Text(slot.room!,
                               style: AppTextStyles.caption,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ),
                       ],
@@ -402,6 +410,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                         Expanded(
                           child: Text(slot.teacher!,
                               style: AppTextStyles.caption,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                         ),
                       ],

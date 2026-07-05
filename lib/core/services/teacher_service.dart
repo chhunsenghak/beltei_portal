@@ -31,7 +31,12 @@ class TeacherProfile {
 }
 
 class TeacherCourse {
+  // Primary key for attendance/grades/roster lookups — one class_term_course
+  // row is one specific teaching assignment (a course within one class term).
+  final String classTermCourseId;
   final String courseId;
+  final String? classId;
+  final String? classCode;
   final String code;
   final String name;
   final int credits;
@@ -46,7 +51,10 @@ class TeacherCourse {
   final CourseStatus status;
 
   const TeacherCourse({
+    required this.classTermCourseId,
     required this.courseId,
+    this.classId,
+    this.classCode,
     required this.code,
     required this.name,
     required this.credits,
@@ -218,6 +226,7 @@ class StudentLeaveDetail {
   final DateTime? reviewedAt;
   final double attendanceRate;
   final int totalAttendanceDays;
+  final int? sessionNumber;
 
   const StudentLeaveDetail({
     required this.id,
@@ -235,6 +244,7 @@ class StudentLeaveDetail {
     this.reviewedAt,
     this.attendanceRate = 0,
     this.totalAttendanceDays = 0,
+    this.sessionNumber,
   });
 
   String get initials {
@@ -247,6 +257,9 @@ class StudentLeaveDetail {
     }
     return '?';
   }
+
+  String get sessionLabel =>
+      sessionNumber == null ? 'Full Day' : 'Session $sessionNumber';
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -302,15 +315,23 @@ class TeacherService {
 
   Future<List<TeacherCourse>> getTeacherCourses(String teacherId) async {
     try {
-      final courses = await _db
-          .from('courses')
-          .select('id, code, name, credits, semester_id, schedule, status')
-          .eq('teacher_id', teacherId);
+      // Each class_term_course row is one teaching assignment: a course
+      // taught to one class term, with its own schedule. Unlike the old
+      // per-course grouping, a teacher teaching the same course to two
+      // different class terms now sees two separate entries — each has its
+      // own roster/attendance/grades, so they can't be merged.
+      final ctc = await _db
+          .from('class_term_courses')
+          .select('id, course_id, class_term_id, schedule, status, '
+              'courses(code, name, credits, status), '
+              'class_terms(semester_id, class_id, classes(class_code))')
+          .eq('teacher_id', teacherId)
+          .eq('status', 'active');
 
-      if (courses.isEmpty) return [];
+      if (ctc.isEmpty) return [];
 
-      final semesterIds = courses
-          .map((c) => c['semester_id'] as String?)
+      final semesterIds = ctc
+          .map((c) => (c['class_terms'] as Map<String, dynamic>?)?['semester_id'] as String?)
           .whereType<String>()
           .toSet()
           .toList();
@@ -324,60 +345,78 @@ class TeacherService {
         semesterMap = {for (final s in sems) s['id'] as String: s};
       }
 
-      final courseIds = courses.map((c) => c['id'] as String).toList();
+      final classTermIds = ctc.map((c) => c['class_term_id'] as String).toList();
       final enrollments = await _db
           .from('enrollments')
-          .select('course_id')
-          .inFilter('course_id', courseIds)
+          .select('class_term_id')
+          .inFilter('class_term_id', classTermIds)
           .neq('status', 'dropped');
 
-      final Map<String, int> countMap = {};
+      final Map<String, int> countByTerm = {};
       for (final e in enrollments) {
-        final cid = e['course_id'] as String;
-        countMap[cid] = (countMap[cid] ?? 0) + 1;
+        final tid = e['class_term_id'] as String?;
+        if (tid != null) countByTerm[tid] = (countByTerm[tid] ?? 0) + 1;
       }
 
-      return courses.map((c) {
-        final courseId = c['id'] as String;
-        final semId = c['semester_id'] as String?;
+      return ctc.map((row) {
+        final course = row['courses'] as Map<String, dynamic>?;
+        if (course == null) return null;
+        final term = row['class_terms'] as Map<String, dynamic>?;
+        final cls = term?['classes'] as Map<String, dynamic>?;
+        final semId = term?['semester_id'] as String?;
         final sem = semId != null ? semesterMap[semId] : null;
-        final rawSchedule =
-            (c['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final classTermId = row['class_term_id'] as String;
+        final rawSchedule = ((row['schedule'] as List?) ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         return TeacherCourse(
-          courseId: courseId,
-          code: c['code'] as String,
-          name: c['name'] as String,
-          credits: c['credits'] as int? ?? 3,
+          classTermCourseId: row['id'] as String,
+          courseId: row['course_id'] as String,
+          classId: term?['class_id'] as String?,
+          classCode: cls?['class_code'] as String?,
+          code: course['code'] as String,
+          name: course['name'] as String,
+          credits: course['credits'] as int? ?? 3,
+          semesterId: semId,
           semesterName: sem?['name'] as String?,
           semesterAcademicYear: sem?['academic_year'] as String?,
           isCurrentSemester: sem?['is_current'] as bool? ?? false,
-          studentCount: countMap[courseId] ?? 0,
+          studentCount: countByTerm[classTermId] ?? 0,
           scheduleDisplay: _formatSchedule(rawSchedule),
           room: _extractRoom(rawSchedule),
           schedule: rawSchedule,
-          status:
-              CourseStatus.values.byName(c['status'] as String? ?? 'active'),
+          status: CourseStatus.values
+              .byName(course['status'] as String? ?? 'active'),
         );
-      }).toList();
+      }).whereType<TeacherCourse>().toList();
     } catch (e, st) {
       debugPrint('getTeacherCourses error: $e\n$st');
       rethrow;
     }
   }
 
-  Future<TeacherCourse?> getCourseById(String courseId) async {
+  /// Info for one teaching assignment (a course within one class term) —
+  /// [classTermCourseId] is a `class_term_courses.id`, not a catalog course id.
+  Future<TeacherCourse?> getCourseById(String classTermCourseId) async {
     try {
-      final c = await _db
-          .from('courses')
-          .select('id, code, name, credits, semester_id, schedule, status')
-          .eq('id', courseId)
+      final row = await _db
+          .from('class_term_courses')
+          .select('id, course_id, class_term_id, schedule, status, '
+              'courses(code, name, credits, status), '
+              'class_terms(semester_id, class_id, classes(class_code))')
+          .eq('id', classTermCourseId)
           .maybeSingle();
-      if (c == null) return null;
+      if (row == null) return null;
+
+      final course = row['courses'] as Map<String, dynamic>?;
+      if (course == null) return null;
+      final term = row['class_terms'] as Map<String, dynamic>?;
+      final cls = term?['classes'] as Map<String, dynamic>?;
 
       String? semesterName;
       String? semesterAcademicYear;
       bool isCurrentSemester = false;
-      final semId = c['semester_id'] as String?;
+      final semId = term?['semester_id'] as String?;
       if (semId != null) {
         final sem = await _db
             .from('semesters')
@@ -389,20 +428,25 @@ class TeacherService {
         isCurrentSemester = sem?['is_current'] as bool? ?? false;
       }
 
+      final classTermId = row['class_term_id'] as String;
       final enrollRows = await _db
           .from('enrollments')
           .select('id')
-          .eq('course_id', courseId)
+          .eq('class_term_id', classTermId)
           .neq('status', 'dropped');
 
-      final rawSchedule =
-          (c['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final rawSchedule = ((row['schedule'] as List?) ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
       return TeacherCourse(
-        courseId: courseId,
-        code: c['code'] as String,
-        name: c['name'] as String,
-        credits: c['credits'] as int? ?? 3,
+        classTermCourseId: row['id'] as String,
+        courseId: row['course_id'] as String,
+        classId: term?['class_id'] as String?,
+        classCode: cls?['class_code'] as String?,
+        code: course['code'] as String,
+        name: course['name'] as String,
+        credits: course['credits'] as int? ?? 3,
         semesterId: semId,
         semesterName: semesterName,
         semesterAcademicYear: semesterAcademicYear,
@@ -411,7 +455,7 @@ class TeacherService {
         scheduleDisplay: _formatSchedule(rawSchedule),
         room: _extractRoom(rawSchedule),
         schedule: rawSchedule,
-        status: CourseStatus.values.byName(c['status'] as String? ?? 'active'),
+        status: CourseStatus.values.byName(course['status'] as String? ?? 'active'),
       );
     } catch (e, st) {
       debugPrint('getCourseById error: $e\n$st');
@@ -419,12 +463,21 @@ class TeacherService {
     }
   }
 
-  Future<List<CourseStudent>> getCourseStudents(String courseId) async {
+  /// Roster for one teaching assignment — since the curriculum is fixed,
+  /// this is every student enrolled in [classTermCourseId]'s class term.
+  Future<List<CourseStudent>> getCourseStudents(String classTermCourseId) async {
     try {
+      final ctc = await _db
+          .from('class_term_courses')
+          .select('class_term_id')
+          .eq('id', classTermCourseId)
+          .maybeSingle();
+      if (ctc == null) return [];
+
       final enrollments = await _db
           .from('enrollments')
           .select('student_id')
-          .eq('course_id', courseId)
+          .eq('class_term_id', ctc['class_term_id'] as String)
           .neq('status', 'dropped');
 
       if (enrollments.isEmpty) return [];
@@ -463,11 +516,19 @@ class TeacherService {
 
   Future<void> saveAttendance({
     required String teacherId,
-    required String courseId,
+    required String classTermCourseId,
     required String date,
     required Map<String, String> statuses,
   }) async {
     if (statuses.isEmpty) return;
+
+    final ctc = await _db
+        .from('class_term_courses')
+        .select('course_id, class_terms(semester_id)')
+        .eq('id', classTermCourseId)
+        .single();
+    final courseId = ctc['course_id'] as String;
+    final semesterId = (ctc['class_terms'] as Map<String, dynamic>?)?['semester_id'] as String?;
 
     final rows = statuses.entries.map((entry) {
       final statusName = switch (entry.value) {
@@ -478,39 +539,43 @@ class TeacherService {
       };
       return {
         'student_id': entry.key,
+        'class_term_course_id': classTermCourseId,
         'course_id': courseId,
+        if (semesterId != null) 'semester_id': semesterId,
         'date': date,
         'status': statusName,
         'marked_by': teacherId,
       };
     }).toList();
 
-    // Upsert on the table's (student_id, course_id, date) unique constraint
-    // instead of delete-then-insert: the old two-step approach left a window
-    // where a failed insert (RLS denial, network error, etc.) would have
-    // already wiped that day's previously-saved attendance with nothing to
-    // show for it.
+    // Upsert on the table's (student_id, class_term_course_id, date) unique
+    // constraint instead of delete-then-insert: the old two-step approach
+    // left a window where a failed insert (RLS denial, network error, etc.)
+    // would have already wiped that day's previously-saved attendance with
+    // nothing to show for it.
     await _db
         .from('attendance')
-        .upsert(rows, onConflict: 'student_id,course_id,date');
+        .upsert(rows, onConflict: 'student_id,class_term_course_id,date');
   }
 
   Future<List<StudentLeaveDetail>> getStudentLeaveRequests(
       String teacherId) async {
     try {
-      final courses = await _db
-          .from('courses')
-          .select('id')
-          .eq('teacher_id', teacherId);
+      final ctc = await _db
+          .from('class_term_courses')
+          .select('class_term_id')
+          .eq('teacher_id', teacherId)
+          .eq('status', 'active');
 
-      if (courses.isEmpty) return [];
+      if (ctc.isEmpty) return [];
 
-      final courseIds = courses.map((c) => c['id'] as String).toList();
+      final classTermIds = ctc.map((c) => c['class_term_id'] as String).toSet().toList();
 
       final enrollments = await _db
           .from('enrollments')
           .select('student_id')
-          .inFilter('course_id', courseIds);
+          .inFilter('class_term_id', classTermIds)
+          .neq('status', 'dropped');
 
       if (enrollments.isEmpty) return [];
 
@@ -568,6 +633,7 @@ class TeacherService {
           createdAt: l['created_at'] == null
               ? null
               : DateTime.tryParse(l['created_at'] as String),
+          sessionNumber: l['session_number'] as int?,
         );
       }).toList();
     } catch (e, st) {
@@ -631,6 +697,7 @@ class TeacherService {
             : DateTime.tryParse(leave['reviewed_at'] as String),
         attendanceRate: attendanceRate,
         totalAttendanceDays: totalAtt,
+        sessionNumber: leave['session_number'] as int?,
       );
     } catch (e, st) {
       debugPrint('getLeaveRequestDetail error: $e\n$st');
@@ -638,12 +705,12 @@ class TeacherService {
     }
   }
 
-  Future<List<CourseGradeData>> getCourseGrades(String courseId) async {
+  Future<List<CourseGradeData>> getCourseGrades(String classTermCourseId) async {
     try {
       final rows = await _db
           .from('grades')
           .select('student_id, midterm, final_exam, assignment, participation')
-          .eq('course_id', courseId);
+          .eq('class_term_course_id', classTermCourseId);
       return rows
           .map((r) => CourseGradeData(
                 studentId: r['student_id'] as String,
@@ -660,16 +727,24 @@ class TeacherService {
   }
 
   Future<void> saveGrades({
-    required String courseId,
-    required String semesterId,
+    required String classTermCourseId,
     required List<CourseGradeData> grades,
   }) async {
     if (grades.isEmpty) return;
     try {
+      final ctc = await _db
+          .from('class_term_courses')
+          .select('course_id, class_terms(semester_id)')
+          .eq('id', classTermCourseId)
+          .single();
+      final courseId = ctc['course_id'] as String;
+      final semesterId = (ctc['class_terms'] as Map<String, dynamic>?)?['semester_id'] as String?;
+
       final records = grades.map((g) {
         final m = <String, dynamic>{
+          'class_term_course_id': classTermCourseId,
           'course_id': courseId,
-          'semester_id': semesterId,
+          if (semesterId != null) 'semester_id': semesterId,
           'student_id': g.studentId,
         };
         if (g.midterm != null) m['midterm'] = g.midterm;
@@ -680,7 +755,7 @@ class TeacherService {
       }).toList();
       await _db.from('grades').upsert(
             records,
-            onConflict: 'student_id, course_id, semester_id',
+            onConflict: 'student_id, class_term_course_id',
           );
     } catch (e, st) {
       debugPrint('saveGrades error: $e\n$st');
@@ -691,12 +766,12 @@ class TeacherService {
   // ── Attendance for a specific date ────────────────────────────────────────
 
   Future<Map<String, String>> getAttendanceForDate(
-      String courseId, String date) async {
+      String classTermCourseId, String date) async {
     try {
       final rows = await _db
           .from('attendance')
           .select('student_id, status')
-          .eq('course_id', courseId)
+          .eq('class_term_course_id', classTermCourseId)
           .eq('date', date);
       return {
         for (final r in rows)
@@ -749,12 +824,12 @@ class TeacherService {
 
   // ── Attendance summary ─────────────────────────────────────────────────────
 
-  Future<AttendanceSummaryData> getAttendanceSummary(String courseId) async {
+  Future<AttendanceSummaryData> getAttendanceSummary(String classTermCourseId) async {
     try {
       final rows = await _db
           .from('attendance')
           .select('student_id, date, status, profiles(full_name)')
-          .eq('course_id', courseId);
+          .eq('class_term_course_id', classTermCourseId);
 
       final dates = <String>{};
       final byStudent = <String, ({String name, int present, int absent})>{};
@@ -794,17 +869,17 @@ class TeacherService {
 
   // ── Course analytics ───────────────────────────────────────────────────────
 
-  Future<CourseAnalyticsData> getCourseAnalytics(String courseId) async {
+  Future<CourseAnalyticsData> getCourseAnalytics(String classTermCourseId) async {
     try {
       final gradeRows = await _db
           .from('grades')
           .select('student_id, total, letter_grade, profiles(full_name)')
-          .eq('course_id', courseId);
+          .eq('class_term_course_id', classTermCourseId);
 
       final attendRows = await _db
           .from('attendance')
           .select('student_id, date, status')
-          .eq('course_id', courseId);
+          .eq('class_term_course_id', classTermCourseId);
 
       // Grade distribution
       final gradeCounts = <String, int>{};
@@ -923,37 +998,6 @@ class TeacherService {
   String? _extractRoom(List<Map<String, dynamic>> schedule) {
     if (schedule.isEmpty) return null;
     return schedule.first['room'] as String?;
-  }
-
-  Future<void> approveLeaveRequest(String id, String teacherId,
-      {String? notes}) async {
-    await _db.from('leave_requests').update({
-      'status': 'approved',
-      'reviewed_by': teacherId,
-      'reviewed_at': DateTime.now().toIso8601String(),
-      if (notes != null && notes.isNotEmpty) 'review_notes': notes,
-    }).eq('id', id);
-    await _notifyStudentOfDecision(id);
-  }
-
-  Future<void> rejectLeaveRequest(String id, String teacherId,
-      {String? notes}) async {
-    await _db.from('leave_requests').update({
-      'status': 'rejected',
-      'reviewed_by': teacherId,
-      'reviewed_at': DateTime.now().toIso8601String(),
-      if (notes != null && notes.isNotEmpty) 'review_notes': notes,
-    }).eq('id', id);
-    await _notifyStudentOfDecision(id);
-  }
-
-  Future<void> _notifyStudentOfDecision(String leaveId) async {
-    try {
-      await _db.rpc('notify_student_of_leave_decision',
-          params: {'p_leave_id': leaveId});
-    } catch (e, st) {
-      debugPrint('notify_student_of_leave_decision error: $e\n$st');
-    }
   }
 
   Future<List<NotificationRow>> getNotifications(String userId) async {

@@ -493,6 +493,7 @@ class LeaveRequestRow {
   final DateTime? reviewedAt;
   final String? reviewNotes;
   final DateTime? createdAt;
+  final int? sessionNumber;
 
   const LeaveRequestRow({
     required this.id,
@@ -508,6 +509,7 @@ class LeaveRequestRow {
     this.reviewedAt,
     this.reviewNotes,
     this.createdAt,
+    this.sessionNumber,
   });
 
   factory LeaveRequestRow.fromMap(Map<String, dynamic> m) => LeaveRequestRow(
@@ -524,6 +526,7 @@ class LeaveRequestRow {
         reviewedAt: m['reviewed_at'] == null ? null : DateTime.parse(m['reviewed_at'] as String),
         reviewNotes: m['review_notes'] as String?,
         createdAt: m['created_at'] == null ? null : DateTime.parse(m['created_at'] as String),
+        sessionNumber: m['session_number'] as int?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -535,6 +538,7 @@ class LeaveRequestRow {
         'end_date': endDate,
         if (docUrl != null) 'doc_url': docUrl,
         'status': status.name,
+        if (sessionNumber != null) 'session_number': sessionNumber,
       };
 }
 

@@ -80,7 +80,7 @@ class _MarkAttendanceScreenState
       );
       await ref.read(teacherServiceProvider).saveAttendance(
             teacherId: user.id,
-            courseId: widget.courseId,
+            classTermCourseId: widget.courseId,
             date: _today,
             statuses: nonNullStatuses,
           );

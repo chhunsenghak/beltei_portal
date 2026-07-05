@@ -289,6 +289,11 @@ class _LeaveBody extends StatelessWidget {
           const SizedBox(height: 12),
           _labelValue(l.leaveDetailTotalDaysLabel,
               l.leaveDetailTotalDaysValue(_totalDays)),
+          if (leave.sessionNumber != null) ...[
+            const SizedBox(height: 12),
+            _labelValue(l.leaveDetailSessionLabel,
+                l.leaveSessionNumbered(leave.sessionNumber!)),
+          ],
           const SizedBox(height: 12),
           _field(l.leaveDetailReasonLabel,
               child: Text(

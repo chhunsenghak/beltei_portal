@@ -10,27 +10,43 @@ import '../../../l10n/app_localizations.dart';
 
 enum _LeaveType { medical, personal, family, other }
 
-// Mon-Fri map to one course each (5 courses per class per semester, two
-// sessions a day); Sat/Sun never appear as a key since there's no class.
 const _kWeekdayAbbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-Map<String, EnrolledCourse> _buildDayCourseMap(List<EnrolledCourse> courses) {
-  final map = <String, EnrolledCourse>{};
+// One weekday can carry more than one class session (e.g. a morning slot and
+// an afternoon slot, possibly from different enrolled courses), which is why
+// a leave request needs to pick a specific session rather than always
+// meaning "the whole day."
+class _DaySession {
+  const _DaySession({required this.course, required this.start, required this.end});
+  final EnrolledCourse course;
+  final String start;
+  final String end;
+}
+
+Map<String, List<_DaySession>> _buildDaySessionMap(List<EnrolledCourse> courses) {
+  final map = <String, List<_DaySession>>{};
   for (final course in courses) {
     if (!course.isCurrentSemester) continue;
     for (final entry in course.schedule) {
       final day = entry['day'] as String?;
-      if (day != null) map[day] = course;
+      final start = entry['start'] as String?;
+      final end = entry['end'] as String?;
+      if (day == null || start == null || end == null) continue;
+      map.putIfAbsent(day, () => [])
+          .add(_DaySession(course: course, start: start, end: end));
     }
+  }
+  for (final sessions in map.values) {
+    sessions.sort((a, b) => a.start.compareTo(b.start));
   }
   return map;
 }
 
 // While courses haven't loaded yet (or the student has none this semester),
 // fall back to a plain Mon-Fri rule rather than blocking date selection.
-bool _isSelectableDay(DateTime date, Map<String, EnrolledCourse> dayCourseMap) {
-  if (dayCourseMap.isEmpty) return date.weekday <= DateTime.friday;
-  return dayCourseMap.containsKey(_kWeekdayAbbr[date.weekday - 1]);
+bool _isSelectableDay(DateTime date, Map<String, List<_DaySession>> daySessionMap) {
+  if (daySessionMap.isEmpty) return date.weekday <= DateTime.friday;
+  return daySessionMap.containsKey(_kWeekdayAbbr[date.weekday - 1]);
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -49,6 +65,7 @@ class _CreateLeaveRequestScreenState
   final _reasonController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
+  int? _sessionNumber; // null = full day
   bool _isSubmitting = false;
   bool _submitted = false;
 
@@ -77,16 +94,29 @@ class _CreateLeaveRequestScreenState
   String _isoDate(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  List<EnrolledCourse> _affectedCourses(Map<String, EnrolledCourse> dayCourseMap) {
+  // Sessions of the currently selected day, when start == end (single-day
+  // request) — the only case a specific session can be picked for.
+  List<_DaySession> _singleDaySessions(Map<String, List<_DaySession>> daySessionMap) {
+    if (_startDate == null || _endDate == null || _startDate != _endDate) return const [];
+    return daySessionMap[_kWeekdayAbbr[_startDate!.weekday - 1]] ?? const [];
+  }
+
+  List<EnrolledCourse> _affectedCourses(Map<String, List<_DaySession>> daySessionMap) {
     if (_startDate == null || _endDate == null) return [];
+    final singleDaySessions = _singleDaySessions(daySessionMap);
+    if (_sessionNumber != null &&
+        _sessionNumber! >= 1 &&
+        _sessionNumber! <= singleDaySessions.length) {
+      return [singleDaySessions[_sessionNumber! - 1].course];
+    }
     final seen = <String>{};
     final result = <EnrolledCourse>[];
     for (var d = _startDate!;
         !d.isAfter(_endDate!);
         d = d.add(const Duration(days: 1))) {
-      final course = dayCourseMap[_kWeekdayAbbr[d.weekday - 1]];
-      if (course != null && seen.add(course.courseId)) {
-        result.add(course);
+      final sessions = daySessionMap[_kWeekdayAbbr[d.weekday - 1]] ?? const [];
+      for (final s in sessions) {
+        if (seen.add(s.course.courseId)) result.add(s.course);
       }
     }
     return result;
@@ -95,17 +125,17 @@ class _CreateLeaveRequestScreenState
   // ── Actions ────────────────────────────────────────────────────────────────
 
   DateTime _firstSelectableFrom(
-      DateTime start, Map<String, EnrolledCourse> dayCourseMap) {
+      DateTime start, Map<String, List<_DaySession>> daySessionMap) {
     var d = start;
     for (var i = 0; i < 14; i++) {
-      if (_isSelectableDay(d, dayCourseMap)) return d;
+      if (_isSelectableDay(d, daySessionMap)) return d;
       d = d.add(const Duration(days: 1));
     }
     return start;
   }
 
   Future<void> _pickDate(
-      bool isStart, Map<String, EnrolledCourse> dayCourseMap) async {
+      bool isStart, Map<String, List<_DaySession>> daySessionMap) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final firstDate = isStart ? today : (_startDate ?? today);
@@ -113,14 +143,14 @@ class _CreateLeaveRequestScreenState
         ? (_startDate ?? firstDate)
         : (_endDate ?? _startDate ?? firstDate);
     final initialDate = _firstSelectableFrom(
-        candidate.isBefore(firstDate) ? firstDate : candidate, dayCourseMap);
+        candidate.isBefore(firstDate) ? firstDate : candidate, daySessionMap);
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: DateTime(now.year + 1),
-      selectableDayPredicate: (d) => _isSelectableDay(d, dayCourseMap),
+      selectableDayPredicate: (d) => _isSelectableDay(d, daySessionMap),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: ColorScheme.light(
@@ -140,20 +170,21 @@ class _CreateLeaveRequestScreenState
       } else {
         _endDate = normalized;
       }
+      _sessionNumber = null;
     });
   }
 
   Future<void> _submit(
-      AppLocalizations l, Map<String, EnrolledCourse> dayCourseMap) async {
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) async {
     if (!_isValid) {
       _showSnackBar(l.createLeaveValidationRequiredFields,
           isError: true);
       return;
     }
 
-    if (dayCourseMap.isNotEmpty &&
-        (!_isSelectableDay(_startDate!, dayCourseMap) ||
-            !_isSelectableDay(_endDate!, dayCourseMap))) {
+    if (daySessionMap.isNotEmpty &&
+        (!_isSelectableDay(_startDate!, daySessionMap) ||
+            !_isSelectableDay(_endDate!, daySessionMap))) {
       _showSnackBar(l.createLeaveNoClassOnDateError, isError: true);
       return;
     }
@@ -173,6 +204,7 @@ class _CreateLeaveRequestScreenState
             reason: _reasonController.text.trim(),
             startDate: _isoDate(_startDate!),
             endDate: _isoDate(_endDate!),
+            sessionNumber: _sessionNumber,
           );
       ref.invalidate(studentLeaveRequestsProvider);
       if (mounted) setState(() => _submitted = true);
@@ -206,10 +238,11 @@ class _CreateLeaveRequestScreenState
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final coursesAsync = ref.watch(studentCoursesProvider);
-    final dayCourseMap = _buildDayCourseMap(coursesAsync.valueOrNull ?? const []);
-    if (_submitted) return _buildSuccessScreen(l, dayCourseMap);
+    final daySessionMap = _buildDaySessionMap(coursesAsync.valueOrNull ?? const []);
+    if (_submitted) return _buildSuccessScreen(l, daySessionMap);
 
-    final affectedCourses = _affectedCourses(dayCourseMap);
+    final affectedCourses = _affectedCourses(daySessionMap);
+    final singleDaySessions = _singleDaySessions(daySessionMap);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -223,10 +256,14 @@ class _CreateLeaveRequestScreenState
             const SizedBox(height: AppSpacing.sectionGap),
             _buildLeaveTypeGrid(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildDateFields(l, dayCourseMap),
+            _buildDateFields(l, daySessionMap),
             if (_startDate != null && _endDate != null) ...[
               const SizedBox(height: 8),
               _buildDurationChip(l),
+            ],
+            if (singleDaySessions.length > 1) ...[
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildSessionPicker(l, singleDaySessions),
             ],
             if (affectedCourses.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sectionGap),
@@ -237,7 +274,7 @@ class _CreateLeaveRequestScreenState
             const SizedBox(height: AppSpacing.sectionGap),
             _buildAttachmentArea(l),
             const SizedBox(height: AppSpacing.xl),
-            _buildSubmitButton(l, dayCourseMap),
+            _buildSubmitButton(l, daySessionMap),
             const SizedBox(height: 24),
           ],
         ),
@@ -355,14 +392,58 @@ class _CreateLeaveRequestScreenState
   }
 
   Widget _buildDateFields(
-      AppLocalizations l, Map<String, EnrolledCourse> dayCourseMap) {
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     return Column(
       children: [
         _buildDateTile(l.createLeaveStartDateLabel, _startDate,
-            () => _pickDate(true, dayCourseMap), l),
+            () => _pickDate(true, daySessionMap), l),
         const SizedBox(height: 12),
         _buildDateTile(l.createLeaveEndDateLabel, _endDate,
-            () => _pickDate(false, dayCourseMap), l),
+            () => _pickDate(false, daySessionMap), l),
+      ],
+    );
+  }
+
+  Widget _buildSessionPicker(AppLocalizations l, List<_DaySession> sessions) {
+    final options = <(int?, String)>[
+      (null, l.leaveSessionFullDay),
+      for (var i = 0; i < sessions.length; i++)
+        (i + 1, '${l.leaveSessionNumbered(i + 1)} (${sessions[i].start}–${sessions[i].end})'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l.createLeaveSessionSectionLabel, style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final (value, label) = opt;
+            final isSelected = _sessionNumber == value;
+            return GestureDetector(
+              onTap: () => setState(() => _sessionNumber = value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primaryNavy.withValues(alpha: 0.08)
+                      : AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primaryNavy : AppColors.border,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(label,
+                    style: AppTextStyles.caption.copyWith(
+                        color: isSelected ? AppColors.primaryNavy : AppColors.textSecondary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }
@@ -537,7 +618,7 @@ class _CreateLeaveRequestScreenState
   }
 
   Widget _buildSubmitButton(
-      AppLocalizations l, Map<String, EnrolledCourse> dayCourseMap) {
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     return AnimatedOpacity(
       opacity: _isValid ? 1.0 : 0.5,
       duration: const Duration(milliseconds: 200),
@@ -545,7 +626,7 @@ class _CreateLeaveRequestScreenState
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _isSubmitting ? null : () => _submit(l, dayCourseMap),
+          onPressed: _isSubmitting ? null : () => _submit(l, daySessionMap),
           icon: _isSubmitting
               ? const SizedBox(
                   width: 16,
@@ -565,9 +646,9 @@ class _CreateLeaveRequestScreenState
   // ── Success screen ─────────────────────────────────────────────────────────
 
   Widget _buildSuccessScreen(
-      AppLocalizations l, Map<String, EnrolledCourse> dayCourseMap) {
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     final leaveLabel = _leaveType?.name.capitalize ?? '';
-    final affectedCourses = _affectedCourses(dayCourseMap);
+    final affectedCourses = _affectedCourses(daySessionMap);
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -634,6 +715,11 @@ class _CreateLeaveRequestScreenState
           Divider(color: AppColors.divider, height: 20),
           _summaryRow(l.createLeaveSummaryDurationLabel,
               l.createLeaveSummaryDurationValue(_totalDays)),
+          if (_sessionNumber != null) ...[
+            Divider(color: AppColors.divider, height: 20),
+            _summaryRow(l.createLeaveSummarySessionLabel,
+                l.leaveSessionNumbered(_sessionNumber!)),
+          ],
           if (affectedCourses.isNotEmpty) ...[
             Divider(color: AppColors.divider, height: 20),
             _summaryRow(l.createLeaveSummaryCoursesLabel,

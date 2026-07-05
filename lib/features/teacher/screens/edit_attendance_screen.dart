@@ -61,6 +61,14 @@ class _EditAttendanceScreenState
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
+  bool get _isPastDate {
+    final parsed = DateTime.tryParse(_date);
+    if (parsed == null) return false;
+    final today = DateTime.now();
+    final todayDateOnly = DateTime(today.year, today.month, today.day);
+    return parsed.isBefore(todayDateOnly);
+  }
+
   void _initStatuses(List<dynamic> students, Map<String, String> existing) {
     if (_initialized) return;
     _initialized = true;
@@ -86,7 +94,7 @@ class _EditAttendanceScreenState
 
       await ref.read(teacherServiceProvider).saveAttendance(
             teacherId: user.id,
-            courseId: widget.courseId,
+            classTermCourseId: widget.courseId,
             date: _date,
             statuses: Map.fromEntries(students.map((s) =>
                 MapEntry(s.studentId as String, _statuses[s.studentId] ?? 'P'))),
@@ -166,6 +174,7 @@ class _EditAttendanceScreenState
           return Column(
             children: [
               _buildSessionCard(courseAsync.valueOrNull, l),
+              if (_isPastDate) _buildViewOnlyBanner(l),
               _buildStatsRow(students.length, l),
               Expanded(
                 child: ListView.separated(
@@ -180,13 +189,13 @@ class _EditAttendanceScreenState
                       code: s.studentCode,
                       status: label,
                       changed: _changed.contains(s.studentId),
-                      onStatus: (v) => _setStatus(s.studentId, v),
+                      onStatus: _isPastDate ? null : (v) => _setStatus(s.studentId, v),
                       changedLabel: l.editAttendanceChangedBadge,
                     );
                   },
                 ),
               ),
-              _buildUpdateButton(students, l),
+              if (!_isPastDate) _buildUpdateButton(students, l),
             ],
           );
         },
@@ -206,6 +215,30 @@ class _EditAttendanceScreenState
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text(l.editAttendanceAppBarTitle, style: AppTextStyles.h3),
+    );
+  }
+
+  // ── View-only banner ───────────────────────────────────────────────────────
+
+  Widget _buildViewOnlyBanner(AppLocalizations l) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      color: AppColors.statusAmberBg,
+      child: Row(
+        children: [
+          Icon(Icons.visibility_outlined,
+              color: AppColors.statusAmber, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              l.editAttendanceViewOnlyBanner,
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.statusAmber, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -318,7 +351,7 @@ class _EditStudentCard extends StatelessWidget {
   });
   final String name, code, status;
   final bool changed;
-  final ValueChanged<String> onStatus;
+  final ValueChanged<String>? onStatus;
   final String changedLabel;
 
   @override
@@ -356,13 +389,15 @@ class _EditStudentCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Row(
-                children: _kOpts.map((opt) {
+              Opacity(
+                opacity: onStatus == null ? 0.5 : 1.0,
+                child: Row(
+                  children: _kOpts.map((opt) {
                   final selected = status == opt.value;
                   return Padding(
                     padding: const EdgeInsets.only(left: 6),
                     child: GestureDetector(
-                      onTap: () => onStatus(opt.value),
+                      onTap: onStatus == null ? null : () => onStatus!(opt.value),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         width: 36,
@@ -389,7 +424,8 @@ class _EditStudentCard extends StatelessWidget {
                       ),
                     ),
                   );
-                }).toList(),
+                  }).toList(),
+                ),
               ),
             ],
           ),
