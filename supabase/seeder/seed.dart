@@ -263,20 +263,21 @@ void main() async {
 
     // ── 6. Academic Years ───────────────────────────────────────────────────
     print('\n🗓️  Inserting academic years...');
-    await supabase.from('academic_years').insert([
-      {
-        'name': '2025-2026',
-        'start_date': '2025-09-01',
-        'end_date': '2026-06-30',
-        'is_current': true,
-      },
+    final academicYearsResult = await supabase.from('academic_years').insert([
       {
         'name': '2024-2025',
         'start_date': '2024-09-01',
         'end_date': '2025-06-30',
-        'is_current': false,
       },
-    ]);
+      {
+        'name': '2025-2026',
+        'start_date': '2025-09-01',
+        'end_date': '2026-06-30',
+      },
+    ]).select();
+    
+    final ay2526Id = academicYearsResult.firstWhere((y) => y['name'] == '2025-2026')['id'] as String;
+    final ay2425Id = academicYearsResult.firstWhere((y) => y['name'] == '2024-2025')['id'] as String;
     print('  ✓ 2 academic years');
 
     // ── 7. Semesters ────────────────────────────────────────────────────────
@@ -284,25 +285,37 @@ void main() async {
     final semesters = await supabase.from('semesters').insert([
       {
         'name': 'Semester 1',
-        'academic_year': '2025-2026',
+        'academic_year_id': ay2425Id,
+        'start_date': '2024-09-01',
+        'end_date': '2024-12-31',
+        'is_current': false,
+      },
+      {
+        'name': 'Semester 2',
+        'academic_year_id': ay2425Id,
+        'start_date': '2025-02-01',
+        'end_date': '2025-06-30',
+        'is_current': false,
+      },
+      {
+        'name': 'Semester 1',
+        'academic_year_id': ay2526Id,
         'start_date': '2025-09-01',
         'end_date': '2025-12-31',
         'is_current': true,
       },
       {
         'name': 'Semester 2',
-        'academic_year': '2024-2025',
-        'start_date': '2025-02-01',
-        'end_date': '2025-06-30',
+        'academic_year_id': ay2526Id,
+        'start_date': '2026-02-01',
+        'end_date': '2026-06-30',
         'is_current': false,
       },
     ]).select();
 
     final sem1Id = semesters
-        .firstWhere((s) => s['academic_year'] == '2025-2026')['id'] as String;
-    final sem2Id = semesters
-        .firstWhere((s) => s['academic_year'] == '2024-2025')['id'] as String;
-    print('  ✓ 2 semesters');
+        .firstWhere((s) => s['academic_year_id'] == ay2526Id && s['name'] == 'Semester 1')['id'] as String;
+    print('  ✓ 4 semesters');
 
     // ── 8. Teachers ─────────────────────────────────────────────────────────
     // One teacher per course — each teaches their own weekday evening slot.
@@ -501,7 +514,7 @@ void main() async {
     print('\n🏫 Inserting classes...');
     final classes = await supabase.from('classes').insert([
       {
-        'class_code': 'EVENING-2025-A',
+        'class_code': 'SE3',
         'faculty_id': fitsId,
         'major_id': seId,
         'program_type': 'national',
@@ -920,7 +933,7 @@ void main() async {
 ✅ Seeding complete!
    • 11 users  (1 admin · 5 teachers · 5 students)
    • 13 faculties · ${departments.length} departments · ${majors.length} majors
-   • 2 academic years · 2 semesters
+   • 2 academic years · 4 semesters
    • ${courses.length} courses · ${classes.length} class · ${classTerms.length} class term · 5 enrollments
    • Evening class (Mon-Fri, one course/day, 2 sessions/day, 20min break)
 

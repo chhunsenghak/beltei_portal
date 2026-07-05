@@ -191,54 +191,92 @@ class _LeaveBody extends StatelessWidget {
         children: [
           Text(l.leaveDetailTimelineTitle, style: AppTextStyles.h3),
           const SizedBox(height: 16),
-          Row(
-            children: List.generate(steps.length * 2 - 1, (i) {
-              if (i.isOdd) {
-                return Expanded(
-                  child: Container(
-                    height: 2,
-                    color: steps[(i ~/ 2) + 1].done
-                        ? AppColors.primaryNavy
-                        : AppColors.border,
-                  ),
-                );
-              }
-              final step = steps[i ~/ 2];
-              return Column(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: step.done
-                          ? AppColors.primaryNavy
-                          : AppColors.bgPage,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: step.done
-                            ? AppColors.primaryNavy
-                            : AppColors.border,
-                        width: 2,
+          Stack(
+            children: [
+              // Background track lines connecting circle centers (circles are 32x32, centers at 16px height)
+              Positioned(
+                top: 14.5, // vertical center of a 32x32 circle (accounting for borders)
+                left: 0,
+                right: 0,
+                child: Row(
+                  children: [
+                    const Spacer(flex: 1),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        height: 3,
+                        color: AppColors.primaryNavy,
                       ),
                     ),
-                    child: step.done
-                        ? const Icon(Icons.check,
-                            color: Colors.white, size: 18)
-                        : null,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(step.label,
-                      style: AppTextStyles.caption.copyWith(
-                          fontWeight: FontWeight.w600, fontSize: 11),
-                      textAlign: TextAlign.center),
-                  if (step.sub.isNotEmpty)
-                    Text(step.sub,
-                        style: AppTextStyles.caption
-                            .copyWith(fontSize: 10),
-                        textAlign: TextAlign.center),
-                ],
-              );
-            }),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        height: 3,
+                        color: steps[2].done ? AppColors.primaryNavy : AppColors.border,
+                      ),
+                    ),
+                    const Spacer(flex: 1),
+                  ],
+                ),
+              ),
+              
+              // Foreground columns containing circle dots and labels
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(steps.length, (i) {
+                  final step = steps[i];
+                  return Expanded(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: step.done ? AppColors.primaryNavy : AppColors.bgPage,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: step.done ? AppColors.primaryNavy : AppColors.border,
+                              width: 2.5,
+                            ),
+                          ),
+                          child: step.done
+                              ? const Icon(Icons.check, color: Colors.white, size: 16)
+                              : null,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          step.label,
+                          style: AppTextStyles.caption.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: step.done ? AppColors.textPrimary : AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (step.sub.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            step.sub,
+                            style: AppTextStyles.caption.copyWith(
+                              fontSize: 10,
+                              fontWeight: i == 2 && isDecided ? FontWeight.bold : null,
+                              color: i == 2
+                                  ? (leave.status == LeaveStatus.approved
+                                      ? Colors.green
+                                      : leave.status == LeaveStatus.rejected
+                                          ? AppColors.statusRed
+                                          : AppColors.textSecondary)
+                                  : AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
         ],
       ),

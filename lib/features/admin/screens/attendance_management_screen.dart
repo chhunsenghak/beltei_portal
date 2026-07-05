@@ -944,7 +944,7 @@ class _AttendanceManagementScreenState
                 items: filteredSemesters
                     .map((s) => DropdownMenuItem(
                         value: s.id,
-                        child: Text(s.name,
+                        child: Text('${s.name} (${s.academicYear})',
                             overflow: TextOverflow.ellipsis)))
                     .toList(),
                 hint: 'All Semesters',

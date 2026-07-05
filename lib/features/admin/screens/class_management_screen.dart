@@ -167,7 +167,7 @@ class _ClassManagementScreenState
               items: sortedSemesters
                   .map((s) => DropdownMenuItem(
                       value: s.id,
-                      child: Text(s.name, overflow: TextOverflow.ellipsis)))
+                      child: Text('${s.name} (${s.academicYear})', overflow: TextOverflow.ellipsis)))
                   .toList(),
               onChanged: (v) => setState(() => _semesterFilter = v),
             ),
@@ -997,7 +997,7 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
                     items: sortedSemesters
                         .map((s) => DropdownMenuItem(
                             value: s.id,
-                            child: Text(s.name, overflow: TextOverflow.ellipsis)))
+                            child: Text('${s.name} (${s.academicYear})', overflow: TextOverflow.ellipsis)))
                         .toList(),
                     onChanged: (v) => setState(() => _semesterId = v),
                   ),
@@ -1306,7 +1306,7 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
                     items: sortedSemesters
                         .map((s) => DropdownMenuItem(
                             value: s.id,
-                            child: Text(s.name, overflow: TextOverflow.ellipsis)))
+                            child: Text('${s.name} (${s.academicYear})', overflow: TextOverflow.ellipsis)))
                         .toList(),
                     onChanged: (v) => setState(() => _semesterId = v),
                   ),

@@ -218,6 +218,7 @@ class AdminLeaveRequest {
 class AdminSemester {
   final String id;
   final String name;
+  final String academicYearId;
   final String academicYear;
   final String startDate;
   final String endDate;
@@ -228,6 +229,7 @@ class AdminSemester {
   const AdminSemester({
     required this.id,
     required this.name,
+    required this.academicYearId,
     required this.academicYear,
     required this.startDate,
     required this.endDate,
@@ -1181,7 +1183,7 @@ class AdminService {
   }
 
   Future<List<AdminSemester>> getSemesters() async {
-    final data = await _db.from('semesters').select('id, name, academic_year, start_date, end_date, is_current, registration_open').order('start_date', ascending: false);
+    final data = await _db.from('semesters').select('id, name, academic_year_id, academic_years(name), start_date, end_date, is_current, registration_open').order('start_date', ascending: false);
     if (data.isEmpty) return [];
 
     final semesterIds = data.map((s) => s['id'] as String).toList();
@@ -1195,7 +1197,8 @@ class AdminService {
     return data.map((s) => AdminSemester(
       id: s['id'] as String,
       name: s['name'] as String,
-      academicYear: s['academic_year'] as String,
+      academicYearId: s['academic_year_id'] as String? ?? '',
+      academicYear: (s['academic_years'] as Map<String, dynamic>?)?['name'] as String? ?? '',
       startDate: s['start_date'] as String,
       endDate: s['end_date'] as String,
       isCurrent: s['is_current'] as bool? ?? false,
@@ -1205,13 +1208,16 @@ class AdminService {
   }
 
   Future<List<AdminAcademicYear>> getAcademicYears() async {
-    final data = await _db.from('academic_years').select('id, name, start_date, end_date, is_current').order('start_date', ascending: false);
+    final data = await _db.from('academic_years').select('id, name, start_date, end_date').order('start_date', ascending: false);
+    final currentSem = await _db.from('semesters').select('academic_year_id').eq('is_current', true).maybeSingle();
+    final currentYearId = currentSem?['academic_year_id'] as String?;
+
     return data.map((y) => AdminAcademicYear(
       id: y['id'] as String,
       name: y['name'] as String,
       startDate: y['start_date'] as String,
       endDate: y['end_date'] as String,
-      isCurrent: y['is_current'] as bool? ?? false,
+      isCurrent: y['id'] == currentYearId,
     )).toList();
   }
 
@@ -1525,8 +1531,11 @@ class AdminService {
 
     final Map<String, String> semNameMap = {};
     if (semIds.isNotEmpty) {
-      final sems = await _db.from('semesters').select('id, name').inFilter('id', semIds);
-      for (final s in sems) { semNameMap[s['id'] as String] = s['name'] as String; }
+      final sems = await _db.from('semesters').select('id, name, academic_years(name)').inFilter('id', semIds);
+      for (final s in sems) {
+        final ayName = (s['academic_years'] as Map<String, dynamic>?)?['name'] as String? ?? '';
+        semNameMap[s['id'] as String] = '${s['name']} ($ayName)';
+      }
     }
 
     final Map<String, String> facultyNameMap = {};
@@ -2000,12 +2009,13 @@ class AdminService {
     final Map<String, Map<String, String>> semMap = {};
     if (semesterIds.isNotEmpty) {
       final sems = await _db.from('semesters')
-          .select('id, name, academic_year')
+          .select('id, name, academic_years(name)')
           .inFilter('id', semesterIds);
       for (final s in sems) {
+        final ayName = (s['academic_years'] as Map<String, dynamic>?)?['name'] as String? ?? '';
         semMap[s['id'] as String] = {
           'name':          s['name'] as String,
-          'academic_year': s['academic_year'] as String,
+          'academic_year': ayName,
         };
       }
     }
@@ -2221,13 +2231,13 @@ class AdminService {
 
   Future<void> createSemester({
     required String name,
-    required String academicYear,
+    required String academicYearId,
     required String startDate,
     required String endDate,
   }) async {
     await _db.from('semesters').insert({
       'name': name.trim(),
-      'academic_year': academicYear.trim(),
+      'academic_year_id': academicYearId,
       'start_date': startDate,
       'end_date': endDate,
       'is_current': false,
@@ -2238,13 +2248,13 @@ class AdminService {
   Future<void> updateSemester({
     required String semesterId,
     required String name,
-    required String academicYear,
+    required String academicYearId,
     required String startDate,
     required String endDate,
   }) async {
     await _db.from('semesters').update({
       'name': name.trim(),
-      'academic_year': academicYear.trim(),
+      'academic_year_id': academicYearId,
       'start_date': startDate,
       'end_date': endDate,
     }).eq('id', semesterId);
@@ -2252,22 +2262,9 @@ class AdminService {
 
   Future<void> setCurrentSemester(String semesterId) async {
     await _db.from('semesters').update({'is_current': false}).neq('id', semesterId);
-    final sem = await _db.from('semesters')
+    await _db.from('semesters')
         .update({'is_current': true})
-        .eq('id', semesterId)
-        .select('academic_year')
-        .maybeSingle();
-
-    // Keep the academic year in sync so admins don't have to set both manually.
-    final academicYear = sem?['academic_year'] as String?;
-    if (academicYear != null) {
-      final year = await _db.from('academic_years').select('id').eq('name', academicYear).maybeSingle();
-      final yearId = year?['id'] as String?;
-      if (yearId != null) {
-        await _db.from('academic_years').update({'is_current': false}).neq('id', yearId);
-        await _db.from('academic_years').update({'is_current': true}).eq('id', yearId);
-      }
-    }
+        .eq('id', semesterId);
   }
 
   Future<void> toggleSemesterRegistration(String semesterId, {required bool open}) async {
@@ -2283,7 +2280,6 @@ class AdminService {
       'name': name.trim(),
       'start_date': startDate,
       'end_date': endDate,
-      'is_current': false,
     });
   }
 
@@ -2298,11 +2294,6 @@ class AdminService {
       'start_date': startDate,
       'end_date': endDate,
     }).eq('id', academicYearId);
-  }
-
-  Future<void> setCurrentAcademicYear(String academicYearId) async {
-    await _db.from('academic_years').update({'is_current': false}).neq('id', academicYearId);
-    await _db.from('academic_years').update({'is_current': true}).eq('id', academicYearId);
   }
 
   Future<void> deleteAcademicYear(String academicYearId) async {

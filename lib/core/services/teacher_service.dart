@@ -340,7 +340,7 @@ class TeacherService {
       if (semesterIds.isNotEmpty) {
         final sems = await _db
             .from('semesters')
-            .select('id, name, academic_year, is_current')
+            .select('id, name, is_current, academic_years(name)')
             .inFilter('id', semesterIds);
         semesterMap = {for (final s in sems) s['id'] as String: s};
       }
@@ -379,7 +379,7 @@ class TeacherService {
           credits: course['credits'] as int? ?? 3,
           semesterId: semId,
           semesterName: sem?['name'] as String?,
-          semesterAcademicYear: sem?['academic_year'] as String?,
+          semesterAcademicYear: (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?,
           isCurrentSemester: sem?['is_current'] as bool? ?? false,
           studentCount: countByTerm[classTermId] ?? 0,
           scheduleDisplay: _formatSchedule(rawSchedule),
@@ -420,11 +420,11 @@ class TeacherService {
       if (semId != null) {
         final sem = await _db
             .from('semesters')
-            .select('name, academic_year, is_current')
+            .select('name, is_current, academic_years(name)')
             .eq('id', semId)
             .maybeSingle();
         semesterName = sem?['name'] as String?;
-        semesterAcademicYear = sem?['academic_year'] as String?;
+        semesterAcademicYear = (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?;
         isCurrentSemester = sem?['is_current'] as bool? ?? false;
       }
 

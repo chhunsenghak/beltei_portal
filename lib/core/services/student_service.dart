@@ -335,7 +335,7 @@ class StudentService {
       if (semesterIds.isNotEmpty) {
         final sems = await _db
             .from('semesters')
-            .select('id, name, academic_year, is_current')
+            .select('id, name, is_current, academic_years(name)')
             .inFilter('id', semesterIds);
         semesterMap = {for (final s in sems) s['id'] as String: s};
       }
@@ -410,7 +410,7 @@ class StudentService {
           teacherName:
               teacherId != null ? teacherNames[teacherId] : null,
           semesterName: sem?['name'] as String?,
-          semesterAcademicYear: sem?['academic_year'] as String?,
+          semesterAcademicYear: (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?,
           isCurrentSemester: sem?['is_current'] as bool? ?? false,
           enrollmentStatus: EnrollmentStatus.values.byName(
               enrollment['status'] as String? ?? 'enrolled'),
@@ -455,7 +455,7 @@ class StudentService {
       if (semesterIds.isNotEmpty) {
         semList = await _db
             .from('semesters')
-            .select('id, name, academic_year, start_date, is_current')
+            .select('id, name, start_date, is_current, academic_years(name)')
             .inFilter('id', semesterIds)
             .order('start_date', ascending: false);
       }
@@ -491,7 +491,7 @@ class StudentService {
         return SemesterGrades(
           semesterId: sid,
           semesterName: sem['name'] as String,
-          academicYear: sem['academic_year'] as String,
+          academicYear: (sem['academic_years'] as Map<String, dynamic>?)?['name'] as String? ?? '',
           startDate: sem['start_date'] as String,
           isCurrent: sem['is_current'] as bool? ?? false,
           courses: courseGrades,
@@ -828,7 +828,8 @@ class StudentService {
         .from('leave_requests')
         .delete()
         .eq('id', requestId)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .select();
 
     if (deleted.isEmpty) {
       throw Exception('Unable to cancel request — it may no longer be pending, or you don\'t have permission.');
