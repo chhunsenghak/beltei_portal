@@ -10,7 +10,8 @@ import '../../../core/services/admin_service.dart';
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class UserManagementScreen extends ConsumerStatefulWidget {
-  const UserManagementScreen({super.key});
+  const UserManagementScreen({super.key, this.initialRole});
+  final String? initialRole;
 
   @override
   ConsumerState<UserManagementScreen> createState() =>
@@ -25,7 +26,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final int initialIndex = widget.initialRole == 'teacher' ? 1 : 0;
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
     _tabController.addListener(() {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {

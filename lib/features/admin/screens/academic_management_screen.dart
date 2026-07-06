@@ -25,7 +25,15 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialTab == 'leave' ? 6 : 0;
+    _selectedIndex = switch (widget.initialTab) {
+      'calendar' => 1,
+      'courses' => 2,
+      'classes' => 3,
+      'enrollment' => 4,
+      'attendance' => 5,
+      'leave' => 6,
+      _ => 0,
+    };
   }
 
   static const _tabs = [

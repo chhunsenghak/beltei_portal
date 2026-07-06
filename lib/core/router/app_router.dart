@@ -307,7 +307,10 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.adminUsers,
-          builder: (context, state) => const UserManagementScreen(),
+          builder: (context, state) {
+            final role = state.uri.queryParameters['role'];
+            return UserManagementScreen(initialRole: role);
+          },
           routes: [
             GoRoute(
               path: 'students/:id',
