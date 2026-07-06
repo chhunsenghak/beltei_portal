@@ -670,5 +670,70 @@
   "uploadMaterialsTitleFieldLabel": "ចំណងជើងសម្ភារៈ",
   "uploadMaterialsTitleHint": "បញ្ចូលចំណងជើងសម្រាប់សម្ភារៈនេះ...",
   "uploadMaterialsUploadButton": "ផ្ទុកឡើង",
-  "uploadMaterialsListTitle": "សម្ភារៈដែលបានផ្ទុកឡើង"
+  "uploadMaterialsListTitle": "សម្ភារៈដែលបានផ្ទុកឡើង",
+  "weeklyAttendanceSheet": "សន្លឹកវត្តមានប្រចាំសប្តាហ៍",
+  "weekOfTotal": "សប្តាហ៍ទី {current} នៃ {total}",
+  "@weekOfTotal": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "activeWeekEditable": "សប្តាហ៍សកម្ម (អាចកែប្រែបាន)",
+  "lockedWeekReadOnly": "សប្តាហ៍ចាក់សោ (អានតែប៉ុណ្ណោះ)",
+  "activeWeekLockBanner": "🟢 សប្តាហ៍សកម្ម៖ វត្តមានអាចត្រូវបានធ្វើបច្ចុប្បន្នភាព និងរក្សាទុក។",
+  "lockedWeekLockBanner": "🔒 បានចាក់សោ៖ កំណត់ត្រាសប្តាហ៍មុន/បន្ទាប់គឺសម្រាប់តែអានប៉ុណ្ណោះ។",
+  "scheduledSessionsThisWeek": "វគ្គសិក្សាដែលបានកំណត់ក្នុងសប្តាហ៍នេះ",
+  "downloadAttendanceReports": "ទាញយករបាយការណ៍អវត្តមាន",
+  "chooseReportScope": "ជ្រើសរើសវិសាលភាពរបាយការណ៍ និងទម្រង់ដើម្បីទាញយក/ចែករំលែក៖",
+  "thisWeekPdf": "សប្តាហ៍នេះ (PDF) – សប្តាហ៍ទី {week}",
+  "@thisWeekPdf": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "allWeeksPdf": "គ្រប់សប្តាហ៍ (PDF) – សរុប",
+  "thisWeekExcel": "សប្តាហ៍នេះ (Excel) – សប្តាហ៍ទី {week}",
+  "@thisWeekExcel": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "allWeeksExcel": "គ្រប់សប្តាហ៍ (Excel) – សរុប",
+  "detailedSessionChecklist": "បញ្ជីវត្តមានលម្អិតសម្រាប់សប្តាហ៍នេះ",
+  "overallStatsRoster": "ស្ថិតិសរុប អវត្តមានសរុប និងការព្រមានរៀនឡើងវិញ",
+  "exportThisWeekSpreadsheet": "នាំចេញព័ត៌មានលម្អិតអំពីវត្តមានសប្តាហ៍នេះទៅកាន់សន្លឹកកិច្ចការ",
+  "fullStudentRosterSpreadsheet": "បញ្ជីឈ្មោះសិស្សពេញលេញ និងសន្លឹកកិច្ចការជាប់/ធ្លាក់",
+  "failedRepeat": "⚠️ ធ្លាក់ (រៀនឡើងវិញ)",
+  "excusedLeave": "ច្បាប់ (អនុញ្ញាត)",
+  "present": "វត្តមាន",
+  "absent": "អវត្តមាន",
+  "late": "យឺត",
+  "notMarked": "មិនទាន់កត់ត្រា",
+  "saveAttendanceChanges": "រក្សាទុកការផ្លាស់ប្តូរវត្តមាន",
+  "saving": "កំពុងរក្សាទុក...",
+  "attendanceUpdatedSuccess": "វត្តមានត្រូវបានធ្វើបច្ចុប្បន្នភាពដោយជោគជ័យ!",
+  "failedToSaveAttendance": "ការរក្សាទុកវត្តមានបានបរាជ័យ៖ {error}",
+  "@failedToSaveAttendance": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "markAllPresent": "វត្តមានទាំងអស់",
+  "markAllAbsent": "អវត្តមានទាំងអស់",
+  "chooseExportFormat": "ជ្រើសរើសទម្រង់នាំចេញ",
+  "chooseExportScope": "ជ្រើសរើសវិសាលភាពនាំចេញ",
+  "pdfDocument": "ឯកសារ PDF",
+  "excelSpreadsheet": "សន្លឹកកិច្ចការ Excel",
+  "pdfDocumentSubtitle": "ល្អបំផុតសម្រាប់ការមើល ការបោះពុម្ព និងកំណត់ត្រាផ្លូវការ",
+  "excelSpreadsheetSubtitle": "ល្អបំផុតសម្រាប់ការតម្រៀបទិន្នន័យ វិភាគ និងរូបមន្តផ្ទាល់ខ្លួន",
+  "selectFileTypeHint": "ជ្រើសរើសប្រភេទឯកសារដែលអ្នកចង់ទាញយក៖",
+  "selectRangeWeeksHint": "ជ្រើសរើសវិសាលភាពសប្តាហ៍សម្រាប់របាយការណ៍ {format}៖",
+  "@selectRangeWeeksHint": {
+    "placeholders": {
+      "format": { "type": "String" }
+    }
+  },
+  "thisWeekOnlySubtitle": "នាំចេញវត្តមានសម្រាប់វគ្គសិក្សាក្នុងសប្តាហ៍ដែលបានជ្រើសរើស",
+  "allWeeksOnlySubtitle": "នាំចេញស្ថិតិសរុប អត្រាវត្តមាន និងការព្រមានធ្លាក់"
 }

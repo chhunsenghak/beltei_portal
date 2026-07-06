@@ -97,9 +97,33 @@ final adminAllClassesProvider =
   return ref.read(adminServiceProvider).getClasses();
 });
 
+class AdminAttendanceFilter {
+  final String? courseId;
+  final String? semesterId;
+  final String? studentId;
+
+  const AdminAttendanceFilter({this.courseId, this.semesterId, this.studentId});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AdminAttendanceFilter &&
+          runtimeType == other.runtimeType &&
+          courseId == other.courseId &&
+          semesterId == other.semesterId &&
+          studentId == other.studentId;
+
+  @override
+  int get hashCode => Object.hash(courseId, semesterId, studentId);
+}
+
 final adminAttendanceProvider =
-    FutureProvider<List<AdminAttendanceRecord>>((ref) async {
-  return ref.read(adminServiceProvider).getAttendanceRecords();
+    FutureProvider.family<List<AdminAttendanceRecord>, AdminAttendanceFilter>((ref, filter) async {
+  return ref.read(adminServiceProvider).getAttendanceRecords(
+    courseId: filter.courseId,
+    semesterId: filter.semesterId,
+    studentId: filter.studentId,
+  );
 });
 
 final classTermEnrollmentsProvider =

@@ -1913,12 +1913,19 @@ class AdminService {
         .eq('id', enrollmentId);
   }
 
-  Future<List<AdminAttendanceRecord>> getAttendanceRecords() async {
-    final data = await _db
+  Future<List<AdminAttendanceRecord>> getAttendanceRecords({
+    String? courseId,
+    String? semesterId,
+    String? studentId,
+  }) async {
+    var query = _db
         .from('attendance')
-        .select('id, student_id, course_id, semester_id, date, status')
-        .order('date', ascending: false)
-        .limit(500);
+        .select('id, student_id, course_id, semester_id, date, status');
+    if (courseId != null) query = query.eq('course_id', courseId);
+    if (semesterId != null) query = query.eq('semester_id', semesterId);
+    if (studentId != null) query = query.eq('student_id', studentId);
+
+    final data = await query.order('date', ascending: false).limit(500);
     if (data.isEmpty) return [];
 
     final studentIds = data.map((a) => a['student_id'] as String).toSet().toList();

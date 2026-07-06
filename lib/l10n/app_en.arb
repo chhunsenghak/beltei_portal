@@ -750,5 +750,70 @@
   "uploadMaterialsTitleFieldLabel": "Material Title",
   "uploadMaterialsTitleHint": "Enter title for this material...",
   "uploadMaterialsUploadButton": "Upload",
-  "uploadMaterialsListTitle": "Uploaded Materials"
+  "uploadMaterialsListTitle": "Uploaded Materials",
+  "weeklyAttendanceSheet": "Weekly Attendance Sheet",
+  "weekOfTotal": "Week {current} of {total}",
+  "@weekOfTotal": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "activeWeekEditable": "Active Week (Editable)",
+  "lockedWeekReadOnly": "Locked Week (Read-Only)",
+  "activeWeekLockBanner": "🟢 Active Week: Attendance can be updated and saved.",
+  "lockedWeekLockBanner": "🔒 Locked: Past/upcoming week records are read-only.",
+  "scheduledSessionsThisWeek": "SCHEDULED SESSIONS THIS WEEK",
+  "downloadAttendanceReports": "Download Attendance Reports",
+  "chooseReportScope": "Choose a report scope and format to download/share:",
+  "thisWeekPdf": "This Week (PDF) – Week {week}",
+  "@thisWeekPdf": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "allWeeksPdf": "All Weeks (PDF) – Cumulative",
+  "thisWeekExcel": "This Week (Excel) – Week {week}",
+  "@thisWeekExcel": {
+    "placeholders": {
+      "week": { "type": "int" }
+    }
+  },
+  "allWeeksExcel": "All Weeks (Excel) – Cumulative",
+  "detailedSessionChecklist": "Detailed session check-in list for this week",
+  "overallStatsRoster": "Overall statistics, total absences, and repeat warnings",
+  "exportThisWeekSpreadsheet": "Export this week's session details to spreadsheet",
+  "fullStudentRosterSpreadsheet": "Full student roster totals and pass/fail spreadsheet",
+  "failedRepeat": "⚠️ FAILED (Repeat)",
+  "excusedLeave": "Excused (Leave)",
+  "present": "Present",
+  "absent": "Absent",
+  "late": "Late",
+  "notMarked": "Not Marked",
+  "saveAttendanceChanges": "Save Attendance Changes",
+  "saving": "Saving...",
+  "attendanceUpdatedSuccess": "Attendance updated successfully!",
+  "failedToSaveAttendance": "Failed to save attendance: {error}",
+  "@failedToSaveAttendance": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "markAllPresent": "Mark All Present",
+  "markAllAbsent": "Mark All Absent",
+  "chooseExportFormat": "Choose Export Format",
+  "chooseExportScope": "Choose Export Scope",
+  "pdfDocument": "PDF Document",
+  "excelSpreadsheet": "Excel Spreadsheet",
+  "pdfDocumentSubtitle": "Best for viewing, printing, and official records",
+  "excelSpreadsheetSubtitle": "Best for data sorting, analysis, and custom formulas",
+  "selectFileTypeHint": "Select the file type you would like to download:",
+  "selectRangeWeeksHint": "Select the range of weeks for the {format} report:",
+  "@selectRangeWeeksHint": {
+    "placeholders": {
+      "format": { "type": "String" }
+    }
+  },
+  "thisWeekOnlySubtitle": "Export check-ins for the selected week's scheduled sessions",
+  "allWeeksOnlySubtitle": "Export overall summary totals, attendance rates, and repeat status warnings"
 }

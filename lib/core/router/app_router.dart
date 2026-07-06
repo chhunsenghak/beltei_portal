@@ -27,8 +27,6 @@ import '../../features/teacher/screens/teacher_shell.dart';
 import '../../features/teacher/screens/teacher_dashboard_screen.dart';
 import '../../features/teacher/screens/teacher_course_list_screen.dart';
 import '../../features/teacher/screens/mark_attendance_screen.dart';
-import '../../features/teacher/screens/edit_attendance_screen.dart';
-import '../../features/teacher/screens/attendance_report_screen.dart';
 import '../../features/teacher/screens/grade_management_screen.dart';
 import '../../features/teacher/screens/create_assessment_screen.dart';
 import '../../features/teacher/screens/upload_materials_screen.dart';
@@ -245,18 +243,6 @@ final appRouter = GoRouter(
               path: ':id/attendance',
               builder: (context, state) =>
                   MarkAttendanceScreen(courseId: state.pathParameters['id']!),
-              routes: [
-                GoRoute(
-                  path: 'edit',
-                  builder: (context, state) =>
-                      EditAttendanceScreen(courseId: state.pathParameters['id']!),
-                ),
-                GoRoute(
-                  path: 'report',
-                  builder: (context, state) =>
-                      AttendanceReportScreen(courseId: state.pathParameters['id']!),
-                ),
-              ],
             ),
             GoRoute(
               path: ':id/grades',
@@ -337,7 +323,10 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.adminAcademic,
-          builder: (context, state) => const AcademicManagementScreen(),
+          builder: (context, state) {
+            final tab = state.uri.queryParameters['tab'];
+            return AcademicManagementScreen(initialTab: tab);
+          },
           routes: [
             GoRoute(
               path: 'courses/:id',

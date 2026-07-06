@@ -43,6 +43,8 @@ class TeacherCourse {
   final String? semesterId;
   final String? semesterName;
   final String? semesterAcademicYear;
+  final String? semesterStartDate;
+  final String? semesterEndDate;
   final bool isCurrentSemester;
   final int studentCount;
   final String scheduleDisplay;
@@ -61,6 +63,8 @@ class TeacherCourse {
     this.semesterId,
     this.semesterName,
     this.semesterAcademicYear,
+    this.semesterStartDate,
+    this.semesterEndDate,
     this.isCurrentSemester = false,
     required this.studentCount,
     required this.scheduleDisplay,
@@ -68,6 +72,78 @@ class TeacherCourse {
     this.schedule = const [],
     this.status = CourseStatus.active,
   });
+
+  int? weekForDate(DateTime date) {
+    if (semesterStartDate == null) return null;
+    final start = DateTime.tryParse(semesterStartDate!);
+    if (start == null) return null;
+    final startOnly = DateTime(start.year, start.month, start.day);
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final diffDays = dateOnly.difference(startOnly).inDays;
+    if (diffDays < 0) return 1;
+    return (diffDays / 7).floor() + 1;
+  }
+
+  int get totalWeeks {
+    if (semesterStartDate == null || semesterEndDate == null) return 15;
+    final start = DateTime.tryParse(semesterStartDate!);
+    final end = DateTime.tryParse(semesterEndDate!);
+    if (start == null || end == null) return 15;
+    final startOnly = DateTime(start.year, start.month, start.day);
+    final endOnly = DateTime(end.year, end.month, end.day);
+    final diffDays = endOnly.difference(startOnly).inDays;
+    return (diffDays / 7).ceil();
+  }
+
+  int get currentWeek {
+    if (semesterStartDate == null) return 1;
+    final start = DateTime.tryParse(semesterStartDate!);
+    if (start == null) return 1;
+    final now = DateTime.now();
+    final startOnly = DateTime(start.year, start.month, start.day);
+    final nowOnly = DateTime(now.year, now.month, now.day);
+    final diffDays = nowOnly.difference(startOnly).inDays;
+    if (diffDays < 0) return 1;
+    final wk = (diffDays / 7).floor() + 1;
+    final tot = totalWeeks;
+    return wk > tot ? tot : wk;
+  }
+
+  List<DateTime> getSessionDatesForWeek(int weekNum) {
+    if (semesterStartDate == null) return [];
+    final start = DateTime.tryParse(semesterStartDate!);
+    if (start == null) return [];
+
+    final semesterStartMonday = start.subtract(Duration(days: start.weekday - 1));
+    final weekMonday = semesterStartMonday.add(Duration(days: (weekNum - 1) * 7));
+
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final sessionDates = <DateTime>[];
+
+    final sortedSchedule = List<Map<String, dynamic>>.from(schedule)
+      ..sort((a, b) {
+        final dayA = a['day'] as String? ?? 'Mon';
+        final dayB = b['day'] as String? ?? 'Mon';
+        final idxA = dayNames.indexOf(dayA);
+        final idxB = dayNames.indexOf(dayB);
+        final dayCompare = idxA.compareTo(idxB);
+        if (dayCompare != 0) return dayCompare;
+        
+        final startA = a['start'] as String? ?? '00:00';
+        final startB = b['start'] as String? ?? '00:00';
+        return startA.compareTo(startB);
+      });
+
+    for (final slot in sortedSchedule) {
+      final day = slot['day'] as String? ?? 'Mon';
+      final weekdayIndex = dayNames.indexOf(day);
+      if (weekdayIndex >= 0) {
+        final date = weekMonday.add(Duration(days: weekdayIndex));
+        sessionDates.add(date);
+      }
+    }
+    return sessionDates;
+  }
 
   bool hasTodayClass() {
     if (schedule.isEmpty) return false;
@@ -340,7 +416,7 @@ class TeacherService {
       if (semesterIds.isNotEmpty) {
         final sems = await _db
             .from('semesters')
-            .select('id, name, is_current, academic_years(name)')
+            .select('id, name, is_current, start_date, end_date, academic_years(name)')
             .inFilter('id', semesterIds);
         semesterMap = {for (final s in sems) s['id'] as String: s};
       }
@@ -380,6 +456,8 @@ class TeacherService {
           semesterId: semId,
           semesterName: sem?['name'] as String?,
           semesterAcademicYear: (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?,
+          semesterStartDate: sem?['start_date'] as String?,
+          semesterEndDate: sem?['end_date'] as String?,
           isCurrentSemester: sem?['is_current'] as bool? ?? false,
           studentCount: countByTerm[classTermId] ?? 0,
           scheduleDisplay: _formatSchedule(rawSchedule),
@@ -415,16 +493,20 @@ class TeacherService {
 
       String? semesterName;
       String? semesterAcademicYear;
+      String? semesterStartDate;
+      String? semesterEndDate;
       bool isCurrentSemester = false;
       final semId = term?['semester_id'] as String?;
       if (semId != null) {
         final sem = await _db
             .from('semesters')
-            .select('name, is_current, academic_years(name)')
+            .select('name, is_current, start_date, end_date, academic_years(name)')
             .eq('id', semId)
             .maybeSingle();
         semesterName = sem?['name'] as String?;
         semesterAcademicYear = (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?;
+        semesterStartDate = sem?['start_date'] as String?;
+        semesterEndDate = sem?['end_date'] as String?;
         isCurrentSemester = sem?['is_current'] as bool? ?? false;
       }
 
@@ -450,6 +532,8 @@ class TeacherService {
         semesterId: semId,
         semesterName: semesterName,
         semesterAcademicYear: semesterAcademicYear,
+        semesterStartDate: semesterStartDate,
+        semesterEndDate: semesterEndDate,
         isCurrentSemester: isCurrentSemester,
         studentCount: enrollRows.length,
         scheduleDisplay: _formatSchedule(rawSchedule),
@@ -518,6 +602,7 @@ class TeacherService {
     required String teacherId,
     required String classTermCourseId,
     required String date,
+    required int sessionNumber,
     required Map<String, String> statuses,
   }) async {
     if (statuses.isEmpty) return;
@@ -543,21 +628,16 @@ class TeacherService {
         'course_id': courseId,
         if (semesterId != null) 'semester_id': semesterId,
         'date': date,
+        'session_number': sessionNumber,
         'status': statusName,
         'marked_by': teacherId,
       };
     }).toList();
 
-    // Upsert on the table's (student_id, class_term_course_id, date) unique
-    // constraint instead of delete-then-insert: the old two-step approach
-    // left a window where a failed insert (RLS denial, network error, etc.)
-    // would have already wiped that day's previously-saved attendance with
-    // nothing to show for it.
     await _db
         .from('attendance')
-        .upsert(rows, onConflict: 'student_id,class_term_course_id,date');
+        .upsert(rows, onConflict: 'student_id,class_term_course_id,date,session_number');
   }
-
   Future<List<StudentLeaveDetail>> getStudentLeaveRequests(
       String teacherId) async {
     try {
@@ -783,6 +863,22 @@ class TeacherService {
     }
   }
 
+  Future<Map<String, String>> getAllAttendance(String classTermCourseId) async {
+    try {
+      final rows = await _db
+          .from('attendance')
+          .select('student_id, date, status, session_number')
+          .eq('class_term_course_id', classTermCourseId);
+      return {
+        for (final r in rows)
+          '${r['student_id']}_${r['date']}_${r['session_number']}': r['status'] as String
+      };
+    } catch (e, st) {
+      debugPrint('getAllAttendance error: $e\n$st');
+      rethrow;
+    }
+  }
+
   // ── Create announcement ────────────────────────────────────────────────────
 
   Future<void> createAnnouncement({
@@ -828,8 +924,21 @@ class TeacherService {
     try {
       final rows = await _db
           .from('attendance')
-          .select('student_id, date, status, profiles(full_name)')
+          .select('student_id, date, status')
           .eq('class_term_course_id', classTermCourseId);
+
+      final studentIds = rows.map((r) => r['student_id'] as String).toSet().toList();
+      Map<String, String> nameMap = {};
+      if (studentIds.isNotEmpty) {
+        final profiles = await _db
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .inFilter('id', studentIds);
+        nameMap = {
+          for (final p in profiles)
+            p['id'] as String: '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim()
+        };
+      }
 
       final dates = <String>{};
       final byStudent = <String, ({String name, int present, int absent})>{};
@@ -838,7 +947,7 @@ class TeacherService {
         final studentId = row['student_id'] as String;
         final status = row['status'] as String;
         final date = row['date'] as String;
-        final name = (row['profiles'] as Map?)?['full_name'] as String? ?? 'Unknown';
+        final name = nameMap[studentId] ?? 'Unknown';
         dates.add(date);
         final prev = byStudent[studentId] ?? (name: name, present: 0, absent: 0);
         final isPresent = status == 'present' || status == 'late';
@@ -873,8 +982,21 @@ class TeacherService {
     try {
       final gradeRows = await _db
           .from('grades')
-          .select('student_id, total, letter_grade, profiles(full_name)')
+          .select('student_id, total, letter_grade')
           .eq('class_term_course_id', classTermCourseId);
+
+      final studentIds = gradeRows.map((g) => g['student_id'] as String).toSet().toList();
+      Map<String, String> nameMap = {};
+      if (studentIds.isNotEmpty) {
+        final profiles = await _db
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .inFilter('id', studentIds);
+        nameMap = {
+          for (final p in profiles)
+            p['id'] as String: '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim()
+        };
+      }
 
       final attendRows = await _db
           .from('attendance')
@@ -901,7 +1023,7 @@ class TeacherService {
       final ranking = gradeRows
           .where((g) => g['total'] != null)
           .map((g) => (
-                name: (g['profiles'] as Map?)?['full_name'] as String? ?? '—',
+                name: nameMap[g['student_id'] as String] ?? '—',
                 score: (g['total'] as num).toDouble(),
               ))
           .toList()

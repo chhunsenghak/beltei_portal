@@ -220,6 +220,7 @@ class TeacherProfileScreen extends ConsumerWidget {
       icon: Icons.person_outline,
       title: l.teacherProfileProfessionalInfoTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _InfoRow(l.profileFullNameLabel, profile.fullName),
           _InfoRow(l.teacherProfileEmployeeIdLabel, profile.employeeCode),
@@ -253,6 +254,7 @@ class TeacherProfileScreen extends ConsumerWidget {
       icon: Icons.contact_phone_outlined,
       title: l.profileContactInfoTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ContactRow(Icons.email_outlined, profile.email),
           if (profile.phone != null)
@@ -279,6 +281,7 @@ class TeacherProfileScreen extends ConsumerWidget {
       icon: Icons.settings_outlined,
       title: l.profileAccountSettingsTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SettingsTile(
             icon: Icons.lock_outline,
@@ -421,13 +424,16 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: last ? 0 : 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppTextStyles.label),
-          const SizedBox(height: 2),
-          Text(value, style: AppTextStyles.body),
-        ],
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppTextStyles.label),
+            const SizedBox(height: 2),
+            Text(value, style: AppTextStyles.body),
+          ],
+        ),
       ),
     );
   }

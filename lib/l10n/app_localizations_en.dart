@@ -2156,4 +2156,143 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get uploadMaterialsListTitle => 'Uploaded Materials';
+
+  @override
+  String get weeklyAttendanceSheet => 'Weekly Attendance Sheet';
+
+  @override
+  String weekOfTotal(int current, int total) {
+    return 'Week $current of $total';
+  }
+
+  @override
+  String get activeWeekEditable => 'Active Week (Editable)';
+
+  @override
+  String get lockedWeekReadOnly => 'Locked Week (Read-Only)';
+
+  @override
+  String get activeWeekLockBanner =>
+      '🟢 Active Week: Attendance can be updated and saved.';
+
+  @override
+  String get lockedWeekLockBanner =>
+      '🔒 Locked: Past/upcoming week records are read-only.';
+
+  @override
+  String get scheduledSessionsThisWeek => 'SCHEDULED SESSIONS THIS WEEK';
+
+  @override
+  String get downloadAttendanceReports => 'Download Attendance Reports';
+
+  @override
+  String get chooseReportScope =>
+      'Choose a report scope and format to download/share:';
+
+  @override
+  String thisWeekPdf(int week) {
+    return 'This Week (PDF) – Week $week';
+  }
+
+  @override
+  String get allWeeksPdf => 'All Weeks (PDF) – Cumulative';
+
+  @override
+  String thisWeekExcel(int week) {
+    return 'This Week (Excel) – Week $week';
+  }
+
+  @override
+  String get allWeeksExcel => 'All Weeks (Excel) – Cumulative';
+
+  @override
+  String get detailedSessionChecklist =>
+      'Detailed session check-in list for this week';
+
+  @override
+  String get overallStatsRoster =>
+      'Overall statistics, total absences, and repeat warnings';
+
+  @override
+  String get exportThisWeekSpreadsheet =>
+      'Export this week\'s session details to spreadsheet';
+
+  @override
+  String get fullStudentRosterSpreadsheet =>
+      'Full student roster totals and pass/fail spreadsheet';
+
+  @override
+  String get failedRepeat => '⚠️ FAILED (Repeat)';
+
+  @override
+  String get excusedLeave => 'Excused (Leave)';
+
+  @override
+  String get present => 'Present';
+
+  @override
+  String get absent => 'Absent';
+
+  @override
+  String get late => 'Late';
+
+  @override
+  String get notMarked => 'Not Marked';
+
+  @override
+  String get saveAttendanceChanges => 'Save Attendance Changes';
+
+  @override
+  String get saving => 'Saving...';
+
+  @override
+  String get attendanceUpdatedSuccess => 'Attendance updated successfully!';
+
+  @override
+  String failedToSaveAttendance(String error) {
+    return 'Failed to save attendance: $error';
+  }
+
+  @override
+  String get markAllPresent => 'Mark All Present';
+
+  @override
+  String get markAllAbsent => 'Mark All Absent';
+
+  @override
+  String get chooseExportFormat => 'Choose Export Format';
+
+  @override
+  String get chooseExportScope => 'Choose Export Scope';
+
+  @override
+  String get pdfDocument => 'PDF Document';
+
+  @override
+  String get excelSpreadsheet => 'Excel Spreadsheet';
+
+  @override
+  String get pdfDocumentSubtitle =>
+      'Best for viewing, printing, and official records';
+
+  @override
+  String get excelSpreadsheetSubtitle =>
+      'Best for data sorting, analysis, and custom formulas';
+
+  @override
+  String get selectFileTypeHint =>
+      'Select the file type you would like to download:';
+
+  @override
+  String selectRangeWeeksHint(String format) {
+    return 'Select the range of weeks for the $format report:';
+  }
+
+  @override
+  String get thisWeekOnlySubtitle =>
+      'Export check-ins for the selected week\'s scheduled sessions';
+
+  @override
+  String get allWeeksOnlySubtitle =>
+      'Export overall summary totals, attendance rates, and repeat status warnings';
 }

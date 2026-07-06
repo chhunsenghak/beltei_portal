@@ -11,7 +11,8 @@ import 'attendance_management_screen.dart';
 import 'global_leave_requests_screen.dart';
 
 class AcademicManagementScreen extends StatefulWidget {
-  const AcademicManagementScreen({super.key});
+  const AcademicManagementScreen({super.key, this.initialTab});
+  final String? initialTab;
 
   @override
   State<AcademicManagementScreen> createState() =>
@@ -19,7 +20,13 @@ class AcademicManagementScreen extends StatefulWidget {
 }
 
 class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTab == 'leave' ? 6 : 0;
+  }
 
   static const _tabs = [
     (label: 'Faculty',    icon: Icons.account_balance_outlined),

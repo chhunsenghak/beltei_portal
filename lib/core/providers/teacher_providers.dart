@@ -76,3 +76,8 @@ final courseAnalyticsProvider =
     FutureProvider.family<CourseAnalyticsData, String>((ref, courseId) async {
   return ref.read(teacherServiceProvider).getCourseAnalytics(courseId);
 });
+
+final allAttendanceProvider =
+    FutureProvider.family<Map<String, String>, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getAllAttendance(courseId);
+});

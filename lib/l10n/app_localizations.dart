@@ -3883,6 +3883,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Uploaded Materials'**
   String get uploadMaterialsListTitle;
+
+  /// No description provided for @weeklyAttendanceSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Attendance Sheet'**
+  String get weeklyAttendanceSheet;
+
+  /// No description provided for @weekOfTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Week {current} of {total}'**
+  String weekOfTotal(int current, int total);
+
+  /// No description provided for @activeWeekEditable.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Week (Editable)'**
+  String get activeWeekEditable;
+
+  /// No description provided for @lockedWeekReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked Week (Read-Only)'**
+  String get lockedWeekReadOnly;
+
+  /// No description provided for @activeWeekLockBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'🟢 Active Week: Attendance can be updated and saved.'**
+  String get activeWeekLockBanner;
+
+  /// No description provided for @lockedWeekLockBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'🔒 Locked: Past/upcoming week records are read-only.'**
+  String get lockedWeekLockBanner;
+
+  /// No description provided for @scheduledSessionsThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'SCHEDULED SESSIONS THIS WEEK'**
+  String get scheduledSessionsThisWeek;
+
+  /// No description provided for @downloadAttendanceReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Attendance Reports'**
+  String get downloadAttendanceReports;
+
+  /// No description provided for @chooseReportScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a report scope and format to download/share:'**
+  String get chooseReportScope;
+
+  /// No description provided for @thisWeekPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'This Week (PDF) – Week {week}'**
+  String thisWeekPdf(int week);
+
+  /// No description provided for @allWeeksPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'All Weeks (PDF) – Cumulative'**
+  String get allWeeksPdf;
+
+  /// No description provided for @thisWeekExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'This Week (Excel) – Week {week}'**
+  String thisWeekExcel(int week);
+
+  /// No description provided for @allWeeksExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'All Weeks (Excel) – Cumulative'**
+  String get allWeeksExcel;
+
+  /// No description provided for @detailedSessionChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed session check-in list for this week'**
+  String get detailedSessionChecklist;
+
+  /// No description provided for @overallStatsRoster.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall statistics, total absences, and repeat warnings'**
+  String get overallStatsRoster;
+
+  /// No description provided for @exportThisWeekSpreadsheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Export this week\'s session details to spreadsheet'**
+  String get exportThisWeekSpreadsheet;
+
+  /// No description provided for @fullStudentRosterSpreadsheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Full student roster totals and pass/fail spreadsheet'**
+  String get fullStudentRosterSpreadsheet;
+
+  /// No description provided for @failedRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ FAILED (Repeat)'**
+  String get failedRepeat;
+
+  /// No description provided for @excusedLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Excused (Leave)'**
+  String get excusedLeave;
+
+  /// No description provided for @present.
+  ///
+  /// In en, this message translates to:
+  /// **'Present'**
+  String get present;
+
+  /// No description provided for @absent.
+  ///
+  /// In en, this message translates to:
+  /// **'Absent'**
+  String get absent;
+
+  /// No description provided for @late.
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get late;
+
+  /// No description provided for @notMarked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Marked'**
+  String get notMarked;
+
+  /// No description provided for @saveAttendanceChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Attendance Changes'**
+  String get saveAttendanceChanges;
+
+  /// No description provided for @saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get saving;
+
+  /// No description provided for @attendanceUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Attendance updated successfully!'**
+  String get attendanceUpdatedSuccess;
+
+  /// No description provided for @failedToSaveAttendance.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save attendance: {error}'**
+  String failedToSaveAttendance(String error);
+
+  /// No description provided for @markAllPresent.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark All Present'**
+  String get markAllPresent;
+
+  /// No description provided for @markAllAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark All Absent'**
+  String get markAllAbsent;
+
+  /// No description provided for @chooseExportFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Export Format'**
+  String get chooseExportFormat;
+
+  /// No description provided for @chooseExportScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Export Scope'**
+  String get chooseExportScope;
+
+  /// No description provided for @pdfDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF Document'**
+  String get pdfDocument;
+
+  /// No description provided for @excelSpreadsheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel Spreadsheet'**
+  String get excelSpreadsheet;
+
+  /// No description provided for @pdfDocumentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for viewing, printing, and official records'**
+  String get pdfDocumentSubtitle;
+
+  /// No description provided for @excelSpreadsheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for data sorting, analysis, and custom formulas'**
+  String get excelSpreadsheetSubtitle;
+
+  /// No description provided for @selectFileTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the file type you would like to download:'**
+  String get selectFileTypeHint;
+
+  /// No description provided for @selectRangeWeeksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the range of weeks for the {format} report:'**
+  String selectRangeWeeksHint(String format);
+
+  /// No description provided for @thisWeekOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export check-ins for the selected week\'s scheduled sessions'**
+  String get thisWeekOnlySubtitle;
+
+  /// No description provided for @allWeeksOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export overall summary totals, attendance rates, and repeat status warnings'**
+  String get allWeeksOnlySubtitle;
 }
 
 class _AppLocalizationsDelegate

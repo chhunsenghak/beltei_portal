@@ -376,7 +376,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           children: [
             Text('Recent Leave Requests', style: AppTextStyles.h2),
             TextButton(
-              onPressed: () => context.go('/admin/academic'),
+              onPressed: () => context.go('/admin/academic?tab=leave'),
               child: Text('View All', style: AppTextStyles.link),
             ),
           ],
