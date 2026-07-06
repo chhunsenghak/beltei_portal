@@ -100,7 +100,7 @@ class _CreateAnnouncementScreenState
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context, l),
+      appBar: null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
@@ -124,33 +124,7 @@ class _CreateAnnouncementScreenState
     );
   }
 
-  // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations l) {
-    return AppBar(
-      backgroundColor: AppColors.bgPage,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Row(
-        children: [
-          Image.asset('assets/images/beltei_logo.png',
-              height: 48, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          Text(l.appTitle, style: AppTextStyles.h3),
-        ],
-      ),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-      ],
-    );
-  }
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
@@ -158,7 +132,20 @@ class _CreateAnnouncementScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l.createAnnouncementTitle, style: AppTextStyles.h1),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryNavy),
+              onPressed: () => Navigator.of(context).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+            Text(l.createAnnouncementTitle, style: AppTextStyles.h1),
+          ],
+        ),
+        const SizedBox(height: 6),
         Text(l.createAnnouncementSubtitle,
             style: AppTextStyles.caption.copyWith(height: 1.4)),
       ],

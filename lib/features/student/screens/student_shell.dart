@@ -77,13 +77,19 @@ class StudentShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final matchedLoc = GoRouterState.of(context).matchedLocation;
+    final showHeader = matchedLoc == AppRoutes.studentHome ||
+                       matchedLoc == AppRoutes.courseList ||
+                       matchedLoc == AppRoutes.schedule ||
+                       matchedLoc == AppRoutes.notificationCenter ||
+                       matchedLoc == AppRoutes.studentProfile;
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
 
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context, ref),
+          if (showHeader) _buildShellHeader(context, ref),
           Expanded(child: child),
         ],
       ),

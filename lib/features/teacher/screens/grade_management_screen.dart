@@ -245,7 +245,20 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l.gradeManagementTitle, style: AppTextStyles.h1),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryNavy),
+              onPressed: () => Navigator.of(context).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+            Text(l.gradeManagementTitle, style: AppTextStyles.h1),
+          ],
+        ),
+        const SizedBox(height: 6),
         Text(
           courseName ?? l.gradeManagementLoadingCourse,
           style: AppTextStyles.caption,

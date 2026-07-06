@@ -246,22 +246,22 @@ class TeacherDashboardScreen extends ConsumerWidget {
       (
         icon: Icons.how_to_reg_outlined,
         label: l.teacherDashboardQuickActionMarkAttendance,
-        route: '/teacher/courses'
+        route: '/teacher/courses?action=attendance'
       ),
       (
         icon: Icons.grade_outlined,
         label: l.dashboardActionGrades,
-        route: '/teacher/courses'
+        route: '/teacher/courses?action=grades'
       ),
       (
         icon: Icons.assignment_outlined,
         label: l.teacherDashboardQuickActionAssignments,
-        route: '/teacher/courses'
+        route: '/teacher/courses?action=assignments'
       ),
       (
         icon: Icons.folder_outlined,
         label: l.teacherDashboardQuickActionMaterials,
-        route: '/teacher/courses'
+        route: '/teacher/courses?action=materials'
       ),
       (
         icon: Icons.bar_chart_outlined,

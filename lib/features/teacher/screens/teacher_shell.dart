@@ -36,11 +36,18 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
 
   @override
   Widget build(BuildContext context) {
+    final matchedLoc = GoRouterState.of(context).matchedLocation;
+    final showHeader = matchedLoc == '/teacher' ||
+                       matchedLoc == '/teacher/courses' ||
+                       matchedLoc == '/teacher/students' ||
+                       matchedLoc == '/teacher/alerts' ||
+                       matchedLoc == '/teacher/profile' ||
+                       matchedLoc == '/teacher/alerts/announcement';
     final active = _activeIndex(context);
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context),
+          if (showHeader) _buildShellHeader(context),
           Expanded(child: widget.child),
         ],
       ),

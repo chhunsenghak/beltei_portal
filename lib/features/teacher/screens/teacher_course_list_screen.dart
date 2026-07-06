@@ -11,7 +11,8 @@ import '../../../l10n/app_localizations.dart';
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class TeacherCourseListScreen extends ConsumerStatefulWidget {
-  const TeacherCourseListScreen({super.key});
+  const TeacherCourseListScreen({super.key, this.action});
+  final String? action;
 
   @override
   ConsumerState<TeacherCourseListScreen> createState() =>
@@ -20,9 +21,15 @@ class TeacherCourseListScreen extends ConsumerStatefulWidget {
 
 class _TeacherCourseListScreenState
     extends ConsumerState<TeacherCourseListScreen> {
-  int _filterIndex = 0;
+  late int _filterIndex;
   String _search = '';
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _filterIndex = widget.action != null ? 1 : 0;
+  }
 
   @override
   void dispose() {
@@ -116,7 +123,7 @@ class _TeacherCourseListScreenState
                           separatorBuilder: (_, _) =>
                               const SizedBox(height: 12),
                           itemBuilder: (_, i) =>
-                              _CourseCard(course: filtered[i], l: l),
+                              _CourseCard(course: filtered[i], action: widget.action, l: l),
                         ),
                 );
               },
@@ -227,31 +234,94 @@ class _TeacherCourseListScreenState
 
 // ── Course card ────────────────────────────────────────────────────────────────
 
-class _CourseCard extends StatelessWidget {
-  const _CourseCard({required this.course, required this.l});
+class _CourseCard extends StatefulWidget {
+  const _CourseCard({required this.course, this.action, required this.l});
   final TeacherCourse course;
+  final String? action;
   final AppLocalizations l;
 
   @override
+  State<_CourseCard> createState() => _CourseCardState();
+}
+
+class _CourseCardState extends State<_CourseCard> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    // Expand by default if an action is pre-selected (coming from dashboard)
+    _isExpanded = widget.action != null;
+  }
+
+  @override
+  void didUpdateWidget(covariant _CourseCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.action != oldWidget.action && widget.action != null) {
+      setState(() {
+        _isExpanded = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildCardHeader(),
-          const SizedBox(height: 10),
-          _buildCardMeta(),
-          const SizedBox(height: 14),
-          Divider(color: AppColors.border, height: 1),
-          const SizedBox(height: 12),
-          _buildCardActions(context),
-        ],
+    return GestureDetector(
+      onTap: () => setState(() => _isExpanded = !_isExpanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          border: Border.all(
+            color: _isExpanded ? AppColors.primaryNavy : AppColors.border,
+            width: _isExpanded ? 1.5 : 1.0,
+          ),
+          boxShadow: _isExpanded
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryNavy.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildCardHeader()),
+                Icon(
+                  _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: _isExpanded ? AppColors.primaryNavy : AppColors.textSecondary,
+                  size: 24,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildCardMeta(),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeInOut,
+              child: _isExpanded
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 14),
+                        Divider(color: AppColors.border, height: 1),
+                        const SizedBox(height: 14),
+                        _buildCardActions(context),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -275,18 +345,18 @@ class _CourseCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(course.name,
+              Text(widget.course.name,
                   style: AppTextStyles.bodyMedium,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
               Row(
                 children: [
-                  _CodeChip(course.code),
-                  if (course.semesterName != null) ...[
+                  _CodeChip(widget.course.code),
+                  if (widget.course.semesterName != null) ...[
                     const SizedBox(width: 8),
                     _CodeChip(
-                      course.semesterName!,
+                      widget.course.semesterName!,
                       color: AppColors.statusAmber,
                       bg: AppColors.statusAmberBg,
                     ),
@@ -303,46 +373,140 @@ class _CourseCard extends StatelessWidget {
   Widget _buildCardMeta() {
     return Column(
       children: [
-        _MetaRow(Icons.calendar_today_outlined, course.scheduleDisplay),
+        _MetaRow(Icons.calendar_today_outlined, widget.course.scheduleDisplay),
         const SizedBox(height: 4),
         _MetaRow(Icons.people_outline,
-            l.teacherCourseListStudentsEnrolled(course.studentCount)),
-        if (course.room != null) ...[
+            widget.l.teacherCourseListStudentsEnrolled(widget.course.studentCount)),
+        if (widget.course.room != null) ...[
           const SizedBox(height: 4),
-          _MetaRow(Icons.meeting_room_outlined, course.room!),
+          _MetaRow(Icons.meeting_room_outlined, widget.course.room!),
         ],
       ],
     );
   }
 
   Widget _buildCardActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => context
-                .push('/teacher/courses/${course.classTermCourseId}/attendance'),
-            icon: const Icon(Icons.how_to_reg_outlined, size: 16),
-            label: Text(l.dashboardActionAttendance),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primaryNavy,
-              side: BorderSide(color: AppColors.primaryNavy),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
+    Widget actionButton({
+      required String label,
+      required IconData icon,
+      required Color color,
+      required VoidCallback onPressed,
+    }) {
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Icon(Icons.arrow_forward_ios, size: 12, color: color.withValues(alpha: 0.8)),
+            ],
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => context
-                .push('/teacher/courses/${course.classTermCourseId}/grades'),
-            icon: const Icon(Icons.grade_outlined, size: 16),
-            label: Text(l.dashboardActionGrades),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primaryBlue,
-              side: BorderSide(color: AppColors.primaryBlue),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withValues(alpha: 0.3)),
+          backgroundColor: color.withValues(alpha: 0.04),
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+
+    final doubleSpacer = const SizedBox(height: 10);
+
+    if (widget.action == 'attendance') {
+      return SizedBox(
+        width: double.infinity,
+        child: actionButton(
+          label: widget.l.dashboardActionAttendance,
+          icon: Icons.how_to_reg_outlined,
+          color: AppColors.primaryNavy,
+          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/attendance'),
+        ),
+      );
+    }
+
+    if (widget.action == 'grades') {
+      return SizedBox(
+        width: double.infinity,
+        child: actionButton(
+          label: widget.l.dashboardActionGrades,
+          icon: Icons.grade_outlined,
+          color: AppColors.primaryBlue,
+          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/grades'),
+        ),
+      );
+    }
+
+    if (widget.action == 'assignments') {
+      return SizedBox(
+        width: double.infinity,
+        child: actionButton(
+          label: widget.l.teacherDashboardQuickActionAssignments,
+          icon: Icons.assignment_outlined,
+          color: const Color(0xFF7C3AED),
+          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments/create'),
+        ),
+      );
+    }
+
+    if (widget.action == 'materials') {
+      return SizedBox(
+        width: double.infinity,
+        child: actionButton(
+          label: widget.l.teacherDashboardQuickActionMaterials,
+          icon: Icons.folder_outlined,
+          color: AppColors.statusAmber,
+          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/materials'),
+        ),
+      );
+    }
+
+    // Default: show all 4 action buttons stacked vertically taking full width
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: actionButton(
+            label: widget.l.dashboardActionAttendance,
+            icon: Icons.how_to_reg_outlined,
+            color: AppColors.primaryNavy,
+            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/attendance'),
+          ),
+        ),
+        doubleSpacer,
+        SizedBox(
+          width: double.infinity,
+          child: actionButton(
+            label: widget.l.dashboardActionGrades,
+            icon: Icons.grade_outlined,
+            color: AppColors.primaryBlue,
+            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/grades'),
+          ),
+        ),
+        doubleSpacer,
+        SizedBox(
+          width: double.infinity,
+          child: actionButton(
+            label: widget.l.teacherDashboardQuickActionAssignments,
+            icon: Icons.assignment_outlined,
+            color: const Color(0xFF7C3AED),
+            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments/create'),
+          ),
+        ),
+        doubleSpacer,
+        SizedBox(
+          width: double.infinity,
+          child: actionButton(
+            label: widget.l.teacherDashboardQuickActionMaterials,
+            icon: Icons.folder_outlined,
+            color: AppColors.statusAmber,
+            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/materials'),
           ),
         ),
       ],

@@ -237,7 +237,10 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.teacherCourses,
-          builder: (context, state) => const TeacherCourseListScreen(),
+          builder: (context, state) {
+            final action = state.uri.queryParameters['action'];
+            return TeacherCourseListScreen(action: action);
+          },
           routes: [
             GoRoute(
               path: ':id/attendance',

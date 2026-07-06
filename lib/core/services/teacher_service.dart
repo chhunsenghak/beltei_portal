@@ -896,6 +896,21 @@ class TeacherService {
         'body': body,
         'is_pinned': isPinned,
       });
+
+      // Dynamically propagate announcement as a student notification
+      final studentRows = await _db.from('students').select('id');
+      final studentIds = studentRows.map((s) => s['id'] as String).toList();
+
+      if (studentIds.isNotEmpty) {
+        final notifications = studentIds.map((sid) => {
+          'user_id': sid,
+          'title': title,
+          'body': body,
+          'type': 'announcement',
+          'is_read': false,
+        }).toList();
+        await _db.from('notifications').insert(notifications);
+      }
     } catch (e, st) {
       debugPrint('createAnnouncement error: $e\n$st');
       rethrow;

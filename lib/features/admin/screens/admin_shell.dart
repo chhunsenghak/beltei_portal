@@ -36,13 +36,19 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    final matchedLoc = GoRouterState.of(context).matchedLocation;
+    final showHeader = matchedLoc == '/admin' ||
+                       matchedLoc == '/admin/users' ||
+                       matchedLoc == '/admin/academic' ||
+                       matchedLoc == '/admin/finance' ||
+                       matchedLoc == '/admin/settings';
     final active = _activeIndex(context);
     final profileAsync = ref.watch(adminProfileProvider);
     final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context, active, profileAsync, logoUrl),
+          if (showHeader) _buildShellHeader(context, active, profileAsync, logoUrl),
           Expanded(child: widget.child),
         ],
       ),
