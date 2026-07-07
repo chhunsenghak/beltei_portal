@@ -283,7 +283,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
                       child: Container(
                         height: 44,
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primaryNavy : Colors.white,
+                          color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
                           borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
                           border: Border.all(
                               color: isSelected ? AppColors.primaryNavy : AppColors.border),
@@ -431,7 +431,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryNavy : Colors.white,
+                      color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
                       border: Border.all(
                           color: isSelected ? AppColors.primaryNavy : AppColors.border),
@@ -478,7 +478,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
                   child: Container(
                     height: 44,
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryNavy : Colors.white,
+                      color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
                       border: Border.all(
                           color: isSelected ? AppColors.primaryNavy : AppColors.border),

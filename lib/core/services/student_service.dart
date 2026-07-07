@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/database.types.dart';
+import 'teacher_service.dart';
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
@@ -840,5 +841,97 @@ class StudentService {
     await _db
         .from('notifications')
         .update({'is_read': true}).eq('id', notificationId);
+  }
+
+  Future<List<AssessmentItem>> getCourseAssessments(String classTermCourseId) async {
+    try {
+      final rows = await _db
+          .from('assessments')
+          .select()
+          .eq('class_term_course_id', classTermCourseId)
+          .order('created_at', ascending: false);
+      return rows.map((r) => AssessmentItem.fromMap(r)).toList();
+    } catch (e, st) {
+      debugPrint('getCourseAssessments error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<AssessmentSubmission?> getSubmission(
+      String assessmentId, String studentId) async {
+    try {
+      final rows = await _db
+          .from('assessment_submissions')
+          .select()
+          .eq('assessment_id', assessmentId)
+          .eq('student_id', studentId)
+          .maybeSingle();
+      if (rows == null) return null;
+      return AssessmentSubmission.fromMap(rows);
+    } catch (e, st) {
+      debugPrint('getSubmission error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> submitAssessment({
+    required String assessmentId,
+    required String studentId,
+    String? submissionText,
+    String? fileUrl,
+  }) async {
+    try {
+      await _db.from('assessment_submissions').upsert({
+        'assessment_id': assessmentId,
+        'student_id': studentId,
+        'submission_text': submissionText,
+        'file_url': fileUrl,
+        'submitted_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'assessment_id,student_id');
+    } catch (e, st) {
+      debugPrint('submitAssessment error: $e\n$st');
+      rethrow;
+    }
+  }
+}
+
+class AssessmentSubmission {
+  final String id;
+  final String assessmentId;
+  final String studentId;
+  final String? submissionText;
+  final String? fileUrl;
+  final double? grade;
+  final String? feedback;
+  final DateTime submittedAt;
+  final DateTime? gradedAt;
+  final String? gradedByName;
+
+  const AssessmentSubmission({
+    required this.id,
+    required this.assessmentId,
+    required this.studentId,
+    this.submissionText,
+    this.fileUrl,
+    this.grade,
+    this.feedback,
+    required this.submittedAt,
+    this.gradedAt,
+    this.gradedByName,
+  });
+
+  factory AssessmentSubmission.fromMap(Map<String, dynamic> map, {String? teacherName}) {
+    return AssessmentSubmission(
+      id: map['id'] as String,
+      assessmentId: map['assessment_id'] as String,
+      studentId: map['student_id'] as String,
+      submissionText: map['submission_text'] as String?,
+      fileUrl: map['file_url'] as String?,
+      grade: map['grade'] != null ? double.tryParse(map['grade'].toString()) : null,
+      feedback: map['feedback'] as String?,
+      submittedAt: DateTime.parse(map['submitted_at'] as String),
+      gradedAt: map['graded_at'] != null ? DateTime.parse(map['graded_at'] as String) : null,
+      gradedByName: teacherName,
+    );
   }
 }

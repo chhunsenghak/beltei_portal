@@ -450,7 +450,7 @@ class _CourseCardState extends State<_CourseCard> {
           label: widget.l.teacherDashboardQuickActionAssignments,
           icon: Icons.assignment_outlined,
           color: const Color(0xFF7C3AED),
-          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments/create'),
+          onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments'),
         ),
       );
     }
@@ -496,7 +496,7 @@ class _CourseCardState extends State<_CourseCard> {
             label: widget.l.teacherDashboardQuickActionAssignments,
             icon: Icons.assignment_outlined,
             color: const Color(0xFF7C3AED),
-            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments/create'),
+            onPressed: () => context.push('/teacher/courses/${widget.course.classTermCourseId}/assessments'),
           ),
         ),
         doubleSpacer,

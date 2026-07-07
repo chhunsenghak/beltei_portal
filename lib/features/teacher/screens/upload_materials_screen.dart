@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -22,6 +26,9 @@ class UploadMaterialsScreen extends ConsumerStatefulWidget {
 class _UploadMaterialsScreenState
     extends ConsumerState<UploadMaterialsScreen> {
   final _titleController = TextEditingController();
+  bool _saving = false;
+  PlatformFile? _selectedFile;
+  int? _selectedSize;
 
   @override
   void dispose() {
@@ -29,9 +36,58 @@ class _UploadMaterialsScreenState
     super.dispose();
   }
 
-  void _upload() {
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        withData: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        setState(() {
+          _selectedFile = file;
+          _selectedSize = file.size;
+          if (_titleController.text.trim().isEmpty) {
+            final nameWithoutExt = file.name.split('.').first;
+            _titleController.text = nameWithoutExt;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
+    }
+  }
+
+  String _getContentType(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+      case 'docx':
+        return 'application/msword';
+      case 'xls':
+      case 'xlsx':
+        return 'application/vnd.ms-excel';
+      case 'ppt':
+      case 'pptx':
+        return 'application/vnd.ms-powerpoint';
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'gif':
+        return 'image/gif';
+      case 'txt':
+        return 'text/plain';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  void _upload() async {
     final l = AppLocalizations.of(context)!;
-    if (_titleController.text.trim().isEmpty) {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(l.uploadMaterialsValidationError,
             style: AppTextStyles.body.copyWith(color: Colors.white)),
@@ -41,17 +97,84 @@ class _UploadMaterialsScreenState
       ));
       return;
     }
-    // File picking requires a device file-picker plugin — placeholder UX only.
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-          l.uploadMaterialsFilePlaceholderSnackbar(_titleController.text.trim()),
-          style: AppTextStyles.body.copyWith(color: Colors.white)),
-      backgroundColor: AppColors.primaryNavy,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-    _titleController.clear();
-    setState(() {});
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Please select a file to upload first.",
+            style: AppTextStyles.body.copyWith(color: Colors.white)),
+        backgroundColor: AppColors.statusRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final course = ref.read(courseInfoProvider(widget.courseId)).valueOrNull;
+      if (course == null) throw Exception("Course details not loaded");
+
+      final teacherId = Supabase.instance.client.auth.currentUser?.id;
+      if (teacherId == null) throw Exception("User not authenticated");
+
+      final bytes = _selectedFile!.bytes ?? await File(_selectedFile!.path!).readAsBytes();
+      final fileExt = _selectedFile!.name.split('.').last;
+      final uniqueName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}';
+      final storagePath = '${course.courseId}/$uniqueName';
+
+      await Supabase.instance.client.storage
+          .from('course-materials')
+          .uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: FileOptions(contentType: _getContentType(fileExt)),
+          );
+
+      final fileUrl = Supabase.instance.client.storage
+          .from('course-materials')
+          .getPublicUrl(storagePath);
+
+      await ref.read(teacherServiceProvider).saveCourseMaterial(
+        courseId: course.courseId,
+        teacherId: teacherId,
+        title: title,
+        description: "Document uploaded by the course instructor.",
+        fileUrl: fileUrl,
+        fileType: fileExt.toUpperCase(),
+        fileSize: bytes.length,
+      );
+
+      ref.invalidate(courseMaterialsProvider(course.courseId));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Document '$title' uploaded successfully!",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+
+      _titleController.clear();
+      setState(() {
+        _selectedFile = null;
+        _selectedSize = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to upload document: $e",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   @override
@@ -121,14 +244,17 @@ class _UploadMaterialsScreenState
 
   Widget _buildUploadZone(AppLocalizations l) {
     return GestureDetector(
-      onTap: () {},
+      onTap: _pickFile,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 40),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-          border: Border.all(color: AppColors.border, width: 1.5),
+          border: Border.all(
+            color: _selectedFile != null ? AppColors.statusGreen : AppColors.border,
+            width: 1.5,
+          ),
         ),
         child: Column(
           children: [
@@ -136,18 +262,44 @@ class _UploadMaterialsScreenState
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                color: (_selectedFile != null ? AppColors.statusGreen : AppColors.primaryBlue).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.cloud_upload_outlined,
-                  color: AppColors.primaryBlue, size: 28),
+              child: Icon(
+                _selectedFile != null ? Icons.insert_drive_file_outlined : Icons.cloud_upload_outlined,
+                color: _selectedFile != null ? AppColors.statusGreen : AppColors.primaryBlue,
+                size: 28,
+              ),
             ),
             const SizedBox(height: 12),
-            Text(l.uploadMaterialsDropzoneText,
-                style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
+            Text(
+              _selectedFile != null
+                  ? "Selected file: ${_selectedFile!.name}"
+                  : l.uploadMaterialsDropzoneText,
+              style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 4),
-            Text(l.uploadMaterialsSupportedFormatsText,
-                style: AppTextStyles.caption, textAlign: TextAlign.center),
+            Text(
+              _selectedFile != null
+                  ? "Size: ${(_selectedSize != null) ? '${(_selectedSize! / 1024 / 1024).toStringAsFixed(2)} MB' : ''}"
+                  : l.uploadMaterialsSupportedFormatsText,
+              style: AppTextStyles.caption,
+              textAlign: TextAlign.center,
+            ),
+            if (_selectedFile != null) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _selectedFile = null;
+                    _selectedSize = null;
+                  });
+                },
+                icon: Icon(Icons.clear, color: AppColors.statusRed, size: 16),
+                label: Text("Clear File", style: AppTextStyles.label.copyWith(color: AppColors.statusRed)),
+              )
+            ]
           ],
         ),
       ),
@@ -176,13 +328,21 @@ class _UploadMaterialsScreenState
   // ── Upload button ──────────────────────────────────────────────────────────
 
   Widget _buildUploadButton(AppLocalizations l) {
+    final titleEmpty = _titleController.text.trim().isEmpty;
+    final cannotSubmit = titleEmpty || _selectedFile == null || _saving;
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: ElevatedButton.icon(
-        onPressed: _upload,
-        icon: const Icon(Icons.upload_outlined, size: 18),
-        label: Text(l.uploadMaterialsUploadButton, style: AppTextStyles.button),
+        onPressed: cannotSubmit ? null : _upload,
+        icon: _saving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : const Icon(Icons.upload_outlined, size: 18),
+        label: Text(_saving ? "Uploading..." : l.uploadMaterialsUploadButton, style: AppTextStyles.button),
       ),
     );
   }
@@ -362,9 +522,24 @@ class _MaterialRow extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.more_vert,
-                color: AppColors.textLabel, size: 18),
-            onPressed: () {},
+            icon: Icon(Icons.download_rounded,
+                color: AppColors.primaryBlue, size: 20),
+            onPressed: () async {
+              try {
+                final uri = Uri.parse(item.fileUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  throw 'Cannot launch URL';
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open file URL: $e')),
+                  );
+                }
+              }
+            },
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),

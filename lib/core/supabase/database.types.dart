@@ -38,6 +38,8 @@ class Tables {
   static const String notifications   = 'notifications';
   static const String courseMaterials = 'course_materials';
   static const String announcements   = 'announcements';
+  static const String assessments     = 'assessments';
+  static const String assessmentSubmissions = 'assessment_submissions';
 }
 
 // ── profiles ──────────────────────────────────────────────────────────────────

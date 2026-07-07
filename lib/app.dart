@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +20,7 @@ class App extends ConsumerWidget {
     final effectiveBrightness = switch (themeMode) {
       ThemeMode.dark => Brightness.dark,
       ThemeMode.light => Brightness.light,
-      ThemeMode.system => MediaQuery.platformBrightnessOf(context),
+      ThemeMode.system => ui.PlatformDispatcher.instance.platformBrightness,
     };
     AppColors.setBrightness(effectiveBrightness);
 

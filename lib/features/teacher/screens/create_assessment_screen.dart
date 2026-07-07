@@ -1,26 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/teacher_providers.dart';
 import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class CreateAssessmentScreen extends StatefulWidget {
+class CreateAssessmentScreen extends ConsumerStatefulWidget {
   const CreateAssessmentScreen({super.key, required this.courseId});
   final String courseId;
 
   @override
-  State<CreateAssessmentScreen> createState() => _CreateAssessmentScreenState();
+  ConsumerState<CreateAssessmentScreen> createState() => _CreateAssessmentScreenState();
 }
 
-class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
+class _CreateAssessmentScreenState extends ConsumerState<CreateAssessmentScreen> {
   final _titleController   = TextEditingController();
   final _scoreController   = TextEditingController(text: '100');
   final _descController    = TextEditingController();
   String? _selectedType;
   DateTime? _dueDate;
   bool _submitted = false;
+  bool _saving = false;
 
   List<String> _types(AppLocalizations l) => [
         l.courseDetailAssignmentLabel,
@@ -61,7 +65,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
     if (picked != null) setState(() => _dueDate = picked);
   }
 
-  void _create(AppLocalizations l) {
+  void _create(AppLocalizations l) async {
     if (!_isValid) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(l.createAssessmentValidationError,
@@ -72,7 +76,45 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       ));
       return;
     }
-    setState(() => _submitted = true);
+
+    setState(() => _saving = true);
+    try {
+      final teacherId = Supabase.instance.client.auth.currentUser?.id;
+      if (teacherId == null) throw Exception("User not authenticated");
+
+      final title = _titleController.text.trim();
+      final type = _selectedType!;
+      final maxScore = double.tryParse(_scoreController.text.trim()) ?? 100.0;
+      final description = _descController.text.trim().isNotEmpty ? _descController.text.trim() : null;
+
+      await ref.read(teacherServiceProvider).createAssessment(
+        classTermCourseId: widget.courseId,
+        teacherId: teacherId,
+        title: title,
+        type: type,
+        maxScore: maxScore,
+        dueDate: _dueDate,
+        description: description,
+      );
+
+      ref.invalidate(courseAssessmentsProvider(widget.courseId));
+
+      setState(() {
+        _submitted = true;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to create assessment: $e",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      setState(() => _saving = false);
+    }
   }
 
   @override
@@ -230,9 +272,18 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
               opacity: _isValid ? 1.0 : 0.5,
               duration: const Duration(milliseconds: 200),
               child: ElevatedButton.icon(
-                onPressed: () => _create(l),
-                icon: const Icon(Icons.send_outlined, size: 18),
-                label: Text(l.createAssessmentTitle, style: AppTextStyles.button),
+                onPressed: (_isValid && !_saving) ? () => _create(l) : null,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined, size: 18),
+                label: Text(
+                  _saving ? "Saving..." : l.createAssessmentTitle,
+                  style: AppTextStyles.button,
+                ),
               ),
             ),
           ),

@@ -34,12 +34,10 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
     var result = courses;
     switch (_filterIndex) {
       case 1:
-        result = result.where((c) => c.isCurrentSemester).toList();
-      case 2:
         result = result
             .where((c) => c.enrollmentStatus == EnrollmentStatus.enrolled)
             .toList();
-      case 3:
+      case 2:
         result = result
             .where((c) => c.enrollmentStatus == EnrollmentStatus.completed)
             .toList();
@@ -64,7 +62,6 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
     final coursesAsync = ref.watch(studentCoursesProvider);
     final filters = [
       l.courseListFilterAll,
-      l.courseListFilterCurrent,
       l.statusActive,
       l.statusCompleted,
     ];

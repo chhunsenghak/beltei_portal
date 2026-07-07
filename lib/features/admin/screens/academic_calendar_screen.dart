@@ -238,7 +238,7 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -389,7 +389,7 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -748,7 +748,7 @@ class _AcademicYearCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.3), style: BorderStyle.solid),
                         borderRadius: BorderRadius.circular(8),
-                        color: Colors.white,
+                        color: AppColors.bgCard,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -830,7 +830,7 @@ class _SemesterCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: semester.isCurrent ? AppColors.primaryBlue.withValues(alpha: 0.3) : AppColors.border,

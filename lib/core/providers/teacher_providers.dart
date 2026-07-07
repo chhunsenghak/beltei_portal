@@ -81,3 +81,17 @@ final allAttendanceProvider =
     FutureProvider.family<Map<String, String>, String>((ref, courseId) async {
   return ref.read(teacherServiceProvider).getAllAttendance(courseId);
 });
+
+final courseAssessmentsProvider =
+    FutureProvider.family<List<AssessmentItem>, String>((ref, classTermCourseId) async {
+  return ref.read(teacherServiceProvider).getAssessments(classTermCourseId);
+});
+
+final assessmentSubmissionsProvider =
+    FutureProvider.family<List<SubmissionListItem>, String>((ref, arg) async {
+  final parts = arg.split('_');
+  final classTermCourseId = parts[0];
+  final assessmentId = parts[1];
+  return ref.read(teacherServiceProvider).getAssessmentSubmissions(classTermCourseId, assessmentId);
+});
+

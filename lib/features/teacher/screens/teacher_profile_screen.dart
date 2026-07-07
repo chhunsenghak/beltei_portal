@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/locale_provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -277,6 +278,7 @@ class TeacherProfileScreen extends ConsumerWidget {
   Widget _buildAccountSettings(
       BuildContext context, WidgetRef ref, AppLocalizations l) {
     final locale = ref.watch(localeProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return _SectionCard(
       icon: Icons.settings_outlined,
       title: l.profileAccountSettingsTitle,
@@ -311,6 +313,30 @@ class TeacherProfileScreen extends ConsumerWidget {
             ),
             onTap: () => _showLanguagePicker(context, ref, locale, l),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.dark_mode_outlined,
+                color: AppColors.primaryNavy, size: 20),
+            title: Text(l.settingsAppearanceTitle, style: AppTextStyles.body),
+            subtitle: Text("Choose your preferred theme",
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  switch (themeMode) {
+                    ThemeMode.light => l.settingsThemeLight,
+                    ThemeMode.dark => l.settingsThemeDark,
+                    ThemeMode.system => l.settingsThemeSystem,
+                  },
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
+            onTap: () => _showThemePicker(context, ref, themeMode, l),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -328,6 +354,51 @@ class TeacherProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Theme picker ───────────────────────────────────────────────────────────
+
+  void _showThemePicker(
+      BuildContext context, WidgetRef ref, ThemeMode currentMode, AppLocalizations l) {
+    final options = [
+      (mode: ThemeMode.light, label: l.settingsThemeLight),
+      (mode: ThemeMode.dark, label: l.settingsThemeDark),
+      (mode: ThemeMode.system, label: l.settingsThemeSystem),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(l.settingsAppearanceTitle, style: AppTextStyles.h3),
+              ),
+              ...options.map((opt) {
+                final isSelected = currentMode == opt.mode;
+                return ListTile(
+                  title: Text(opt.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(themeModeProvider.notifier).setThemeMode(opt.mode);
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }

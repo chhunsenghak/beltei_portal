@@ -166,7 +166,7 @@ class _GlobalLeaveRequestsScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
@@ -251,7 +251,7 @@ class _GlobalLeaveRequestsScreenState
                         hint: Text(
                           requesterList.isEmpty
                               ? 'No ${requesterType}s found'
-                              : 'Select ${requesterType}',
+                              : 'Select $requesterType',
                           style: AppTextStyles.caption
                               .copyWith(color: AppColors.textLabel),
                         ),

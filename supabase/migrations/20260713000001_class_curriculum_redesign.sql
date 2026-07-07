@@ -86,7 +86,7 @@ CREATE INDEX class_term_courses_teacher_id_idx    ON class_term_courses (teacher
 -- ── Enrollments: one row per student per class TERM (not per course) ────────
 
 CREATE TABLE enrollments (
-  id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id     UUID REFERENCES students(id) ON DELETE CASCADE,
   class_term_id  UUID NOT NULL REFERENCES class_terms(id) ON DELETE CASCADE,
   status         TEXT DEFAULT 'enrolled' CHECK (status IN ('enrolled', 'dropped', 'completed')),
@@ -103,7 +103,7 @@ CREATE INDEX enrollments_class_term_id_idx ON enrollments (class_term_id);
 -- existing "attendance for course X" queries keep working unchanged.
 
 CREATE TABLE attendance (
-  id                    UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id            UUID REFERENCES students(id) ON DELETE CASCADE,
   class_term_course_id  UUID NOT NULL REFERENCES class_term_courses(id) ON DELETE CASCADE,
   course_id             UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
@@ -124,7 +124,7 @@ CREATE INDEX attendance_semester_id_idx          ON attendance (semester_id);
 -- ── Grades: per course-within-term occurrence ────────────────────────────────
 
 CREATE TABLE grades (
-  id                    UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id            UUID REFERENCES students(id) ON DELETE CASCADE,
   class_term_course_id  UUID NOT NULL REFERENCES class_term_courses(id) ON DELETE CASCADE,
   course_id             UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,

@@ -640,7 +640,7 @@ class _AttendanceManagementScreenState
 
   Widget _buildTabBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
@@ -688,37 +688,41 @@ class _AttendanceManagementScreenState
   Widget _buildRosterReport(List<AdminAttendanceRecord> records) {
     if (_courseFilter == null) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.school_outlined, size: 48, color: AppColors.textLabel),
-            const SizedBox(height: 12),
-            Text(
-              'Select a Course to view the Roster Report',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Use the filter panel to select a Faculty and Course.',
-              style: AppTextStyles.caption.copyWith(color: AppColors.textLabel),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.school_outlined, size: 48, color: AppColors.textLabel),
+              const SizedBox(height: 12),
+              Text(
+                'Select a Course to view the Roster Report',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Use the filter panel to select a Faculty and Course.',
+                style: AppTextStyles.caption.copyWith(color: AppColors.textLabel),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (records.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off, size: 48, color: AppColors.textLabel),
-            const SizedBox(height: 12),
-            Text(
-              'No attendance records found for this course',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 48, color: AppColors.textLabel),
+              const SizedBox(height: 12),
+              Text(
+                'No attendance records found for this course',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -757,10 +761,15 @@ class _AttendanceManagementScreenState
       int l = stats.late;
       int e = stats.excused;
 
-      if (r.status == 'present') p++;
-      else if (r.status == 'absent') a++;
-      else if (r.status == 'late') l++;
-      else if (r.status == 'excused') e++;
+      if (r.status == 'present') {
+        p++;
+      } else if (r.status == 'absent') {
+        a++;
+      } else if (r.status == 'late') {
+        l++;
+      } else if (r.status == 'excused') {
+        e++;
+      }
 
       final tot = p + a + l + e;
       final rate = tot > 0 ? (p + e + l * 0.5) / tot : 0.0;
@@ -853,7 +862,7 @@ class _AttendanceManagementScreenState
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             itemCount: statsList.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (_, index) {
               final student = statsList[index];
               final ratePct = (student.rate * 100).toStringAsFixed(1);
@@ -866,7 +875,7 @@ class _AttendanceManagementScreenState
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.bgCard,
                   borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
                   border: Border.all(color: AppColors.border),
                 ),
@@ -944,7 +953,7 @@ class _AttendanceManagementScreenState
       List<AdminAttendanceRecord> all,
       List<AdminAttendanceRecord> filtered) {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1818,9 +1827,9 @@ class _ClassPickerSheetState extends State<_ClassPickerSheet> {
       maxChildSize: 0.9,
       expand: false,
       builder: (_, sc) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: Column(children: [
           // Handle
@@ -2089,9 +2098,9 @@ class _ExportSuccessSheetState extends State<_ExportSuccessSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2353,9 +2362,9 @@ class _ExportFormatSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2522,7 +2531,7 @@ class _SummaryStatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),

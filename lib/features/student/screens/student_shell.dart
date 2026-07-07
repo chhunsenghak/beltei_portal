@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/router/app_router.dart';
 import '../../../l10n/app_localizations.dart';
 
@@ -77,6 +78,7 @@ class StudentShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(themeModeProvider);
     final matchedLoc = GoRouterState.of(context).matchedLocation;
     final showHeader = matchedLoc == AppRoutes.studentHome ||
                        matchedLoc == AppRoutes.courseList ||

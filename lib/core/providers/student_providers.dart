@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import '../services/student_service.dart';
+import '../services/teacher_service.dart';
 import '../supabase/database.types.dart';
 
 final studentServiceProvider =
@@ -92,4 +93,17 @@ final studentCourseAttendanceProvider =
   return ref
       .read(studentServiceProvider)
       .getCourseAttendanceHistory(user.id, courseId);
+});
+
+final studentCourseAssessmentsProvider =
+    FutureProvider.family<List<AssessmentItem>, String>((ref, classTermCourseId) async {
+  return ref.read(studentServiceProvider).getCourseAssessments(classTermCourseId);
+});
+
+final studentAssessmentSubmissionProvider =
+    FutureProvider.family<AssessmentSubmission?, String>((ref, arg) async {
+  final parts = arg.split('_');
+  final assessmentId = parts[0];
+  final studentId = parts[1];
+  return ref.read(studentServiceProvider).getSubmission(assessmentId, studentId);
 });

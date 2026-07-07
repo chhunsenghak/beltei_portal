@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:supabase/supabase.dart';
 
-const kPassword = 'Beltei@2025';
+const kPassword = 'Beltei@2026';
 
 void main() async {
   final (url: url, serviceKey: key) = _loadConfig();
@@ -757,6 +757,42 @@ void main() async {
     await supabase.from('grades').insert(activeGrades);
     print('  ✓ Active course grades (midterm only) successfully seeded');
 
+    // ── 16.5 Active Assessments ──────────────────────────────────────────────
+    print('\n📝 Seeding active course assessments...');
+    final List<Map<String, dynamic>> activeAssessments = [];
+    for (final entry in activeCids.entries) {
+      final ctcId = entry.value;
+
+      activeAssessments.add({
+        'class_term_course_id': ctcId,
+        'title': 'Homework 1: Fundamentals',
+        'type': 'Assignment',
+        'max_score': 100.0,
+        'due_date': '2026-05-15',
+        'description': 'Please complete all exercises in Chapter 1.',
+        'file_url': 'https://raw.githubusercontent.com/pdf-association/pdf-test-files/master/content/eng/pdf-a/PDF-A-1b.pdf',
+      });
+      activeAssessments.add({
+        'class_term_course_id': ctcId,
+        'title': 'Quiz 1: Progress Check',
+        'type': 'Quiz',
+        'max_score': 50.0,
+        'due_date': '2026-06-10',
+        'description': 'A quick check of concepts covered in weeks 1-4.',
+      });
+      activeAssessments.add({
+        'class_term_course_id': ctcId,
+        'title': 'Midterm Project Proposal',
+        'type': 'Project',
+        'max_score': 100.0,
+        'due_date': '2026-06-30',
+        'description': 'Submit your team project proposal document.',
+      });
+    }
+    await supabase.from('assessments').insert(activeAssessments);
+    print('  ✓ Active course assessments successfully seeded');
+
+
     // ── 17. Active Leave Requests ───────────────────────────────────────────
     print('\n🏖️  Inserting active leave requests...');
     await supabase.from('leave_requests').insert([
@@ -822,23 +858,41 @@ Future<String> _createUser(
   required String lastName,
   required String role,
 }) async {
-  final res = await supabase.auth.admin.createUser(AdminUserAttributes(
-    email: email,
-    password: kPassword,
-    emailConfirm: true,
-    userMetadata: {
-      'first_name': firstName,
-      'last_name': lastName,
-      'role': role
-    },
-  ));
-  final id = res.user!.id;
-  print('  + $email  ($id)');
-  return id;
+  try {
+    final res = await supabase.auth.admin.createUser(AdminUserAttributes(
+      email: email,
+      password: kPassword,
+      emailConfirm: true,
+      userMetadata: {
+        'first_name': firstName,
+        'last_name': lastName,
+        'role': role
+      },
+    ));
+    final id = res.user!.id;
+    print('  + $email  ($id)');
+    return id;
+  } catch (e) {
+    if (e.toString().toLowerCase().contains('already') || 
+        e.toString().toLowerCase().contains('exist')) {
+      final usersRes = await supabase.auth.admin.listUsers(page: 1, perPage: 1000);
+      for (final u in usersRes) {
+        if (u.email == email) {
+          print('  ~ $email  (already exists: ${u.id})');
+          return u.id;
+        }
+      }
+    }
+    rethrow;
+  }
 }
 
 ({String url, String serviceKey}) _loadConfig() {
-  final env = _readEnv('../../.env');
+  String envPath = '.env';
+  if (!File(envPath).existsSync()) {
+    envPath = '../../.env';
+  }
+  final env = _readEnv(envPath);
   final url = env['SUPABASE_URL'];
   final key = env['SUPABASE_SERVICE_ROLE_KEY'];
   if (url == null || key == null) {

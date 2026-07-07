@@ -266,7 +266,7 @@ class _EnrollmentManagementScreenState
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primaryNavy : Colors.white,
+                  color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
                   borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
                   border: Border.all(
                       color: isSelected ? AppColors.primaryNavy : AppColors.border),
@@ -304,7 +304,7 @@ class _EnrollmentManagementScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
@@ -353,7 +353,7 @@ class _EnrollmentManagementScreenState
                       Container(
                         constraints: const BoxConstraints(maxHeight: 200),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.bgCard,
                           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
                           border: Border.all(color: AppColors.border),
                         ),
@@ -523,7 +523,7 @@ class _EnrollmentManagementScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => _ClassTermStudentsSheet(

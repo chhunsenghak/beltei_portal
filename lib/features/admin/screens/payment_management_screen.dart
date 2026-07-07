@@ -443,7 +443,7 @@ class _ActionButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
           border: Border.all(color: AppColors.border),
         ),

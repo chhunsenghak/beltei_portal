@@ -114,7 +114,7 @@ class _ClassManagementScreenState
       ..sort((a, b) => a.name.compareTo(b.name));
 
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(children: [
         // Search
@@ -230,7 +230,7 @@ class _ClassManagementScreenState
     final entries = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: SizedBox(
         height: 28,
@@ -318,7 +318,7 @@ class _ClassManagementScreenState
   void _showAddMenu(BuildContext context, List<AdminClassTerm> allTerms) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => SafeArea(
@@ -547,7 +547,7 @@ class _ClassTermCardState extends State<_ClassTermCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
@@ -910,9 +910,9 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
         minChildSize: 0.5,
         expand: false,
         builder: (_, sc) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(children: [
             Container(
@@ -1236,9 +1236,9 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
         minChildSize: 0.5,
         expand: false,
         builder: (_, sc) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(children: [
             Container(
@@ -1498,9 +1498,9 @@ class _ClassTermCourseFormSheetState extends ConsumerState<_ClassTermCourseFormS
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -1598,9 +1598,9 @@ class _StudentsSheet extends ConsumerWidget {
       minChildSize: 0.4,
       expand: false,
       builder: (_, sc) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(children: [
           Container(
@@ -1656,7 +1656,7 @@ class _StudentsSheet extends ConsumerWidget {
                   controller: sc,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: students.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (context, index) =>
                       const Divider(height: 0, indent: 16, endIndent: 16),
                   itemBuilder: (_, i) {
                     final s = students[i];

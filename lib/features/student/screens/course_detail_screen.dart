@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -29,7 +33,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -56,6 +60,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           _buildOverviewTab(course, l),
           _buildAttendanceTab(l),
           _buildGradesTab(l),
+          _buildAssignmentsTab(course, l),
           _buildMaterialsTab(l),
         ],
       ),
@@ -70,6 +75,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       l.courseDetailTabOverview,
       l.courseDetailTabAttendance,
       l.courseDetailTabGrades,
+      l.teacherDashboardQuickActionAssignments,
       l.courseDetailTabMaterials,
     ];
     return AppBar(
@@ -633,6 +639,49 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       },
     );
   }
+
+  Widget _buildAssignmentsTab(EnrolledCourse? course, AppLocalizations l) {
+    if (course == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final userAsync = ref.watch(currentUserProvider);
+    final studentId = userAsync.valueOrNull?.id;
+
+    if (studentId == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final assessmentsAsync = ref.watch(studentCourseAssessmentsProvider(course.classTermCourseId));
+
+    return assessmentsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text("Error loading assignments: $e")),
+      data: (assessments) {
+        if (assessments.isEmpty) {
+          return Center(
+            child: Text(
+              "No assignments found for this course.",
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          itemCount: assessments.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final assessment = assessments[index];
+            return _AssignmentItemWidget(
+              assessment: assessment,
+              studentId: studentId,
+              l: l,
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // ── Attendance row ─────────────────────────────────────────────────────────────
@@ -835,8 +884,28 @@ class _MaterialCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.download_outlined,
-              color: AppColors.textLabel, size: 20),
+          IconButton(
+            icon: Icon(Icons.download_outlined,
+                color: AppColors.primaryBlue, size: 20),
+            onPressed: () async {
+              try {
+                final uri = Uri.parse(item.fileUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  throw 'Cannot launch URL';
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open file URL: $e')),
+                  );
+                }
+              }
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
         ],
       ),
     );
@@ -863,3 +932,487 @@ class _Card extends StatelessWidget {
     );
   }
 }
+
+class _AssignmentItemWidget extends ConsumerWidget {
+  const _AssignmentItemWidget({
+    required this.assessment,
+    required this.studentId,
+    required this.l,
+  });
+
+  final AssessmentItem assessment;
+  final String studentId;
+  final AppLocalizations l;
+
+  Color _getTypeColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return AppColors.primaryBlue;
+      case 'assignment':
+        return const Color(0xFF7C3AED);
+      case 'project':
+        return AppColors.statusGreen;
+      case 'exam':
+        return AppColors.statusRed;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  Color _getTypeBgColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return AppColors.statusBlueBg;
+      case 'assignment':
+        return const Color(0xFFF3E8FF);
+      case 'project':
+        return AppColors.statusGreenBg;
+      case 'exam':
+        return AppColors.statusRedBg;
+      default:
+        return AppColors.border;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final submissionAsync = ref.watch(studentAssessmentSubmissionProvider('${assessment.id}_$studentId'));
+    final submission = submissionAsync.valueOrNull;
+
+    String statusText = "Not Submitted";
+    Color statusColor = AppColors.textSecondary;
+    Color statusBg = AppColors.border;
+
+    if (submission != null) {
+      if (submission.grade != null) {
+        statusText = "Graded: ${submission.grade} / ${assessment.maxScore}";
+        statusColor = AppColors.statusGreen;
+        statusBg = AppColors.statusGreenBg;
+      } else {
+        statusText = "Submitted (Pending Grade)";
+        statusColor = AppColors.statusAmber;
+        statusBg = AppColors.statusAmberBg;
+      }
+    }
+
+    final formattedDueDate = assessment.dueDate != null
+        ? DateFormat('EEE, MMM d, y').format(assessment.dueDate!)
+        : 'No due date';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) => _SubmitAssignmentSheet(
+              assessment: assessment,
+              studentId: studentId,
+              submission: submission,
+              l: l,
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getTypeBgColor(assessment.type),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      assessment.type,
+                      style: AppTextStyles.label.copyWith(
+                        color: _getTypeColor(assessment.type),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: AppTextStyles.label.copyWith(
+                        color: statusColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                assessment.title,
+                style: AppTextStyles.bodySemiBold.copyWith(fontSize: 15, color: AppColors.primaryNavy),
+              ),
+              if (assessment.description != null && assessment.description!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  assessment.description!,
+                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textLabel),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Due: $formattedDueDate",
+                        style: AppTextStyles.caption.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    "Max Score: ${assessment.maxScore}",
+                    style: AppTextStyles.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryNavy,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubmitAssignmentSheet extends ConsumerStatefulWidget {
+  const _SubmitAssignmentSheet({
+    required this.assessment,
+    required this.studentId,
+    required this.submission,
+    required this.l,
+  });
+
+  final AssessmentItem assessment;
+  final String studentId;
+  final AssessmentSubmission? submission;
+  final AppLocalizations l;
+
+  @override
+  ConsumerState<_SubmitAssignmentSheet> createState() => _SubmitAssignmentSheetState();
+}
+
+class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> {
+  final _textController = TextEditingController();
+  XFile? _selectedFile;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.submission != null) {
+      _textController.text = widget.submission!.submissionText ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery);
+      if (file != null) {
+        setState(() {
+          _selectedFile = file;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking submission file: $e');
+    }
+  }
+
+  Future<void> _submit() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty && _selectedFile == null && widget.submission?.fileUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Please write a text response or pick a file to submit.",
+            style: AppTextStyles.body.copyWith(color: Colors.white)),
+        backgroundColor: AppColors.statusRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      String? finalFileUrl = widget.submission?.fileUrl;
+
+      if (_selectedFile != null) {
+        final bytes = await _selectedFile!.readAsBytes();
+        final fileExt = _selectedFile!.name.split('.').last;
+        final uniqueName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}';
+        final storagePath = 'submissions/${widget.assessment.id}/${widget.studentId}/$uniqueName';
+
+        await Supabase.instance.client.storage
+            .from('course-materials')
+            .uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: FileOptions(contentType: 'image/$fileExt'),
+            );
+
+        finalFileUrl = Supabase.instance.client.storage
+            .from('course-materials')
+            .getPublicUrl(storagePath);
+      }
+
+      await ref.read(studentServiceProvider).submitAssessment(
+        assessmentId: widget.assessment.id,
+        studentId: widget.studentId,
+        submissionText: text.isNotEmpty ? text : null,
+        fileUrl: finalFileUrl,
+      );
+
+      ref.invalidate(studentAssessmentSubmissionProvider('${widget.assessment.id}_${widget.studentId}'));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Assignment submitted successfully!",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to submit: $e",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = widget.submission;
+    final isGraded = sub?.grade != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgPage,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        left: AppSpacing.screenPadding,
+        right: AppSpacing.screenPadding,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(widget.assessment.title, style: AppTextStyles.h2),
+            const SizedBox(height: 4),
+            Text(
+              "Max Score: ${widget.assessment.maxScore}",
+              style: AppTextStyles.caption.copyWith(color: AppColors.primaryNavy, fontWeight: FontWeight.w600),
+            ),
+            const Divider(height: 24),
+            if (isGraded) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.statusGreenBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.statusGreen.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Grade: ${sub!.grade} / ${widget.assessment.maxScore}",
+                      style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.statusGreen),
+                    ),
+                    if (sub.feedback != null && sub.feedback!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        "Feedback: ${sub.feedback}",
+                        style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            Text("Submission Text", style: AppTextStyles.label),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _textController,
+              enabled: !isGraded && !_saving,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: "Write your submission text here...",
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text("Attachment File", style: AppTextStyles.label),
+            const SizedBox(height: 6),
+            if (isGraded)
+              if (sub?.fileUrl != null)
+                ListTile(
+                  leading: Icon(Icons.insert_drive_file_outlined, color: AppColors.primaryBlue),
+                  title: const Text("View submitted file"),
+                  trailing: Icon(Icons.open_in_new, color: AppColors.textLabel),
+                  onTap: () async {
+                    try {
+                      final uri = Uri.parse(sub!.fileUrl!);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        throw 'Cannot launch URL';
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Could not open file URL: $e')),
+                        );
+                      }
+                    }
+                  },
+                )
+              else
+                Text("No file attached", style: AppTextStyles.caption)
+            else ...[
+              GestureDetector(
+                onTap: _saving ? null : _pickFile,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                    border: Border.all(
+                      color: _selectedFile != null || sub?.fileUrl != null
+                          ? AppColors.statusGreen
+                          : AppColors.border,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _selectedFile != null || sub?.fileUrl != null
+                            ? Icons.check_circle_outline
+                            : Icons.add_photo_alternate_outlined,
+                        color: _selectedFile != null || sub?.fileUrl != null
+                            ? AppColors.statusGreen
+                            : AppColors.primaryBlue,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedFile != null
+                            ? "Selected: ${_selectedFile!.name}"
+                            : sub?.fileUrl != null
+                                ? "Existing attachment: file loaded"
+                                : "Tap to attach a file/image",
+                        style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_selectedFile != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() {
+                      _selectedFile = null;
+                    }),
+                    icon: Icon(Icons.clear, color: AppColors.statusRed, size: 14),
+                    label: Text("Clear File", style: TextStyle(color: AppColors.statusRed, fontSize: 11)),
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(height: 24),
+            if (!isGraded)
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.buttonHeight,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _submit,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(sub != null ? "Resubmit Assignment" : "Submit Assignment", style: AppTextStyles.button),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

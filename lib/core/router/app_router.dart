@@ -29,7 +29,9 @@ import '../../features/teacher/screens/teacher_course_list_screen.dart';
 import '../../features/teacher/screens/mark_attendance_screen.dart';
 import '../../features/teacher/screens/grade_management_screen.dart';
 import '../../features/teacher/screens/create_assessment_screen.dart';
+import '../../features/teacher/screens/teacher_assessments_list_screen.dart';
 import '../../features/teacher/screens/upload_materials_screen.dart';
+import '../../features/teacher/screens/teacher_grading_screen.dart';
 import '../../features/teacher/screens/teacher_schedule_screen.dart';
 import '../../features/teacher/screens/leave_management_screen.dart';
 import '../../features/teacher/screens/leave_request_review_screen.dart';
@@ -253,9 +255,24 @@ final appRouter = GoRouter(
                   GradeManagementScreen(courseId: state.pathParameters['id']!),
             ),
             GoRoute(
-              path: ':id/assessments/create',
+              path: ':id/assessments',
               builder: (context, state) =>
-                  CreateAssessmentScreen(courseId: state.pathParameters['id']!),
+                  TeacherAssessmentsListScreen(courseId: state.pathParameters['id']!),
+              routes: [
+                GoRoute(
+                  path: 'create',
+                  builder: (context, state) =>
+                      CreateAssessmentScreen(courseId: state.pathParameters['id']!),
+                ),
+                GoRoute(
+                  path: ':assessmentId/submissions',
+                  builder: (context, state) =>
+                      TeacherGradingScreen(
+                        courseId: state.pathParameters['id']!,
+                        assessmentId: state.pathParameters['assessmentId']!,
+                      ),
+                ),
+              ],
             ),
             GoRoute(
               path: ':id/materials',

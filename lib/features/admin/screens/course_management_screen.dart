@@ -28,10 +28,14 @@ class _CourseManagementScreenState
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         if (!c.name.toLowerCase().contains(q) &&
-            !c.code.toLowerCase().contains(q)) return false;
+            !c.code.toLowerCase().contains(q)) {
+          return false;
+        }
       }
       if (_selectedFaculty != 'All Faculties' &&
-          c.facultyName != _selectedFaculty) return false;
+          c.facultyName != _selectedFaculty) {
+        return false;
+      }
       return true;
     }).toList();
   }
@@ -106,7 +110,7 @@ class _CourseManagementScreenState
 
   Widget _buildFilters(List<String> faculties) {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +169,7 @@ class _CourseManagementScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
@@ -265,7 +269,7 @@ class _CourseManagementScreenState
                                   );
                               ref.invalidate(adminCoursesProvider);
                               if (ctx.mounted) Navigator.pop(ctx);
-                              if (mounted) showSuccessToast(context, 'Course created.');
+                              if (context.mounted) showSuccessToast(context, 'Course created.');
                             } catch (e) {
                               setSheet(() => saving = false);
                               if (ctx.mounted) {

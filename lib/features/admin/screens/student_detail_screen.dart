@@ -125,7 +125,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   Widget _buildNavRow(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgPage,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -372,7 +372,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,
+                      color: isSelected ? color.withValues(alpha: 0.1) : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
                       border: Border.all(
                           color: isSelected ? color : AppColors.border,

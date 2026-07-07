@@ -71,7 +71,7 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
 
   Widget _buildSecondaryNav() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgCard,
       child: Column(
         children: [
           SizedBox(

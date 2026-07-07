@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/database.types.dart';
+import 'student_service.dart';
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
@@ -246,6 +247,44 @@ class CourseMaterialItem {
     if (kb < 1024) return '${kb.toStringAsFixed(0)} KB';
     return '${(kb / 1024).toStringAsFixed(1)} MB';
   }
+}
+
+// ── Assessment DTO ────────────────────────────────────────────────────────────
+
+class AssessmentItem {
+  final String id;
+  final String classTermCourseId;
+  final String title;
+  final String type;
+  final double maxScore;
+  final DateTime? dueDate;
+  final String? description;
+  final String? fileUrl;
+  final DateTime? createdAt;
+
+  const AssessmentItem({
+    required this.id,
+    required this.classTermCourseId,
+    required this.title,
+    required this.type,
+    required this.maxScore,
+    this.dueDate,
+    this.description,
+    this.fileUrl,
+    this.createdAt,
+  });
+
+  factory AssessmentItem.fromMap(Map<String, dynamic> m) => AssessmentItem(
+        id: m['id'] as String,
+        classTermCourseId: m['class_term_course_id'] as String,
+        title: m['title'] as String,
+        type: m['type'] as String,
+        maxScore: (m['max_score'] as num).toDouble(),
+        dueDate: m['due_date'] == null ? null : DateTime.parse(m['due_date'] as String),
+        description: m['description'] as String?,
+        fileUrl: m['file_url'] as String?,
+        createdAt: m['created_at'] == null ? null : DateTime.parse(m['created_at'] as String),
+      );
 }
 
 // ── Attendance summary DTO ─────────────────────────────────────────────────────
@@ -617,10 +656,11 @@ class TeacherService {
 
     final rows = statuses.entries.map((entry) {
       final statusName = switch (entry.value) {
-        'P' => 'present',
-        'A' => 'absent',
-        'L' => 'late',
-        _ => 'excused',
+        'P' || 'present' => 'present',
+        'A' || 'absent' => 'absent',
+        'L' || 'late' => 'late',
+        'LV' || 'excused' => 'excused',
+        _ => 'present',
       };
       return {
         'student_id': entry.key,
@@ -933,6 +973,73 @@ class TeacherService {
     }
   }
 
+  Future<void> saveCourseMaterial({
+    required String courseId,
+    required String teacherId,
+    required String title,
+    String? description,
+    required String fileUrl,
+    required String fileType,
+    required int fileSize,
+  }) async {
+    try {
+      await _db.from('course_materials').insert({
+        'course_id': courseId,
+        'teacher_id': teacherId,
+        'title': title,
+        'description': description,
+        'file_url': fileUrl,
+        'file_type': fileType,
+        'file_size': fileSize,
+      });
+    } catch (e, st) {
+      debugPrint('saveCourseMaterial error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // ── Assessments ────────────────────────────────────────────────────────────
+
+  Future<List<AssessmentItem>> getAssessments(String classTermCourseId) async {
+    try {
+      final rows = await _db
+          .from('assessments')
+          .select()
+          .eq('class_term_course_id', classTermCourseId)
+          .order('created_at', ascending: false);
+      return rows.map((r) => AssessmentItem.fromMap(r)).toList();
+    } catch (e, st) {
+      debugPrint('getAssessments error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> createAssessment({
+    required String classTermCourseId,
+    required String teacherId,
+    required String title,
+    required String type,
+    required double maxScore,
+    DateTime? dueDate,
+    String? description,
+    String? fileUrl,
+  }) async {
+    try {
+      await _db.from('assessments').insert({
+        'class_term_course_id': classTermCourseId,
+        'title': title,
+        'type': type,
+        'max_score': maxScore,
+        if (dueDate != null) 'due_date': dueDate.toIso8601String().substring(0, 10),
+        'description': description,
+        'file_url': fileUrl,
+      });
+    } catch (e, st) {
+      debugPrint('createAssessment error: $e\n$st');
+      rethrow;
+    }
+  }
+
   // ── Attendance summary ─────────────────────────────────────────────────────
 
   Future<AttendanceSummaryData> getAttendanceSummary(String classTermCourseId) async {
@@ -1157,4 +1264,76 @@ class TeacherService {
         .from('notifications')
         .update({'is_read': true}).eq('id', notificationId);
   }
+
+  Future<List<SubmissionListItem>> getAssessmentSubmissions(
+      String classTermCourseId, String assessmentId) async {
+    try {
+      final students = await getCourseStudents(classTermCourseId);
+      final rows = await _db
+          .from('assessment_submissions')
+          .select('*, profiles!assessment_submissions_graded_by_fkey(first_name, last_name)')
+          .eq('assessment_id', assessmentId);
+
+      final Map<String, Map<String, dynamic>> submissionsMap = {
+        for (final r in rows) r['student_id'] as String: r
+      };
+
+      return students.map((s) {
+        final subRow = submissionsMap[s.studentId];
+        AssessmentSubmission? submission;
+        if (subRow != null) {
+          final teacherProfile = subRow['profiles'] as Map<String, dynamic>?;
+          final teacherName = teacherProfile != null
+              ? '${teacherProfile['first_name'] ?? ''} ${teacherProfile['last_name'] ?? ''}'.trim()
+              : null;
+          submission = AssessmentSubmission.fromMap(subRow, teacherName: teacherName);
+        }
+        return SubmissionListItem(
+          studentId: s.studentId,
+          studentCode: s.studentCode,
+          studentName: s.fullName,
+          submission: submission,
+        );
+      }).toList();
+    } catch (e, st) {
+      debugPrint('getAssessmentSubmissions error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  Future<void> saveGrade({
+    required String assessmentId,
+    required String studentId,
+    required String teacherId,
+    required double grade,
+    required String feedback,
+  }) async {
+    try {
+      await _db.from('assessment_submissions').upsert({
+        'assessment_id': assessmentId,
+        'student_id': studentId,
+        'grade': grade,
+        'feedback': feedback,
+        'graded_at': DateTime.now().toIso8601String(),
+        'graded_by': teacherId,
+      }, onConflict: 'assessment_id,student_id');
+    } catch (e, st) {
+      debugPrint('saveGrade error: $e\n$st');
+      rethrow;
+    }
+  }
+}
+
+class SubmissionListItem {
+  final String studentId;
+  final String studentCode;
+  final String studentName;
+  final AssessmentSubmission? submission;
+
+  const SubmissionListItem({
+    required this.studentId,
+    required this.studentCode,
+    required this.studentName,
+    this.submission,
+  });
 }

@@ -889,13 +889,17 @@ class AdminService {
     final Map<String, String> majorNames = {};
     if (majorIds.isNotEmpty) {
       final majors = await _db.from('majors').select('id, name').inFilter('id', majorIds);
-      for (final m in majors) majorNames[m['id'] as String] = m['name'] as String;
+      for (final m in majors) {
+        majorNames[m['id'] as String] = m['name'] as String;
+      }
     }
 
     final Map<String, String> facNames = {};
     if (facultyIds.isNotEmpty) {
       final facs = await _db.from('faculties').select('id, name').inFilter('id', facultyIds);
-      for (final f in facs) facNames[f['id'] as String] = f['name'] as String;
+      for (final f in facs) {
+        facNames[f['id'] as String] = f['name'] as String;
+      }
     }
 
     final profileMap = {for (final p in profiles) p['id'] as String: p};
@@ -1101,14 +1105,18 @@ class AdminService {
     final Map<String, String> studentCodes = {};
     if (studentIds.isNotEmpty) {
       final ss = await _db.from('students').select('id, student_code').inFilter('id', studentIds);
-      for (final s in ss) studentCodes[s['id'] as String] = s['student_code'] as String;
+      for (final s in ss) {
+        studentCodes[s['id'] as String] = s['student_code'] as String;
+      }
     }
 
     final teacherIds = leavesData.where((l) => l['requester_type'] == 'teacher').map((l) => l['requester_id'] as String).toSet().toList();
     final Map<String, String> teacherCodes = {};
     if (teacherIds.isNotEmpty) {
       final ts = await _db.from('teachers').select('id, employee_code').inFilter('id', teacherIds);
-      for (final t in ts) teacherCodes[t['id'] as String] = t['employee_code'] as String;
+      for (final t in ts) {
+        teacherCodes[t['id'] as String] = t['employee_code'] as String;
+      }
     }
 
     return leavesData.map((l) {
@@ -1270,7 +1278,9 @@ class AdminService {
     final Map<String, String> facNames = {};
     if (facIds.isNotEmpty) {
       final facs = await _db.from('faculties').select('id, name').inFilter('id', facIds);
-      for (final f in facs) facNames[f['id'] as String] = f['name'] as String;
+      for (final f in facs) {
+        facNames[f['id'] as String] = f['name'] as String;
+      }
     }
 
     return data.map((m) {
@@ -1296,7 +1306,9 @@ class AdminService {
     final Map<String, String> facCodes = {};
     if (facIds.isNotEmpty) {
       final facs = await _db.from('faculties').select('id, code').inFilter('id', facIds);
-      for (final f in facs) facCodes[f['id'] as String] = f['code'] as String;
+      for (final f in facs) {
+        facCodes[f['id'] as String] = f['code'] as String;
+      }
     }
 
     final deptIds = depts.map((d) => d['id'] as String).toList();
@@ -1339,7 +1351,9 @@ class AdminService {
     final Map<String, String> semNames = {};
     if (semIds.isNotEmpty) {
       final sems = await _db.from('semesters').select('id, name').inFilter('id', semIds);
-      for (final s in sems) semNames[s['id'] as String] = s['name'] as String;
+      for (final s in sems) {
+        semNames[s['id'] as String] = s['name'] as String;
+      }
     }
 
     return invoices.map((inv) {
