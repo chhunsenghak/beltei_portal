@@ -5,6 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 class SemesterGradeDetailScreen extends ConsumerWidget {
   const SemesterGradeDetailScreen(
@@ -13,6 +14,7 @@ class SemesterGradeDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final asyncGrades = ref.watch(studentGradesProvider);
 
     return Scaffold(
@@ -33,13 +35,14 @@ class SemesterGradeDetailScreen extends ConsumerWidget {
             return Text(
               sem != null
                   ? '${sem.semesterName} ${sem.academicYear}'
-                  : 'Semester Grades',
+                  : l.semesterGradeDefaultTitle,
               style: AppTextStyles.h3White,
             );
           },
-          loading: () => Text('Semester Grades', style: AppTextStyles.h3White),
+          loading: () =>
+              Text(l.semesterGradeDefaultTitle, style: AppTextStyles.h3White),
           error: (_, _) =>
-              Text('Semester Grades', style: AppTextStyles.h3White),
+              Text(l.semesterGradeDefaultTitle, style: AppTextStyles.h3White),
         ),
       ),
       body: asyncGrades.when(
@@ -51,10 +54,10 @@ class SemesterGradeDetailScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load grades', style: AppTextStyles.bodyMedium),
+              Text(l.loadErrorGrades, style: AppTextStyles.bodyMedium),
               TextButton(
                 onPressed: () => ref.invalidate(studentGradesProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -64,9 +67,10 @@ class SemesterGradeDetailScreen extends ConsumerWidget {
               .where((s) => s.semesterId == semesterId)
               .firstOrNull;
           if (semester == null) {
-            return const Center(child: Text('Semester not found.'));
+            return Center(child: Text(l.semesterGradeNotFound));
           }
-          return _SemesterBody(semester: semester, allSemesters: semesters);
+          return _SemesterBody(
+              semester: semester, allSemesters: semesters, l: l);
         },
       ),
     );
@@ -77,9 +81,10 @@ class SemesterGradeDetailScreen extends ConsumerWidget {
 
 class _SemesterBody extends StatelessWidget {
   const _SemesterBody(
-      {required this.semester, required this.allSemesters});
+      {required this.semester, required this.allSemesters, required this.l});
   final SemesterGrades semester;
   final List<SemesterGrades> allSemesters;
+  final AppLocalizations l;
 
   int get _totalCreditsEarned {
     int total = 0;
@@ -106,14 +111,14 @@ class _SemesterBody extends StatelessWidget {
         children: [
           _buildGpaBanner(),
           const SizedBox(height: AppSpacing.sectionGap),
-          Text('Enrolled Courses', style: AppTextStyles.h2),
+          Text(l.semesterGradeEnrolledCoursesTitle, style: AppTextStyles.h2),
           const SizedBox(height: 12),
           if (semester.courses.isEmpty)
             _buildEmpty()
           else
             ...semester.courses.map((c) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _CourseGradeCard(course: c),
+                  child: _CourseGradeCard(course: c, l: l),
                 )),
           const SizedBox(height: AppSpacing.sectionGap),
           _buildGradeKey(),
@@ -147,12 +152,12 @@ class _SemesterBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('SEMESTER GPA',
+                Text(l.semesterGradeGpaLabel,
                     style: AppTextStyles.label
                         .copyWith(color: Colors.white70)),
                 const SizedBox(height: 6),
                 Text(
-                  gpa > 0 ? gpa.toStringAsFixed(2) : 'N/A',
+                  gpa > 0 ? gpa.toStringAsFixed(2) : l.profileNa,
                   style: AppTextStyles.metric
                       .copyWith(color: Colors.white, fontSize: 36),
                 ),
@@ -163,7 +168,7 @@ class _SemesterBody extends StatelessWidget {
                       Icon(Icons.trending_up,
                           color: AppColors.accentGold, size: 16),
                       const SizedBox(width: 4),
-                      Text("Dean's List Qualification",
+                      Text(l.semesterGradeDeansListQualification,
                           style: AppTextStyles.caption
                               .copyWith(color: AppColors.accentGold)),
                     ],
@@ -181,13 +186,14 @@ class _SemesterBody extends StatelessWidget {
             ),
             child: Column(
               children: [
-                Text('Credits\nEarned',
+                Text(l.semesterGradeCreditsEarnedLabel,
                     textAlign: TextAlign.center,
                     style: AppTextStyles.caption
                         .copyWith(color: Colors.white70)),
                 const SizedBox(height: 4),
                 Text(
-                  '$creditsEarned / $_semesterCreditsEnrolled',
+                  l.semesterGradeCreditsRatio(
+                      creditsEarned, _semesterCreditsEnrolled),
                   style: AppTextStyles.h2White,
                 ),
               ],
@@ -202,7 +208,7 @@ class _SemesterBody extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24),
       alignment: Alignment.center,
-      child: Text('No grades recorded yet.',
+      child: Text(l.semesterGradeNoGradesRecorded,
           style: AppTextStyles.body
               .copyWith(color: AppColors.textSecondary)),
     );
@@ -210,10 +216,10 @@ class _SemesterBody extends StatelessWidget {
 
   Widget _buildGradeKey() {
     final keys = [
-      (grade: 'A', range: '4.0 (90–100)',  color: AppColors.primaryNavy),
-      (grade: 'B', range: '3.0 (80–89)',   color: AppColors.primaryBlue),
-      (grade: 'C', range: '2.0 (70–79)',   color: AppColors.statusAmber),
-      (grade: 'F', range: '0.0 (below 60)', color: AppColors.statusRed),
+      (grade: 'A', range: l.semesterGradeRangeA, color: AppColors.primaryNavy),
+      (grade: 'B', range: l.semesterGradeRangeB, color: AppColors.primaryBlue),
+      (grade: 'C', range: l.semesterGradeRangeC, color: AppColors.statusAmber),
+      (grade: 'F', range: l.semesterGradeRangeF, color: AppColors.statusRed),
     ];
 
     return Container(
@@ -226,7 +232,7 @@ class _SemesterBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Grade Key', style: AppTextStyles.h3),
+          Text(l.semesterGradeKeyTitle, style: AppTextStyles.h3),
           const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: 2,
@@ -279,9 +285,9 @@ class _SemesterBody extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Degree Completion', style: AppTextStyles.h3),
+              Text(l.semesterGradeDegreeCompletionTitle, style: AppTextStyles.h3),
               Text(
-                '${(pct * 100).round()}%',
+                l.semesterGradePercentComplete((pct * 100).round()),
                 style: AppTextStyles.bodySemiBold
                     .copyWith(color: AppColors.primaryNavy),
               ),
@@ -300,7 +306,7 @@ class _SemesterBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '$earned of $totalRequired credits completed.',
+            l.semesterGradeCreditsCompletedSummary(earned, totalRequired),
             style: AppTextStyles.caption.copyWith(height: 1.5),
           ),
         ],
@@ -312,8 +318,9 @@ class _SemesterBody extends StatelessWidget {
 // ── Course grade card ─────────────────────────────────────────────────────────
 
 class _CourseGradeCard extends StatelessWidget {
-  const _CourseGradeCard({required this.course});
+  const _CourseGradeCard({required this.course, required this.l});
   final CourseGrade course;
+  final AppLocalizations l;
 
   Color get _gradeColor {
     final g = course.letterGrade?.toUpperCase() ?? '';
@@ -369,10 +376,10 @@ class _CourseGradeCard extends StatelessWidget {
             style: AppTextStyles.bodySemiBold
                 .copyWith(color: AppColors.primaryNavy)),
         const SizedBox(height: 2),
-        Text('${course.credits} Credits',
+        Text(l.semesterGradeCreditsCount(course.credits),
             style: AppTextStyles.caption),
         const SizedBox(height: 6),
-        Text('GRADE POINTS', style: AppTextStyles.label),
+        Text(l.semesterGradeGradePointsLabel, style: AppTextStyles.label),
         Text(
           course.gpaPoints != null
               ? course.gpaPoints!.toStringAsFixed(1)

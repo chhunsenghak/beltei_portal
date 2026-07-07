@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   const InvoiceDetailScreen({super.key, required this.invoiceId});
@@ -13,6 +14,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final asyncFinance = ref.watch(studentFinanceProvider);
 
     return Scaffold(
@@ -25,14 +27,14 @@ class InvoiceDetailScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Invoice Detail', style: AppTextStyles.h3),
+        title: Text(l.invoiceDetailTitle, style: AppTextStyles.h3),
       ),
       body: asyncFinance.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Failed to load invoice: $e',
+            child: Text(l.invoiceLoadError(e),
                 style: AppTextStyles.body, textAlign: TextAlign.center),
           ),
         ),
@@ -40,9 +42,9 @@ class InvoiceDetailScreen extends ConsumerWidget {
           final invoice =
               finance.invoices.where((i) => i.id == invoiceId).firstOrNull;
           if (invoice == null) {
-            return const Center(child: Text('Invoice not found.'));
+            return Center(child: Text(l.invoiceNotFound));
           }
-          return _InvoiceBody(invoice: invoice);
+          return _InvoiceBody(invoice: invoice, l: l);
         },
       ),
     );
@@ -52,8 +54,9 @@ class InvoiceDetailScreen extends ConsumerWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _InvoiceBody extends StatelessWidget {
-  const _InvoiceBody({required this.invoice});
+  const _InvoiceBody({required this.invoice, required this.l});
   final InvoiceRow invoice;
+  final AppLocalizations l;
 
   String _fmtDate(String iso) {
     try {
@@ -72,10 +75,10 @@ class _InvoiceBody extends StatelessWidget {
   }
 
   String get _statusLabel => switch (invoice.status) {
-        InvoiceStatus.paid    => 'PAID',
-        InvoiceStatus.overdue => 'OVERDUE',
-        InvoiceStatus.partial => 'PARTIAL',
-        InvoiceStatus.unpaid  => 'UNPAID',
+        InvoiceStatus.paid    => l.invoiceStatusPaid,
+        InvoiceStatus.overdue => l.invoiceStatusOverdue,
+        InvoiceStatus.partial => l.invoiceStatusPartial,
+        InvoiceStatus.unpaid  => l.invoiceStatusUnpaid,
       };
 
   Color get _statusColor => switch (invoice.status) {
@@ -123,7 +126,7 @@ class _InvoiceBody extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('INVOICE',
+              Text(l.invoiceLabelBadge,
                   style:
                       AppTextStyles.label.copyWith(color: Colors.white70)),
               Container(
@@ -141,10 +144,10 @@ class _InvoiceBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text('#$_shortId', style: AppTextStyles.h2White),
+          Text(l.invoiceNumberLabel(_shortId), style: AppTextStyles.h2White),
           const SizedBox(height: 4),
           Text(invoice.description, style: AppTextStyles.captionWhite),
-          Text('Due: ${_fmtDate(invoice.dueDate)}',
+          Text(l.invoiceDueLabel(_fmtDate(invoice.dueDate)),
               style: AppTextStyles.captionWhite),
         ],
       ),
@@ -163,14 +166,14 @@ class _InvoiceBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Payment Details', style: AppTextStyles.h3),
+          Text(l.invoicePaymentDetailsTitle, style: AppTextStyles.h3),
           const SizedBox(height: 12),
-          _row('Description', invoice.description),
+          _row(l.invoiceDescriptionRowLabel, invoice.description),
           Divider(color: AppColors.divider, height: 20),
-          _row('Due Date', _fmtDate(invoice.dueDate)),
+          _row(l.invoiceDueDateRowLabel, _fmtDate(invoice.dueDate)),
           if (invoice.paidAt != null) ...[
             Divider(color: AppColors.divider, height: 20),
-            _row('Paid On', _fmtDateTime(invoice.paidAt!)),
+            _row(l.invoicePaidOnRowLabel, _fmtDateTime(invoice.paidAt!)),
           ],
           if (invoice.status == InvoiceStatus.overdue) ...[
             Divider(color: AppColors.divider, height: 20),
@@ -179,7 +182,7 @@ class _InvoiceBody extends StatelessWidget {
                 Icon(Icons.warning_amber_outlined,
                     color: AppColors.statusRed, size: 16),
                 const SizedBox(width: 6),
-                Text('This invoice is past due.',
+                Text(l.invoicePastDueWarning,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.statusRed)),
               ],
@@ -201,7 +204,7 @@ class _InvoiceBody extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Total Amount', style: AppTextStyles.h2),
+          Text(l.invoiceTotalAmountLabel, style: AppTextStyles.h2),
           Text(
             '\$${invoice.amount.toStringAsFixed(2)}',
             style: AppTextStyles.metric

@@ -1,27 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/teacher_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-class CreateAssessmentScreen extends StatefulWidget {
+class CreateAssessmentScreen extends ConsumerStatefulWidget {
   const CreateAssessmentScreen({super.key, required this.courseId});
   final String courseId;
 
   @override
-  State<CreateAssessmentScreen> createState() => _CreateAssessmentScreenState();
+  ConsumerState<CreateAssessmentScreen> createState() => _CreateAssessmentScreenState();
 }
 
-class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
+class _CreateAssessmentScreenState extends ConsumerState<CreateAssessmentScreen> {
   final _titleController   = TextEditingController();
   final _scoreController   = TextEditingController(text: '100');
   final _descController    = TextEditingController();
   String? _selectedType;
   DateTime? _dueDate;
   bool _submitted = false;
+  bool _saving = false;
 
-  static const _types = ['Assignment', 'Quiz', 'Lab Report', 'Project', 'Midterm', 'Final Exam'];
+  List<String> _types(AppLocalizations l) => [
+        l.courseDetailAssignmentLabel,
+        l.createAssessmentTypeQuiz,
+        l.createAssessmentTypeLabReport,
+        l.createAssessmentTypeProject,
+        l.courseDetailMidtermLabel,
+        l.courseDetailFinalExamLabel,
+      ];
 
   @override
   void dispose() {
@@ -53,10 +65,10 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
     if (picked != null) setState(() => _dueDate = picked);
   }
 
-  void _create() {
+  void _create(AppLocalizations l) async {
     if (!_isValid) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please fill in Title, Type and Max Score.',
+        content: Text(l.createAssessmentValidationError,
             style: AppTextStyles.body.copyWith(color: Colors.white)),
         backgroundColor: AppColors.statusRed,
         behavior: SnackBarBehavior.floating,
@@ -64,28 +76,67 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       ));
       return;
     }
-    setState(() => _submitted = true);
+
+    setState(() => _saving = true);
+    try {
+      final teacherId = Supabase.instance.client.auth.currentUser?.id;
+      if (teacherId == null) throw Exception("User not authenticated");
+
+      final title = _titleController.text.trim();
+      final type = _selectedType!;
+      final maxScore = double.tryParse(_scoreController.text.trim()) ?? 100.0;
+      final description = _descController.text.trim().isNotEmpty ? _descController.text.trim() : null;
+
+      await ref.read(teacherServiceProvider).createAssessment(
+        classTermCourseId: widget.courseId,
+        teacherId: teacherId,
+        title: title,
+        type: type,
+        maxScore: maxScore,
+        dueDate: _dueDate,
+        description: description,
+      );
+
+      ref.invalidate(courseAssessmentsProvider(widget.courseId));
+
+      setState(() {
+        _submitted = true;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to create assessment: $e",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_submitted) return _buildSuccessScreen(context);
+    final l = AppLocalizations.of(context)!;
+    if (_submitted) return _buildSuccessScreen(context, l);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, l),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildBreadcrumb(),
+            _buildBreadcrumb(l),
             const SizedBox(height: AppSpacing.md),
-            _buildFormCard(),
+            _buildFormCard(l),
             const SizedBox(height: AppSpacing.md),
-            _buildQuickTip(),
+            _buildQuickTip(l),
             const SizedBox(height: AppSpacing.md),
-            _buildVisibilityCard(),
+            _buildVisibilityCard(l),
             const SizedBox(height: 24),
           ],
         ),
@@ -95,7 +146,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations l) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -104,7 +155,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
         icon: const Icon(Icons.arrow_back_ios, size: 18),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text('Create Assessment',
+      title: Text(l.createAssessmentTitle,
           style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
       actions: [
         IconButton(
@@ -115,15 +166,15 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── Breadcrumb ─────────────────────────────────────────────────────────────
 
-  Widget _buildBreadcrumb() {
+  Widget _buildBreadcrumb(AppLocalizations l) {
     return Row(
       children: [
-        Text('Courses', style: AppTextStyles.caption),
+        Text(l.navCourses, style: AppTextStyles.caption),
         Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
         Text('Advanced Mathematics',
             style: AppTextStyles.caption),
         Icon(Icons.chevron_right, size: 14, color: AppColors.textLabel),
-        Text('New Assessment',
+        Text(l.createAssessmentBreadcrumbNew,
             style: AppTextStyles.caption
                 .copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
       ],
@@ -132,7 +183,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── Form card ──────────────────────────────────────────────────────────────
 
-  Widget _buildFormCard() {
+  Widget _buildFormCard(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -143,21 +194,21 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildFieldLabel('Assessment Title'),
+          _buildFieldLabel(l.createAssessmentTitleFieldLabel),
           const SizedBox(height: 8),
           TextField(
             controller: _titleController,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'e.g. Mid-term Research Paper',
+            decoration: InputDecoration(
+              hintText: l.createAssessmentTitleHint,
             ),
           ),
           const SizedBox(height: 16),
-          _buildFieldLabel('Type'),
+          _buildFieldLabel(l.createAssessmentTypeFieldLabel),
           const SizedBox(height: 8),
-          _buildTypeDropdown(),
+          _buildTypeDropdown(l),
           const SizedBox(height: 16),
-          _buildFieldLabel('Max Score'),
+          _buildFieldLabel(l.createAssessmentMaxScoreFieldLabel),
           const SizedBox(height: 8),
           TextField(
             controller: _scoreController,
@@ -165,7 +216,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             decoration: const InputDecoration(hintText: '100'),
           ),
           const SizedBox(height: 16),
-          _buildFieldLabel('Due Date & Time'),
+          _buildFieldLabel(l.createAssessmentDueDateFieldLabel),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: _pickDueDate,
@@ -184,7 +235,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
                     child: Text(
                       _dueDate != null
                           ? '${_dueDate!.month.toString().padLeft(2,'0')}/${_dueDate!.day.toString().padLeft(2,'0')}/${_dueDate!.year}'
-                          : 'mm/dd/yyyy, --:-- --',
+                          : l.createAssessmentDueDatePlaceholder,
                       style: AppTextStyles.body.copyWith(
                         color: _dueDate != null
                             ? AppColors.textPrimary
@@ -199,20 +250,20 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _buildFieldLabel('Description'),
+          _buildFieldLabel(l.createAssessmentDescriptionFieldLabel),
           const SizedBox(height: 8),
           TextField(
             controller: _descController,
             maxLines: 6,
-            decoration: const InputDecoration(
-              hintText: 'Provide detailed instructions for the students...',
+            decoration: InputDecoration(
+              hintText: l.createAssessmentDescriptionHint,
               alignLabelWithHint: true,
             ),
           ),
           const SizedBox(height: 16),
-          _buildFieldLabel('Attachments'),
+          _buildFieldLabel(l.createAssessmentAttachmentsFieldLabel),
           const SizedBox(height: 8),
-          _buildAttachmentZone(),
+          _buildAttachmentZone(l),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -221,9 +272,18 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
               opacity: _isValid ? 1.0 : 0.5,
               duration: const Duration(milliseconds: 200),
               child: ElevatedButton.icon(
-                onPressed: _create,
-                icon: const Icon(Icons.send_outlined, size: 18),
-                label: Text('Create Assessment', style: AppTextStyles.button),
+                onPressed: (_isValid && !_saving) ? () => _create(l) : null,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined, size: 18),
+                label: Text(
+                  _saving ? "Saving..." : l.createAssessmentTitle,
+                  style: AppTextStyles.button,
+                ),
               ),
             ),
           ),
@@ -238,7 +298,8 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             .copyWith(fontWeight: FontWeight.w600));
   }
 
-  Widget _buildTypeDropdown() {
+  Widget _buildTypeDropdown(AppLocalizations l) {
+    final types = _types(l);
     return GestureDetector(
       onTap: () => showModalBottomSheet(
         context: context,
@@ -249,7 +310,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 16),
-            ..._types.map((t) => ListTile(
+            ...types.map((t) => ListTile(
                   title: Text(t, style: AppTextStyles.body),
                   trailing: t == _selectedType
                       ? Icon(Icons.check, color: AppColors.primaryNavy)
@@ -276,7 +337,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
           children: [
             Expanded(
               child: Text(
-                _selectedType ?? 'Select assessment type',
+                _selectedType ?? l.createAssessmentSelectTypeHint,
                 style: AppTextStyles.body.copyWith(
                   color: _selectedType != null ? AppColors.textPrimary : AppColors.textLabel,
                 ),
@@ -289,7 +350,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
     );
   }
 
-  Widget _buildAttachmentZone() {
+  Widget _buildAttachmentZone(AppLocalizations l) {
     return GestureDetector(
       onTap: () {},
       child: Container(
@@ -304,12 +365,12 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             Icon(Icons.cloud_upload_outlined,
                 color: AppColors.textLabel, size: 32),
             const SizedBox(height: 8),
-            Text('Click or drag and drop to upload files',
+            Text(l.createAssessmentUploadZoneTitle,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 4),
-            Text('PDF, DOCX, ZIP (Max 50MB)',
+            Text(l.createAssessmentUploadZoneSubtitle,
                 style: AppTextStyles.caption, textAlign: TextAlign.center),
           ],
         ),
@@ -319,7 +380,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── Quick tip ──────────────────────────────────────────────────────────────
 
-  Widget _buildQuickTip() {
+  Widget _buildQuickTip(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -338,12 +399,12 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Quick Tip',
+                Text(l.createAssessmentQuickTipTitle,
                     style: AppTextStyles.bodyMedium
                         .copyWith(color: AppColors.primaryBlue)),
                 const SizedBox(height: 4),
                 Text(
-                  'Scheduled assessments will automatically alert all enrolled students via push notifications.',
+                  l.createAssessmentQuickTipBody,
                   style: AppTextStyles.caption.copyWith(height: 1.4),
                 ),
               ],
@@ -356,7 +417,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── Visibility card ────────────────────────────────────────────────────────
 
-  Widget _buildVisibilityCard() {
+  Widget _buildVisibilityCard(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -374,10 +435,10 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Visibility', style: AppTextStyles.bodyMedium),
+                Text(l.createAssessmentVisibilityTitle, style: AppTextStyles.bodyMedium),
                 const SizedBox(height: 4),
                 Text(
-                    "This assessment will be saved as a draft and hidden until you toggle 'Publish'.",
+                    l.createAssessmentVisibilityBody,
                     style: AppTextStyles.caption.copyWith(height: 1.4)),
               ],
             ),
@@ -389,7 +450,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
-  Widget _buildSuccessScreen(BuildContext context) {
+  Widget _buildSuccessScreen(BuildContext context, AppLocalizations l) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -409,10 +470,10 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
-              Text('Assessment Created!', style: AppTextStyles.h1, textAlign: TextAlign.center),
+              Text(l.createAssessmentSuccessTitle, style: AppTextStyles.h1, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                '"${_titleController.text}" has been saved as a draft. Students will be notified when published.',
+                l.createAssessmentSuccessMessage(_titleController.text),
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,
@@ -423,7 +484,7 @@ class _CreateAssessmentScreenState extends State<CreateAssessmentScreen> {
                 height: AppSpacing.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Back to Course', style: AppTextStyles.button),
+                  child: Text(l.createAssessmentBackToCourseButton, style: AppTextStyles.button),
                 ),
               ),
             ],

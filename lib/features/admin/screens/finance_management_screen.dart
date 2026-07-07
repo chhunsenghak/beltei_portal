@@ -44,7 +44,7 @@ class _FinanceManagementScreenState extends State<FinanceManagementScreen> {
 
   Widget _buildSecondaryNav() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgCard,
       child: Column(
         children: [
           SizedBox(

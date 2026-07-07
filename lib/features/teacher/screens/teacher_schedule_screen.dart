@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // Day order for sorting
 const _kDayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -46,32 +48,39 @@ class _TeacherScheduleScreenState
     return monday.add(Duration(days: _weekOffset * 7));
   }
 
-  String _weekLabel() {
+  String _weekLabel(AppLocalizations l) {
     final monday = _weekStart();
     final friday = monday.add(const Duration(days: 4));
-    final months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${monday.day} ${months[monday.month]} – '
-        '${friday.day} ${months[friday.month]}, ${monday.year}';
+    final fmt = DateFormat.MMMd(l.localeName);
+    return '${fmt.format(monday)} – ${fmt.format(friday)}, ${monday.year}';
   }
 
-  String _dayDateLabel(String day, DateTime weekStart) {
+  String _dayDateLabel(String day, DateTime weekStart, AppLocalizations l) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     final idx = days.indexOf(day);
     if (idx < 0) return day;
     final date = weekStart.add(Duration(days: idx));
-    return '${day.toUpperCase()}\n${date.day}';
+    return '${_dayLabel(day, l)}\n${date.day}';
   }
+
+  String _dayLabel(String abbr, AppLocalizations l) => switch (abbr) {
+        'Mon' => l.dayMon,
+        'Tue' => l.dayTue,
+        'Wed' => l.dayWed,
+        'Thu' => l.dayThu,
+        'Fri' => l.dayFri,
+        'Sat' => l.daySat,
+        _ => abbr,
+      };
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final coursesAsync = ref.watch(teacherCoursesProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, l),
       body: coursesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -81,10 +90,10 @@ class _TeacherScheduleScreenState
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load schedule', style: AppTextStyles.body),
+              Text(l.loadErrorSchedule, style: AppTextStyles.body),
               TextButton(
                 onPressed: () => ref.invalidate(teacherCoursesProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -97,13 +106,13 @@ class _TeacherScheduleScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTitle(),
+                _buildTitle(l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildWeekNav(),
+                _buildWeekNav(l),
                 const SizedBox(height: 16),
-                _buildTimetable(currentCourses),
+                _buildTimetable(currentCourses, l),
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildStatCards(currentCourses),
+                _buildStatCards(currentCourses, l),
                 const SizedBox(height: 24),
               ],
             ),
@@ -115,7 +124,7 @@ class _TeacherScheduleScreenState
 
   // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations l) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -131,7 +140,7 @@ class _TeacherScheduleScreenState
           Image.asset('assets/images/beltei_logo.png',
               height: 48, fit: BoxFit.contain),
           const SizedBox(width: 10),
-          Text('BELTEI Portal', style: AppTextStyles.h3),
+          Text(l.appTitle, style: AppTextStyles.h3),
         ],
       ),
       actions: [
@@ -146,20 +155,20 @@ class _TeacherScheduleScreenState
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Academic Weekly Schedule',
+        Text(l.teacherScheduleTitle,
             style: AppTextStyles.h1.copyWith(color: AppColors.primaryNavy)),
-        Text('Current Semester', style: AppTextStyles.caption),
+        Text(l.settingsCurrentSemester, style: AppTextStyles.caption),
       ],
     );
   }
 
   // ── Week navigator ─────────────────────────────────────────────────────────
 
-  Widget _buildWeekNav() {
+  Widget _buildWeekNav(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -177,7 +186,7 @@ class _TeacherScheduleScreenState
           ),
           Expanded(
             child: Text(
-              _weekLabel(),
+              _weekLabel(l),
               textAlign: TextAlign.center,
               style: AppTextStyles.bodyMedium,
             ),
@@ -195,7 +204,7 @@ class _TeacherScheduleScreenState
 
   // ── Timetable ──────────────────────────────────────────────────────────────
 
-  Widget _buildTimetable(List<TeacherCourse> courses) {
+  Widget _buildTimetable(List<TeacherCourse> courses, AppLocalizations l) {
     if (courses.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -207,7 +216,7 @@ class _TeacherScheduleScreenState
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('No scheduled classes this semester.',
+            child: Text(l.teacherScheduleNoClassesThisSemester,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary)),
           ),
@@ -249,7 +258,7 @@ class _TeacherScheduleScreenState
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('No schedule data available.',
+            child: Text(l.teacherScheduleNoScheduleData,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary)),
           ),
@@ -291,7 +300,7 @@ class _TeacherScheduleScreenState
                   width: 56,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Text('TIME',
+                    child: Text(l.teacherScheduleTimeColumnHeader,
                         style: AppTextStyles.label.copyWith(fontSize: 10)),
                   ),
                 ),
@@ -300,7 +309,7 @@ class _TeacherScheduleScreenState
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         child: Text(
-                          _dayDateLabel(d, weekStart),
+                          _dayDateLabel(d, weekStart, l),
                           style: AppTextStyles.label.copyWith(fontSize: 11),
                           textAlign: TextAlign.center,
                         ),
@@ -337,7 +346,7 @@ class _TeacherScheduleScreenState
                           child: Container(
                             margin: const EdgeInsets.all(4),
                             child: slot != null
-                                ? _SlotCard(slot: slot)
+                                ? _SlotCard(slot: slot, l: l)
                                 : const SizedBox.shrink(),
                           ),
                         );
@@ -356,7 +365,7 @@ class _TeacherScheduleScreenState
 
   // ── Stat cards ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatCards(List<TeacherCourse> courses) {
+  Widget _buildStatCards(List<TeacherCourse> courses, AppLocalizations l) {
     // Compute total weekly hours from all schedule slots
     double totalHours = 0;
     for (final c in courses) {
@@ -376,20 +385,20 @@ class _TeacherScheduleScreenState
       (
         icon: Icons.hourglass_empty_outlined,
         iconBg: AppColors.primaryNavy,
-        label: 'WEEKLY HOURS',
-        value: '${totalHours.toStringAsFixed(1)} Hours'
+        label: l.teacherScheduleWeeklyHoursLabel,
+        value: l.teacherScheduleHoursValue(totalHours.toStringAsFixed(1))
       ),
       (
         icon: Icons.people_outline,
         iconBg: AppColors.primaryBlue,
-        label: 'TOTAL STUDENTS',
-        value: '$totalStudents Students'
+        label: l.teacherScheduleTotalStudentsLabel,
+        value: l.studentsCountLabel(totalStudents)
       ),
       (
         icon: Icons.check_circle_outline,
         iconBg: AppColors.statusAmber,
-        label: 'CLASSES TODAY',
-        value: '$todayCount Classes'
+        label: l.teacherScheduleClassesTodayLabel,
+        value: l.teacherScheduleClassesCountValue(todayCount)
       ),
     ];
 
@@ -451,8 +460,9 @@ class _SlotData {
 // ── Slot card ──────────────────────────────────────────────────────────────────
 
 class _SlotCard extends StatelessWidget {
-  const _SlotCard({required this.slot});
+  const _SlotCard({required this.slot, required this.l});
   final _SlotData slot;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -494,7 +504,7 @@ class _SlotCard extends StatelessWidget {
               color: slot.color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('${slot.studentCount} Students',
+            child: Text(l.studentsCountLabel(slot.studentCount),
                 style: AppTextStyles.caption
                     .copyWith(color: slot.color, fontSize: 10)),
           ),

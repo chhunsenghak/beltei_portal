@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../l10n/app_localizations.dart';
 
 class TeacherShell extends ConsumerStatefulWidget {
@@ -36,11 +37,19 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
+    final matchedLoc = GoRouterState.of(context).matchedLocation;
+    final showHeader = matchedLoc == '/teacher' ||
+                       matchedLoc == '/teacher/courses' ||
+                       matchedLoc == '/teacher/students' ||
+                       matchedLoc == '/teacher/alerts' ||
+                       matchedLoc == '/teacher/profile' ||
+                       matchedLoc == '/teacher/alerts/announcement';
     final active = _activeIndex(context);
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context),
+          if (showHeader) _buildShellHeader(context),
           Expanded(child: widget.child),
         ],
       ),
@@ -92,7 +101,7 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
                       Icons.notifications_outlined,
                       color: AppColors.textSecondary,
                     ),
-                    onPressed: () {},
+                    onPressed: () => context.go('/teacher/alerts'),
                   ),
                 ],
               ),
@@ -108,7 +117,7 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
     return Container(
       height: 64,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgCard,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(

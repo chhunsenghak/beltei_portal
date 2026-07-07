@@ -5,6 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/teacher_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -39,9 +40,10 @@ class _CreateAnnouncementScreenState
       _contentController.text.trim().isNotEmpty;
 
   Future<void> _post() async {
+    final l = AppLocalizations.of(context)!;
     if (!_isValid) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Please fill in the title and content.',
+        content: Text(l.createAnnouncementValidationError,
             style: AppTextStyles.body.copyWith(color: Colors.white)),
         backgroundColor: AppColors.statusRed,
         behavior: SnackBarBehavior.floating,
@@ -67,7 +69,7 @@ class _CreateAnnouncementScreenState
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed to post announcement.',
+          content: Text(l.createAnnouncementPostError,
               style: AppTextStyles.body.copyWith(color: Colors.white)),
           backgroundColor: AppColors.statusRed,
           behavior: SnackBarBehavior.floating,
@@ -81,8 +83,9 @@ class _CreateAnnouncementScreenState
   }
 
   void _saveDraft() {
+    final l = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Saved as draft.',
+      content: Text(l.createAnnouncementDraftSavedSnackbar,
           style: AppTextStyles.body.copyWith(color: Colors.white)),
       backgroundColor: AppColors.primaryNavy,
       behavior: SnackBarBehavior.floating,
@@ -92,27 +95,28 @@ class _CreateAnnouncementScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (_posted) return _buildSuccessScreen(context);
+    final l = AppLocalizations.of(context)!;
+    if (_posted) return _buildSuccessScreen(context, l);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
+      appBar: null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTitle(),
+            _buildTitle(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildCompositionCard(),
+            _buildCompositionCard(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildPublicationSettings(),
+            _buildPublicationSettings(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildLivePreviewCard(),
+            _buildLivePreviewCard(l),
             const SizedBox(height: AppSpacing.xl),
-            _buildPostButton(),
+            _buildPostButton(l),
             const SizedBox(height: 12),
-            _buildDraftButton(),
+            _buildDraftButton(l),
             const SizedBox(height: 24),
           ],
         ),
@@ -120,42 +124,29 @@ class _CreateAnnouncementScreenState
     );
   }
 
-  // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: AppColors.bgPage,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      toolbarHeight: 64,
-      titleSpacing: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, size: 18),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Row(
-        children: [
-          Image.asset('assets/images/beltei_logo.png',
-              height: 48, fit: BoxFit.contain),
-          const SizedBox(width: 10),
-          Text('BELTEI Portal', style: AppTextStyles.h3),
-        ],
-      ),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-      ],
-    );
-  }
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Create Announcement', style: AppTextStyles.h1),
-        Text('Broadcast information to students and faculty members.',
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryNavy),
+              onPressed: () => Navigator.of(context).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+            Text(l.createAnnouncementTitle, style: AppTextStyles.h1),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(l.createAnnouncementSubtitle,
             style: AppTextStyles.caption.copyWith(height: 1.4)),
       ],
     );
@@ -163,7 +154,7 @@ class _CreateAnnouncementScreenState
 
   // ── Composition card ───────────────────────────────────────────────────────
 
-  Widget _buildCompositionCard() {
+  Widget _buildCompositionCard(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -174,17 +165,17 @@ class _CreateAnnouncementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ANNOUNCEMENT TITLE', style: AppTextStyles.label),
+          Text(l.createAnnouncementTitleFieldLabel, style: AppTextStyles.label),
           const SizedBox(height: 8),
           TextField(
             controller: _titleController,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'e.g., Upcoming Midterm Examination Schedule',
+            decoration: InputDecoration(
+              hintText: l.createAnnouncementTitleHint,
             ),
           ),
           const SizedBox(height: 16),
-          Text('CONTENT', style: AppTextStyles.label),
+          Text(l.createAnnouncementContentLabel, style: AppTextStyles.label),
           const SizedBox(height: 8),
           _buildFormattingToolbar(),
           const SizedBox(height: 4),
@@ -198,10 +189,10 @@ class _CreateAnnouncementScreenState
               controller: _contentController,
               maxLines: 8,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Write your announcement details here...',
+              decoration: InputDecoration(
+                hintText: l.createAnnouncementContentHint,
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.all(12),
+                contentPadding: const EdgeInsets.all(12),
               ),
             ),
           ),
@@ -212,7 +203,7 @@ class _CreateAnnouncementScreenState
                 onPressed: () {},
                 icon: Icon(Icons.attach_file,
                     size: 16, color: AppColors.primaryNavy),
-                label: Text('Attach Files',
+                label: Text(l.createAnnouncementAttachFilesButton,
                     style: AppTextStyles.link.copyWith(fontSize: 13)),
               ),
               const SizedBox(width: 16),
@@ -220,7 +211,7 @@ class _CreateAnnouncementScreenState
                 onPressed: () {},
                 icon: Icon(Icons.schedule_outlined,
                     size: 16, color: AppColors.primaryNavy),
-                label: Text('Schedule',
+                label: Text(l.createAnnouncementScheduleButton,
                     style: AppTextStyles.link.copyWith(fontSize: 13)),
               ),
             ],
@@ -266,7 +257,7 @@ class _CreateAnnouncementScreenState
 
   // ── Publication settings ───────────────────────────────────────────────────
 
-  Widget _buildPublicationSettings() {
+  Widget _buildPublicationSettings(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -277,35 +268,35 @@ class _CreateAnnouncementScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Publication Settings',
+          Text(l.createAnnouncementPublicationSettingsTitle,
               style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 14),
-          Text('RECIPIENT SCOPE', style: AppTextStyles.label),
+          Text(l.createAnnouncementRecipientScopeLabel, style: AppTextStyles.label),
           const SizedBox(height: 10),
-          _buildScopeButtons(),
+          _buildScopeButtons(l),
           const SizedBox(height: 14),
-          _buildToggleRow('Send Email Notification', _sendEmail,
+          _buildToggleRow(l.createAnnouncementSendEmailLabel, _sendEmail,
               (val) => setState(() => _sendEmail = val)),
           const SizedBox(height: 10),
-          _buildToggleRow('Push Notification (App)', _pushNotif,
+          _buildToggleRow(l.createAnnouncementPushNotifLabel, _pushNotif,
               (val) => setState(() => _pushNotif = val)),
         ],
       ),
     );
   }
 
-  Widget _buildScopeButtons() {
+  Widget _buildScopeButtons(AppLocalizations l) {
     return Row(
       children: [
         _ScopeChip(
-          label: 'All Students',
+          label: l.createAnnouncementAllStudentsChip,
           icon: Icons.public,
           selected: _allStudents,
           onTap: () => setState(() => _allStudents = true),
         ),
         const SizedBox(width: 10),
         _ScopeChip(
-          label: 'Specific Course',
+          label: l.createAnnouncementSpecificCourseChip,
           icon: Icons.menu_book_outlined,
           selected: !_allStudents,
           onTap: () => setState(() => _allStudents = false),
@@ -331,7 +322,7 @@ class _CreateAnnouncementScreenState
 
   // ── Live preview card ──────────────────────────────────────────────────────
 
-  Widget _buildLivePreviewCard() {
+  Widget _buildLivePreviewCard(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -344,10 +335,10 @@ class _CreateAnnouncementScreenState
           Icon(Icons.visibility_outlined,
               color: AppColors.textSecondary, size: 28),
           const SizedBox(height: 8),
-          Text('Live Preview', style: AppTextStyles.h2),
+          Text(l.createAnnouncementLivePreviewTitle, style: AppTextStyles.h2),
           const SizedBox(height: 4),
           Text(
-            'See how your announcement will appear to the selected audience.',
+            l.createAnnouncementLivePreviewSubtitle,
             style: AppTextStyles.caption.copyWith(height: 1.4),
             textAlign: TextAlign.center,
           ),
@@ -356,7 +347,7 @@ class _CreateAnnouncementScreenState
             width: double.infinity,
             child: OutlinedButton(
               onPressed: () {},
-              child: Text('Preview as Student',
+              child: Text(l.createAnnouncementPreviewAsStudentButton,
                   style: AppTextStyles.button
                       .copyWith(color: AppColors.primaryNavy)),
             ),
@@ -368,7 +359,7 @@ class _CreateAnnouncementScreenState
 
   // ── Post button ────────────────────────────────────────────────────────────
 
-  Widget _buildPostButton() {
+  Widget _buildPostButton(AppLocalizations l) {
     return AnimatedOpacity(
       opacity: _isValid ? 1.0 : 0.5,
       duration: const Duration(milliseconds: 200),
@@ -385,18 +376,18 @@ class _CreateAnnouncementScreenState
                       strokeWidth: 2, color: Colors.white),
                 )
               : const Icon(Icons.send_outlined, size: 18),
-          label: Text('Post Announcement', style: AppTextStyles.button),
+          label: Text(l.createAnnouncementPostButton, style: AppTextStyles.button),
         ),
       ),
     );
   }
 
-  Widget _buildDraftButton() {
+  Widget _buildDraftButton(AppLocalizations l) {
     return SizedBox(
       width: double.infinity,
       child: TextButton(
         onPressed: _saveDraft,
-        child: Text('Save as Draft',
+        child: Text(l.createAnnouncementSaveDraftButton,
             style:
                 AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
       ),
@@ -405,7 +396,7 @@ class _CreateAnnouncementScreenState
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
-  Widget _buildSuccessScreen(BuildContext context) {
+  Widget _buildSuccessScreen(BuildContext context, AppLocalizations l) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -425,11 +416,11 @@ class _CreateAnnouncementScreenState
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
-              Text('Announcement Posted!',
+              Text(l.createAnnouncementSuccessTitle,
                   style: AppTextStyles.h1, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                '"${_postedTitle ?? ''}" has been posted successfully.',
+                l.createAnnouncementSuccessMessage(_postedTitle ?? ''),
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,
@@ -440,7 +431,7 @@ class _CreateAnnouncementScreenState
                 height: AppSpacing.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Done', style: AppTextStyles.button),
+                  child: Text(l.done, style: AppTextStyles.button),
                 ),
               ),
             ],

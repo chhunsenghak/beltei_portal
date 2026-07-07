@@ -93,7 +93,7 @@ class _InstitutionalReportsScreenState
   Widget _buildFilters() {
     final semesterItems = <String>[
       'All Semesters',
-      ...ref.watch(adminSemestersProvider).valueOrNull?.map((s) => s.name) ?? <String>[],
+      ...ref.watch(adminSemestersProvider).valueOrNull?.map((s) => '${s.name} (${s.academicYear})') ?? <String>[],
     ];
     final semValue = semesterItems.contains(_semester) ? _semester : semesterItems.first;
 

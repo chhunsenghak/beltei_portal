@@ -5,8 +5,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
-
-const _kTabs = ['Midterm', 'Assignment', 'Participation', 'Final Exam'];
+import '../../../l10n/app_localizations.dart';
 
 class GradeManagementScreen extends ConsumerStatefulWidget {
   const GradeManagementScreen({super.key, required this.courseId});
@@ -20,6 +19,13 @@ class GradeManagementScreen extends ConsumerStatefulWidget {
 class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
   int _selectedTab = 0;
   bool _saving = false;
+
+  List<String> _kTabs(AppLocalizations l) => [
+        l.courseDetailMidtermLabel,
+        l.courseDetailAssignmentLabel,
+        l.gradeManagementParticipationLabel,
+        l.courseDetailFinalExamLabel,
+      ];
 
   // studentId → tab index → TextEditingController
   final Map<String, List<TextEditingController>> _controllers = {};
@@ -92,17 +98,17 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
       }
 
       await ref.read(teacherServiceProvider).saveGrades(
-            courseId: widget.courseId,
-            semesterId: semesterId,
+            classTermCourseId: widget.courseId,
             grades: gradesToSave,
           );
 
       ref.invalidate(courseGradesProvider(widget.courseId));
 
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Grades saved successfully.',
+            content: Text(l.gradeManagementSaveSuccess,
                 style: AppTextStyles.body.copyWith(color: Colors.white)),
             backgroundColor: AppColors.statusGreen,
             behavior: SnackBarBehavior.floating,
@@ -113,9 +119,10 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final l = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save grades: $e',
+            content: Text(l.gradeManagementSaveError(e),
                 style: AppTextStyles.body.copyWith(color: Colors.white)),
             backgroundColor: AppColors.statusRed,
             behavior: SnackBarBehavior.floating,
@@ -131,6 +138,7 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final asyncCourse = ref.watch(courseInfoProvider(widget.courseId));
     final asyncStudents = ref.watch(courseStudentsProvider(widget.courseId));
     final asyncGrades = ref.watch(courseGradesProvider(widget.courseId));
@@ -153,12 +161,12 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                     Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
-                    Text('Could not load students',
+                    Text(l.loadErrorStudents,
                         style: AppTextStyles.bodyMedium),
                     TextButton(
                       onPressed: () => ref
                           .invalidate(courseStudentsProvider(widget.courseId)),
-                      child: const Text('Retry'),
+                      child: Text(l.retry),
                     ),
                   ],
                 ),
@@ -174,12 +182,12 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                         Icon(Icons.error_outline,
                             color: AppColors.statusRed, size: 40),
                         const SizedBox(height: 8),
-                        Text('Could not load grades',
+                        Text(l.loadErrorGrades,
                             style: AppTextStyles.bodyMedium),
                         TextButton(
                           onPressed: () => ref.invalidate(
                               courseGradesProvider(widget.courseId)),
-                          child: const Text('Retry'),
+                          child: Text(l.retry),
                         ),
                       ],
                     ),
@@ -192,16 +200,17 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTitle(courseName),
+                          _buildTitle(courseName, l),
                           const SizedBox(height: AppSpacing.md),
-                          _buildTypeTabs(),
+                          _buildTypeTabs(l),
                           const SizedBox(height: 12),
                           Text(
-                              '${students.length} Student${students.length == 1 ? '' : 's'} Enrolled',
+                              l.gradeManagementStudentsEnrolledCount(
+                                  students.length),
                               style: AppTextStyles.caption),
                           const SizedBox(height: 12),
                           if (students.isEmpty)
-                            _buildEmpty()
+                            _buildEmpty(l)
                           else
                             ...students.map((s) {
                               final ctrls = _controllers[s.studentId]!;
@@ -211,7 +220,8 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                                 child: _GradeCard(
                                   student: s,
                                   controller: ctrls[_selectedTab],
-                                  tabLabel: _kTabs[_selectedTab],
+                                  tabLabel: _kTabs(l)[_selectedTab],
+                                  l: l,
                                 ),
                               );
                             }),
@@ -225,19 +235,32 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
             ),
           ),
           _buildSaveButton(semesterId,
-              asyncStudents.whenData((s) => s).value ?? []),
+              asyncStudents.whenData((s) => s).value ?? [], l),
         ],
       ),
     );
   }
 
-  Widget _buildTitle(String? courseName) {
+  Widget _buildTitle(String? courseName, AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Grade Management', style: AppTextStyles.h1),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryNavy),
+              onPressed: () => Navigator.of(context).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 8),
+            Text(l.gradeManagementTitle, style: AppTextStyles.h1),
+          ],
+        ),
+        const SizedBox(height: 6),
         Text(
-          courseName ?? 'Loading course...',
+          courseName ?? l.gradeManagementLoadingCourse,
           style: AppTextStyles.caption,
           overflow: TextOverflow.ellipsis,
         ),
@@ -245,11 +268,12 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
     );
   }
 
-  Widget _buildTypeTabs() {
+  Widget _buildTypeTabs(AppLocalizations l) {
+    final tabs = _kTabs(l);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(_kTabs.length, (i) {
+        children: List.generate(tabs.length, (i) {
           final isActive = i == _selectedTab;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -270,7 +294,7 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                   ),
                 ),
                 child: Text(
-                  _kTabs[i],
+                  tabs[i],
                   style: AppTextStyles.caption.copyWith(
                     color: isActive
                         ? Colors.white
@@ -288,18 +312,18 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32),
       alignment: Alignment.center,
-      child: Text('No students enrolled in this course.',
+      child: Text(l.gradeManagementEmptyState,
           style: AppTextStyles.body
               .copyWith(color: AppColors.textSecondary)),
     );
   }
 
   Widget _buildSaveButton(
-      String? semesterId, List<CourseStudent> students) {
+      String? semesterId, List<CourseStudent> students, AppLocalizations l) {
     final canSave = semesterId != null && !_saving;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -320,7 +344,7 @@ class _GradeManagementScreenState extends ConsumerState<GradeManagementScreen> {
                 )
               : const Icon(Icons.save_outlined, size: 18),
           label: Text(
-            _saving ? 'Saving…' : 'Save Grades',
+            _saving ? l.gradeManagementSaving : l.gradeManagementSaveButton,
             style: AppTextStyles.button,
           ),
         ),
@@ -336,11 +360,13 @@ class _GradeCard extends StatelessWidget {
     required this.student,
     required this.controller,
     required this.tabLabel,
+    required this.l,
   });
 
   final CourseStudent student;
   final TextEditingController controller;
   final String tabLabel;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -400,11 +426,11 @@ class _GradeCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text('/ 100',
+          Text(l.gradeManagementMaxScoreLabel,
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textSecondary)),
           const SizedBox(width: 10),
-          _ScoreLabel(tabLabel: tabLabel, controller: controller),
+          _ScoreLabel(tabLabel: tabLabel, controller: controller, l: l),
         ],
       ),
     );
@@ -413,9 +439,10 @@ class _GradeCard extends StatelessWidget {
 
 class _ScoreLabel extends StatefulWidget {
   const _ScoreLabel(
-      {required this.tabLabel, required this.controller});
+      {required this.tabLabel, required this.controller, required this.l});
   final String tabLabel;
   final TextEditingController controller;
+  final AppLocalizations l;
 
   @override
   State<_ScoreLabel> createState() => _ScoreLabelState();
@@ -450,7 +477,7 @@ class _ScoreLabelState extends State<_ScoreLabel> {
             BorderRadius.circular(AppSpacing.chipRadius),
       ),
       child: Text(
-        hasScore ? widget.tabLabel : 'Pending',
+        hasScore ? widget.tabLabel : widget.l.leaveDashboardStatusPending,
         style: AppTextStyles.caption.copyWith(
           color: hasScore
               ? AppColors.primaryBlue

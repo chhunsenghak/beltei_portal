@@ -4,12 +4,19 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
+import '../../../l10n/app_localizations.dart';
 
-const _kMethods = [
-  (name: 'ABA Bank', icon: Icons.account_balance_outlined),
-  (name: 'Wing', icon: Icons.phone_android_outlined),
-  (name: 'Pi Pay', icon: Icons.qr_code_outlined),
+const _kMethodIcons = [
+  Icons.account_balance_outlined,
+  Icons.phone_android_outlined,
+  Icons.qr_code_outlined,
 ];
+
+List<String> _methodNames(AppLocalizations l) => [
+      l.paymentMethodAbaBank,
+      l.paymentMethodWing,
+      l.paymentMethodPiPay,
+    ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -47,12 +54,13 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  void _confirmPayment(String studentName, String studentCode) {
+  void _confirmPayment(
+      String studentName, String studentCode, AppLocalizations l) {
     final amount = _amountController.text.trim();
     if (amount.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please enter a payment amount.',
+          content: Text(l.paymentAmountRequired,
               style: AppTextStyles.body.copyWith(color: Colors.white)),
           backgroundColor: AppColors.statusRed,
           behavior: SnackBarBehavior.floating,
@@ -65,9 +73,10 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
     showDialog(
       context: context,
       builder: (_) => _ConfirmDialog(
-        method: _kMethods[_methodIndex].name,
+        method: _methodNames(l)[_methodIndex],
         amount: amount,
         onConfirm: _processPayment,
+        l: l,
       ),
     );
   }
@@ -88,6 +97,7 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final profileAsync = ref.watch(studentProfileProvider);
     final financeAsync = ref.watch(studentFinanceProvider);
 
@@ -101,27 +111,27 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
     final outstanding = finance?.outstanding ?? 0.0;
 
     if (_succeeded) {
-      return _buildSuccessScreen(studentName, studentCode);
+      return _buildSuccessScreen(studentName, studentCode, l);
     }
-    if (_processing) return _buildProcessingScreen();
+    if (_processing) return _buildProcessingScreen(l);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(l),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildOutstandingBanner(outstanding),
+            _buildOutstandingBanner(outstanding, l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildPaymentMethodSelector(),
+            _buildPaymentMethodSelector(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildAmountField(),
+            _buildAmountField(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildOrderSummaryCard(studentName, studentCode),
+            _buildOrderSummaryCard(studentName, studentCode, l),
             const SizedBox(height: AppSpacing.xl),
-            _buildPayButton(studentName, studentCode),
+            _buildPayButton(studentName, studentCode, l),
             const SizedBox(height: 24),
           ],
         ),
@@ -131,7 +141,7 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── App bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(AppLocalizations l) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -140,13 +150,13 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
         icon: const Icon(Icons.arrow_back_ios, size: 18),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text('Online Payment', style: AppTextStyles.h3),
+      title: Text(l.paymentAppBarTitle, style: AppTextStyles.h3),
     );
   }
 
   // ── Outstanding balance banner ─────────────────────────────────────────────
 
-  Widget _buildOutstandingBanner(double outstanding) {
+  Widget _buildOutstandingBanner(double outstanding, AppLocalizations l) {
     final isZero = outstanding <= 0;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -176,7 +186,9 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                isZero ? 'No Outstanding Balance' : 'Outstanding Balance',
+                isZero
+                    ? l.paymentNoOutstandingBalance
+                    : l.paymentOutstandingBalance,
                 style: AppTextStyles.h3.copyWith(
                     color: isZero
                         ? AppColors.statusGreen
@@ -197,20 +209,20 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Payment method selector ────────────────────────────────────────────────
 
-  Widget _buildPaymentMethodSelector() {
+  Widget _buildPaymentMethodSelector(AppLocalizations l) {
+    final methodNames = _methodNames(l);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('PAYMENT METHOD', style: AppTextStyles.label),
+        Text(l.paymentMethodSectionLabel, style: AppTextStyles.label),
         const SizedBox(height: 8),
         Row(
-          children: List.generate(_kMethods.length, (i) {
+          children: List.generate(_kMethodIcons.length, (i) {
             final isSelected = _methodIndex == i;
-            final method = _kMethods[i];
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(
-                    right: i < _kMethods.length - 1 ? 8 : 0),
+                    right: i < _kMethodIcons.length - 1 ? 8 : 0),
                 child: GestureDetector(
                   onTap: () => setState(() => _methodIndex = i),
                   child: AnimatedContainer(
@@ -232,14 +244,14 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(method.icon,
+                        Icon(_kMethodIcons[i],
                             color: isSelected
                                 ? Colors.white
                                 : AppColors.textSecondary,
                             size: 20),
                         const SizedBox(height: 4),
                         Text(
-                          method.name,
+                          methodNames[i],
                           textAlign: TextAlign.center,
                           style: AppTextStyles.caption.copyWith(
                             color: isSelected
@@ -264,11 +276,11 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Amount field ───────────────────────────────────────────────────────────
 
-  Widget _buildAmountField() {
+  Widget _buildAmountField(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('AMOUNT (USD)', style: AppTextStyles.label),
+        Text(l.paymentAmountSectionLabel, style: AppTextStyles.label),
         const SizedBox(height: 8),
         TextField(
           controller: _amountController,
@@ -287,7 +299,8 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Order summary ──────────────────────────────────────────────────────────
 
-  Widget _buildOrderSummaryCard(String studentName, String studentCode) {
+  Widget _buildOrderSummaryCard(
+      String studentName, String studentCode, AppLocalizations l) {
     final amount = _amountController.text.trim().isEmpty
         ? '0.00'
         : _amountController.text.trim();
@@ -301,15 +314,16 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ORDER SUMMARY', style: AppTextStyles.label),
+          Text(l.paymentOrderSummaryLabel, style: AppTextStyles.label),
           const SizedBox(height: 12),
-          _buildSummaryRow('Student', studentName),
+          _buildSummaryRow(l.paymentStudentLabel, studentName),
           Divider(color: AppColors.divider, height: 16),
-          _buildSummaryRow('Student ID', studentCode),
+          _buildSummaryRow(l.paymentStudentIdLabel, studentCode),
           Divider(color: AppColors.divider, height: 16),
-          _buildSummaryRow('Method', _kMethods[_methodIndex].name),
+          _buildSummaryRow(
+              l.paymentMethodLabel, _methodNames(l)[_methodIndex]),
           Divider(color: AppColors.divider, height: 16),
-          _buildSummaryRow('Amount', '\$$amount',
+          _buildSummaryRow(l.paymentAmountLabel, '\$$amount',
               valueStyle: AppTextStyles.metric
                   .copyWith(color: AppColors.primaryNavy, fontSize: 18)),
         ],
@@ -332,21 +346,22 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Pay button ─────────────────────────────────────────────────────────────
 
-  Widget _buildPayButton(String studentName, String studentCode) {
+  Widget _buildPayButton(
+      String studentName, String studentCode, AppLocalizations l) {
     return SizedBox(
       width: double.infinity,
       height: AppSpacing.buttonHeight,
       child: ElevatedButton.icon(
-        onPressed: () => _confirmPayment(studentName, studentCode),
+        onPressed: () => _confirmPayment(studentName, studentCode, l),
         icon: const Icon(Icons.lock_outline, size: 18),
-        label: Text('Proceed to Pay', style: AppTextStyles.button),
+        label: Text(l.paymentProceedButton, style: AppTextStyles.button),
       ),
     );
   }
 
   // ── Processing screen ──────────────────────────────────────────────────────
 
-  Widget _buildProcessingScreen() {
+  Widget _buildProcessingScreen(AppLocalizations l) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -363,10 +378,10 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Processing Payment...', style: AppTextStyles.h2),
+              Text(l.paymentProcessingTitle, style: AppTextStyles.h2),
               const SizedBox(height: 8),
               Text(
-                'Please do not close this screen.',
+                l.paymentProcessingSubtitle,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary),
               ),
@@ -379,7 +394,8 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
-  Widget _buildSuccessScreen(String studentName, String studentCode) {
+  Widget _buildSuccessScreen(
+      String studentName, String studentCode, AppLocalizations l) {
     final amount = _amountController.text.trim().isEmpty
         ? '0.00'
         : _amountController.text.trim();
@@ -403,24 +419,26 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
-              Text('Payment Successful!',
+              Text(l.paymentSuccessTitle,
                   style: AppTextStyles.h1, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                'Your payment has been processed successfully.',
+                l.paymentSuccessSubtitle,
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              _buildReceiptCard(amount, studentName, studentCode, receiptNo),
+              _buildReceiptCard(
+                  amount, studentName, studentCode, receiptNo, l),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: AppSpacing.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Back to Finance', style: AppTextStyles.button),
+                  child: Text(l.paymentBackToFinanceButton,
+                      style: AppTextStyles.button),
                 ),
               ),
             ],
@@ -431,7 +449,7 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
   }
 
   Widget _buildReceiptCard(String amount, String studentName,
-      String studentCode, String receiptNo) {
+      String studentCode, String receiptNo, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -441,17 +459,18 @@ class _OnlinePaymentScreenState extends ConsumerState<OnlinePaymentScreen> {
       ),
       child: Column(
         children: [
-          _buildReceiptRow('Receipt No.', receiptNo,
+          _buildReceiptRow(l.paymentReceiptNumberLabel, receiptNo,
               valueColor: AppColors.primaryBlue),
           Divider(color: AppColors.divider, height: 20),
-          _buildReceiptRow('Student', studentName),
+          _buildReceiptRow(l.paymentStudentLabel, studentName),
           Divider(color: AppColors.divider, height: 20),
-          _buildReceiptRow('Method', _kMethods[_methodIndex].name),
+          _buildReceiptRow(
+              l.paymentMethodLabel, _methodNames(l)[_methodIndex]),
           Divider(color: AppColors.divider, height: 20),
-          _buildReceiptRow('Amount Paid', '\$$amount',
+          _buildReceiptRow(l.paymentAmountPaidLabel, '\$$amount',
               valueColor: AppColors.statusGreen),
           Divider(color: AppColors.divider, height: 20),
-          _buildReceiptRow('Status', 'PAID',
+          _buildReceiptRow(l.paymentStatusLabel, l.paymentStatusPaidValue,
               valueColor: AppColors.statusGreen),
         ],
       ),
@@ -482,11 +501,13 @@ class _ConfirmDialog extends StatelessWidget {
     required this.method,
     required this.amount,
     required this.onConfirm,
+    required this.l,
   });
 
   final String method;
   final String amount;
   final VoidCallback onConfirm;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -495,20 +516,20 @@ class _ConfirmDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
           borderRadius:
               BorderRadius.circular(AppSpacing.cardRadius + 4)),
-      title: Text('Confirm Payment', style: AppTextStyles.h2),
+      title: Text(l.paymentConfirmDialogTitle, style: AppTextStyles.h2),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'You are about to make the following payment:',
+            l.paymentConfirmDialogBody,
             style: AppTextStyles.body
                 .copyWith(color: AppColors.textSecondary, height: 1.5),
           ),
           const SizedBox(height: 16),
-          _DialogRow('Method', method),
+          _DialogRow(l.paymentMethodLabel, method),
           const SizedBox(height: 8),
-          _DialogRow('Amount', '\$$amount', bold: true),
+          _DialogRow(l.paymentAmountLabel, '\$$amount', bold: true),
         ],
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -517,7 +538,7 @@ class _ConfirmDialog extends StatelessWidget {
           width: double.infinity,
           child: ElevatedButton(
             onPressed: onConfirm,
-            child: Text('Confirm & Pay', style: AppTextStyles.button),
+            child: Text(l.paymentConfirmButton, style: AppTextStyles.button),
           ),
         ),
         const SizedBox(height: 8),
@@ -525,7 +546,7 @@ class _ConfirmDialog extends StatelessWidget {
           width: double.infinity,
           child: OutlinedButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancel',
+            child: Text(l.cancel,
                 style: AppTextStyles.button
                     .copyWith(color: AppColors.textSecondary)),
           ),

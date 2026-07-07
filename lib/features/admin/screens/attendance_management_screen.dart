@@ -45,6 +45,9 @@ class AttendanceManagementScreen extends ConsumerStatefulWidget {
 
 class _AttendanceManagementScreenState
     extends ConsumerState<AttendanceManagementScreen> {
+  // ── active tab ────────────────────────────────────────────────────────────
+  int _activeTab = 0; // 0: Roster Report, 1: Daily Logs
+
   // ── filter state ─────────────────────────────────────────────────────────
   String? _yearFilter;
   String? _facultyFilter;    // facultyId
@@ -210,7 +213,11 @@ class _AttendanceManagementScreenState
       } else {
         await svc.updateAttendanceStatuses(ids, action);
       }
-      ref.invalidate(adminAttendanceProvider);
+      final filter = AdminAttendanceFilter(
+        courseId: _courseFilter,
+        semesterId: _semesterFilter,
+      );
+      ref.invalidate(adminAttendanceProvider(filter));
       if (mounted) setState(() => _selected.clear());
     } catch (e) {
       if (mounted) {
@@ -571,7 +578,11 @@ class _AttendanceManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(adminAttendanceProvider);
+    final filter = AdminAttendanceFilter(
+      courseId: _courseFilter,
+      semesterId: _semesterFilter,
+    );
+    final async = ref.watch(adminAttendanceProvider(filter));
 
     // Pre-load reference data so filter dropdowns always show all options
     final allFaculties =
@@ -584,7 +595,7 @@ class _AttendanceManagementScreenState
         ref.watch(adminAllCoursesProvider).valueOrNull ?? [];
 
     return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -596,7 +607,7 @@ class _AttendanceManagementScreenState
                 style: AppTextStyles.body),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => ref.invalidate(adminAttendanceProvider),
+              onPressed: () => ref.invalidate(adminAttendanceProvider(filter)),
               child: const Text('Retry'),
             ),
           ],
@@ -609,14 +620,330 @@ class _AttendanceManagementScreenState
         return Column(
           children: [
             _buildHeader(allRecords, filtered),
+            _buildTabBar(),
             if (_filtersExpanded)
               _buildFilterPanel(allRecords, allFaculties, allMajors, allSemesters, allCourses),
-            _buildTableHeader(),
-            Expanded(child: _buildList(items)),
-            if (_bulkEditMode && _selected.isNotEmpty) _buildBulkBar(),
+            if (_activeTab == 0)
+              Expanded(child: _buildRosterReport(filtered))
+            else ...[
+              _buildTableHeader(),
+              Expanded(child: _buildList(items)),
+              if (_bulkEditMode && _selected.isNotEmpty) _buildBulkBar(),
+            ],
           ],
         );
       },
+    );
+  }
+
+  // ── Tab bar ────────────────────────────────────────────────────────────────
+
+  Widget _buildTabBar() {
+    return Container(
+      color: AppColors.bgPage,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _buildTabItem(0, 'Roster Report', Icons.analytics_outlined),
+          const SizedBox(width: 16),
+          _buildTabItem(1, 'Daily Logs', Icons.list_alt_outlined),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem(int index, String label, IconData icon) {
+    final isActive = _activeTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _activeTab = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isActive ? AppColors.primaryNavy : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: isActive ? AppColors.primaryNavy : AppColors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppTextStyles.bodySemiBold.copyWith(
+                color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Roster Report ──────────────────────────────────────────────────────────
+
+  Widget _buildRosterReport(List<AdminAttendanceRecord> records) {
+    if (_courseFilter == null) {
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.school_outlined, size: 48, color: AppColors.textLabel),
+              const SizedBox(height: 12),
+              Text(
+                'Select a Course to view the Roster Report',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Use the filter panel to select a Faculty and Course.',
+                style: AppTextStyles.caption.copyWith(color: AppColors.textLabel),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (records.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 48, color: AppColors.textLabel),
+              const SizedBox(height: 12),
+              Text(
+                'No attendance records found for this course',
+                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Group records by student
+    final studentStats = <String, ({
+      String studentId,
+      String studentCode,
+      String studentName,
+      int present,
+      int absent,
+      int late,
+      int excused,
+      int total,
+      double rate,
+    })>{};
+
+    final uniqueDates = <String>{};
+
+    for (final r in records) {
+      uniqueDates.add(r.date);
+      final stats = studentStats.putIfAbsent(r.studentId, () => (
+        studentId: r.studentId,
+        studentCode: r.studentCode,
+        studentName: r.studentName,
+        present: 0,
+        absent: 0,
+        late: 0,
+        excused: 0,
+        total: 0,
+        rate: 0.0,
+      ));
+
+      int p = stats.present;
+      int a = stats.absent;
+      int l = stats.late;
+      int e = stats.excused;
+
+      if (r.status == 'present') {
+        p++;
+      } else if (r.status == 'absent') {
+        a++;
+      } else if (r.status == 'late') {
+        l++;
+      } else if (r.status == 'excused') {
+        e++;
+      }
+
+      final tot = p + a + l + e;
+      final rate = tot > 0 ? (p + e + l * 0.5) / tot : 0.0;
+
+      studentStats[r.studentId] = (
+        studentId: r.studentId,
+        studentCode: r.studentCode,
+        studentName: r.studentName,
+        present: p,
+        absent: a,
+        late: l,
+        excused: e,
+        total: tot,
+        rate: rate,
+      );
+    }
+
+    final statsList = studentStats.values.toList()
+      ..sort((a, b) => a.studentName.compareTo(b.studentName));
+
+    final totalSessions = uniqueDates.length;
+    final totalStudents = statsList.length;
+    final avgRate = statsList.isEmpty
+        ? 0.0
+        : statsList.fold<double>(0.0, (sum, s) => sum + s.rate) / statsList.length;
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          // Summary Stats cards
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SummaryStatCard(
+                    title: 'Total Students',
+                    value: totalStudents.toString(),
+                    icon: Icons.people_outline,
+                    color: AppColors.primaryNavy,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SummaryStatCard(
+                    title: 'Sessions Marked',
+                    value: totalSessions.toString(),
+                    icon: Icons.calendar_today_outlined,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SummaryStatCard(
+                    title: 'Average Attendance',
+                    value: '${(avgRate * 100).toStringAsFixed(1)}%',
+                    icon: Icons.insights_outlined,
+                    color: avgRate >= 0.85
+                        ? AppColors.statusGreen
+                        : avgRate >= 0.75
+                            ? AppColors.statusAmber
+                            : AppColors.statusRed,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Roster List Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bgPage,
+              border: Border(
+                top: BorderSide(color: AppColors.border),
+                bottom: BorderSide(color: AppColors.border),
+              ),
+            ),
+            child: Text(
+              'STUDENT ROSTER & RATES',
+              style: AppTextStyles.label.copyWith(color: AppColors.textSecondary, fontSize: 10, letterSpacing: 0.5),
+            ),
+          ),
+
+          // Roster List
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: statsList.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (_, index) {
+              final student = statsList[index];
+              final ratePct = (student.rate * 100).toStringAsFixed(1);
+              final Color rateColor = student.rate >= 0.85
+                  ? AppColors.statusGreen
+                  : student.rate >= 0.75
+                      ? AppColors.statusAmber
+                      : AppColors.statusRed;
+
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                student.studentName,
+                                style: AppTextStyles.bodySemiBold,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'ID: ${student.studentCode}',
+                                style: AppTextStyles.label.copyWith(color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: rateColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '$ratePct%',
+                            style: AppTextStyles.label.copyWith(color: rateColor, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Progress Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: student.rate,
+                        backgroundColor: AppColors.border,
+                        valueColor: AlwaysStoppedAnimation<Color>(rateColor),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Counter Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _StatMiniIndicator(label: 'Present', count: student.present, color: AppColors.statusGreen),
+                        _StatMiniIndicator(label: 'Absent', count: student.absent, color: AppColors.statusRed),
+                        _StatMiniIndicator(label: 'Late', count: student.late, color: AppColors.statusAmber),
+                        _StatMiniIndicator(label: 'Excused', count: student.excused, color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -626,7 +953,7 @@ class _AttendanceManagementScreenState
       List<AdminAttendanceRecord> all,
       List<AdminAttendanceRecord> filtered) {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,11 +1140,12 @@ class _AttendanceManagementScreenState
         return y != 0 ? y : a.name.compareTo(b.name);
       });
 
-    // Courses cascade: filtered by year, faculty, semester (all by ID)
+    // Courses cascade: filtered by faculty (courses have no semester of their
+    // own anymore — a course can be taught in many semesters via different
+    // class terms, so year/semester filtering happens on the attendance
+    // records themselves below, not on the course list).
     final filteredCourses = allCourses.where((c) {
-      if (_yearFilter != null && c.semesterAcademicYear != _yearFilter) return false;
       if (_facultyFilter != null && c.facultyId != _facultyFilter) return false;
-      if (_semesterFilter != null && c.semesterId != _semesterFilter) return false;
       return true;
     }).toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -943,7 +1271,7 @@ class _AttendanceManagementScreenState
                 items: filteredSemesters
                     .map((s) => DropdownMenuItem(
                         value: s.id,
-                        child: Text(s.name,
+                        child: Text('${s.name} (${s.academicYear})',
                             overflow: TextOverflow.ellipsis)))
                     .toList(),
                 hint: 'All Semesters',
@@ -1499,9 +1827,9 @@ class _ClassPickerSheetState extends State<_ClassPickerSheet> {
       maxChildSize: 0.9,
       expand: false,
       builder: (_, sc) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: Column(children: [
           // Handle
@@ -1770,9 +2098,9 @@ class _ExportSuccessSheetState extends State<_ExportSuccessSheet>
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2034,9 +2362,9 @@ class _ExportFormatSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2179,6 +2507,87 @@ class _FormatCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Roster Report Helper Widgets ──────────────────────────────────────────────
+
+class _SummaryStatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _SummaryStatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.label.copyWith(color: AppColors.textSecondary, fontSize: 10),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy, fontSize: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatMiniIndicator extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+
+  const _StatMiniIndicator({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '$label: $count',
+          style: AppTextStyles.label.copyWith(fontSize: 10, color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 }

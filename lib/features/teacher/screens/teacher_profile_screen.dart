@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/locale_provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +18,7 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final profileAsync = ref.watch(teacherProfileProvider);
     final coursesAsync = ref.watch(teacherCoursesProvider);
 
@@ -29,19 +34,19 @@ class TeacherProfileScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load profile',
+              Text(l.teacherProfileLoadError,
                   style: AppTextStyles.bodyMedium),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(teacherProfileProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
         ),
         data: (profile) {
           if (profile == null) {
-            return const Center(child: Text('Profile not found.'));
+            return Center(child: Text(l.teacherProfileNotFound));
           }
           final courses = coursesAsync.valueOrNull ?? [];
           final activeCourses = courses
@@ -57,15 +62,15 @@ class TeacherProfileScreen extends ConsumerWidget {
                 const EdgeInsets.all(AppSpacing.screenPadding),
             children: [
               _buildStatsGrid(activeCourses.length, totalStudents,
-                  totalCredits),
+                  totalCredits, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildTeachingInfo(activeCourses),
+              _buildTeachingInfo(activeCourses, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildPersonalInfo(profile),
+              _buildPersonalInfo(profile, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildContactInfo(profile),
+              _buildContactInfo(profile, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildAccountSettings(context),
+              _buildAccountSettings(context, ref, l),
               const SizedBox(height: 24),
             ],
           );
@@ -76,27 +81,27 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   // ── Stats grid ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsGrid(
-      int activeCourses, int totalStudents, int weeklyCredits) {
+  Widget _buildStatsGrid(int activeCourses, int totalStudents,
+      int weeklyCredits, AppLocalizations l) {
     final stats = [
       (
-        label: 'ACTIVE\nCOURSES',
+        label: l.teacherProfileStatActiveCourses,
         value: activeCourses.toString().padLeft(2, '0'),
         color: AppColors.primaryNavy
       ),
       (
-        label: 'STUDENTS',
+        label: l.teacherProfileStatStudents,
         value: '$totalStudents',
         color: AppColors.primaryBlue
       ),
       (
-        label: 'CREDITS\n/ SEM',
+        label: l.teacherProfileStatCreditsPerSem,
         value: '$weeklyCredits',
         color: AppColors.statusAmber
       ),
       (
-        label: 'STATUS',
-        value: 'Active',
+        label: l.teacherProfileStatStatus,
+        value: l.statusActive,
         color: AppColors.statusGreen
       ),
     ];
@@ -136,14 +141,14 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   // ── Teaching info ──────────────────────────────────────────────────────────
 
-  Widget _buildTeachingInfo(List<TeacherCourse> courses) {
+  Widget _buildTeachingInfo(List<TeacherCourse> courses, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.menu_book_outlined,
-      title: 'Teaching Information',
+      title: l.teacherProfileTeachingInfoTitle,
       child: Column(
         children: [
           if (courses.isEmpty)
-            Text('No active courses assigned.',
+            Text(l.teacherProfileNoActiveCourses,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary))
           else
@@ -192,7 +197,9 @@ class TeacherProfileScreen extends ConsumerWidget {
                             color: AppColors.statusBlueBg,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: Text('${c.studentCount}\nStudents',
+                          child: Text(
+                              l.teacherProfileStudentsCountLabel(
+                                  c.studentCount),
                               style: AppTextStyles.label.copyWith(
                                   color: AppColors.primaryBlue,
                                   fontSize: 10),
@@ -209,34 +216,33 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   // ── Personal info ──────────────────────────────────────────────────────────
 
-  Widget _buildPersonalInfo(TeacherProfile profile) {
+  Widget _buildPersonalInfo(TeacherProfile profile, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.person_outline,
-      title: 'Professional Information',
+      title: l.teacherProfileProfessionalInfoTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _InfoRow('FULL NAME', profile.fullName),
-          _InfoRow('EMPLOYEE ID', profile.employeeCode),
-          _InfoRow('POSITION', profile.position ?? 'Not specified'),
-          _InfoRow('SPECIALIZATION',
-              profile.specialization ?? 'Not specified'),
-          _InfoRow('HIRE DATE',
-              _fmtDate(profile.hireDate) ?? 'Not specified',
+          _InfoRow(l.profileFullNameLabel, profile.fullName),
+          _InfoRow(l.teacherProfileEmployeeIdLabel, profile.employeeCode),
+          _InfoRow(l.teacherProfilePositionLabel,
+              profile.position ?? l.teacherProfileNotSpecified),
+          _InfoRow(l.teacherProfileSpecializationLabel,
+              profile.specialization ?? l.teacherProfileNotSpecified),
+          _InfoRow(
+              l.teacherProfileHireDateLabel,
+              _fmtDate(profile.hireDate, l) ?? l.teacherProfileNotSpecified,
               last: true),
         ],
       ),
     );
   }
 
-  String? _fmtDate(String? iso) {
+  String? _fmtDate(String? iso, AppLocalizations l) {
     if (iso == null) return null;
     try {
       final d = DateTime.parse(iso);
-      const months = [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-      return '${d.day} ${months[d.month]} ${d.year}';
+      return DateFormat.yMMMd(l.localeName).format(d);
     } catch (_) {
       return iso;
     }
@@ -244,11 +250,12 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   // ── Contact info ───────────────────────────────────────────────────────────
 
-  Widget _buildContactInfo(TeacherProfile profile) {
+  Widget _buildContactInfo(TeacherProfile profile, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.contact_phone_outlined,
-      title: 'Contact Information',
+      title: l.profileContactInfoTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ContactRow(Icons.email_outlined, profile.email),
           if (profile.phone != null)
@@ -258,7 +265,8 @@ class TeacherProfileScreen extends ConsumerWidget {
                 profile.departmentName!,
                 last: true)
           else
-            _ContactRow(Icons.business_outlined, 'Department not set',
+            _ContactRow(Icons.business_outlined,
+                l.teacherProfileDepartmentNotSet,
                 last: true),
         ],
       ),
@@ -267,21 +275,67 @@ class TeacherProfileScreen extends ConsumerWidget {
 
   // ── Account settings ───────────────────────────────────────────────────────
 
-  Widget _buildAccountSettings(BuildContext context) {
+  Widget _buildAccountSettings(
+      BuildContext context, WidgetRef ref, AppLocalizations l) {
+    final locale = ref.watch(localeProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return _SectionCard(
       icon: Icons.settings_outlined,
-      title: 'Account Settings',
+      title: l.profileAccountSettingsTitle,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SettingsTile(
             icon: Icons.lock_outline,
-            label: 'Change Password',
+            label: l.profileChangePassword,
             onTap: () {},
           ),
           _SettingsTile(
             icon: Icons.notifications_outlined,
-            label: 'Notification Settings',
-            onTap: () {},
+            label: l.profileNotificationSettings,
+            onTap: () => context.push('/teacher/alerts'),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.language_outlined,
+                color: AppColors.primaryNavy, size: 20),
+            title: Text(l.profileLanguageSettings, style: AppTextStyles.body),
+            subtitle: Text(l.profileLanguageSettingsSubtitle,
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(locale.languageCode == 'km' ? 'ភាសាខ្មែរ' : 'English',
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary)),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
+            onTap: () => _showLanguagePicker(context, ref, locale, l),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.dark_mode_outlined,
+                color: AppColors.primaryNavy, size: 20),
+            title: Text(l.settingsAppearanceTitle, style: AppTextStyles.body),
+            subtitle: Text("Choose your preferred theme",
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  switch (themeMode) {
+                    ThemeMode.light => l.settingsThemeLight,
+                    ThemeMode.dark => l.settingsThemeDark,
+                    ThemeMode.system => l.settingsThemeSystem,
+                  },
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
+            onTap: () => _showThemePicker(context, ref, themeMode, l),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -290,7 +344,7 @@ class TeacherProfileScreen extends ConsumerWidget {
               onPressed: () => context.go('/login'),
               icon: Icon(Icons.logout,
                   size: 16, color: AppColors.statusRed),
-              label: Text('Sign Out',
+              label: Text(l.profileSignOut,
                   style: AppTextStyles.button
                       .copyWith(color: AppColors.statusRed)),
               style: OutlinedButton.styleFrom(
@@ -300,6 +354,95 @@ class TeacherProfileScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Theme picker ───────────────────────────────────────────────────────────
+
+  void _showThemePicker(
+      BuildContext context, WidgetRef ref, ThemeMode currentMode, AppLocalizations l) {
+    final options = [
+      (mode: ThemeMode.light, label: l.settingsThemeLight),
+      (mode: ThemeMode.dark, label: l.settingsThemeDark),
+      (mode: ThemeMode.system, label: l.settingsThemeSystem),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(l.settingsAppearanceTitle, style: AppTextStyles.h3),
+              ),
+              ...options.map((opt) {
+                final isSelected = currentMode == opt.mode;
+                return ListTile(
+                  title: Text(opt.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(themeModeProvider.notifier).setThemeMode(opt.mode);
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Language picker ────────────────────────────────────────────────────────
+
+  void _showLanguagePicker(
+      BuildContext context, WidgetRef ref, Locale locale, AppLocalizations l) {
+    final options = [
+      (code: 'en', label: 'English'),
+      (code: 'km', label: 'ភាសាខ្មែរ'),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(l.profileChooseLanguage, style: AppTextStyles.h3),
+              ),
+              ...options.map((opt) {
+                final isSelected = locale.languageCode == opt.code;
+                return ListTile(
+                  title: Text(opt.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(localeProvider.notifier).setLocale(Locale(opt.code));
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -352,13 +495,16 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: last ? 0 : 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppTextStyles.label),
-          const SizedBox(height: 2),
-          Text(value, style: AppTextStyles.body),
-        ],
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppTextStyles.label),
+            const SizedBox(height: 2),
+            Text(value, style: AppTextStyles.body),
+          ],
+        ),
       ),
     );
   }

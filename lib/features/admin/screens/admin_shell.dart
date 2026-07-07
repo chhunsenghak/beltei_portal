@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../l10n/app_localizations.dart';
 
 class AdminShell extends ConsumerStatefulWidget {
@@ -36,13 +37,20 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(themeModeProvider);
+    final matchedLoc = GoRouterState.of(context).matchedLocation;
+    final showHeader = matchedLoc == '/admin' ||
+                       matchedLoc == '/admin/users' ||
+                       matchedLoc == '/admin/academic' ||
+                       matchedLoc == '/admin/finance' ||
+                       matchedLoc == '/admin/settings';
     final active = _activeIndex(context);
     final profileAsync = ref.watch(adminProfileProvider);
     final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
     return Scaffold(
       body: Column(
         children: [
-          _buildShellHeader(context, active, profileAsync, logoUrl),
+          if (showHeader) _buildShellHeader(context, active, profileAsync, logoUrl),
           Expanded(child: widget.child),
         ],
       ),
@@ -86,7 +94,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgPage,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Column(
@@ -225,7 +233,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
     return Container(
       height: 64,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgCard,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(

@@ -217,7 +217,7 @@ class _FacultyDepartmentScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -302,7 +302,7 @@ class _FacultyDepartmentScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -386,7 +386,7 @@ class _FacultyDepartmentScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -470,7 +470,7 @@ class _FacultyDepartmentScreenState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -742,12 +742,10 @@ class _SheetField extends StatelessWidget {
     required this.label,
     required this.controller,
     this.hint,
-    this.keyboardType,
   });
   final String label;
   final TextEditingController controller;
   final String? hint;
-  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -760,8 +758,8 @@ class _SheetField extends StatelessWidget {
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          keyboardType: keyboardType,
           style: AppTextStyles.body,
+
           decoration: InputDecoration(
             hintText: hint,
             hintStyle:

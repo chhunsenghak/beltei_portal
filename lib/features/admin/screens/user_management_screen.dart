@@ -10,7 +10,8 @@ import '../../../core/services/admin_service.dart';
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class UserManagementScreen extends ConsumerStatefulWidget {
-  const UserManagementScreen({super.key});
+  const UserManagementScreen({super.key, this.initialRole});
+  final String? initialRole;
 
   @override
   ConsumerState<UserManagementScreen> createState() =>
@@ -25,7 +26,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final int initialIndex = widget.initialRole == 'teacher' ? 1 : 0;
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
     _tabController.addListener(() {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -72,7 +74,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
 
   Widget _buildSearchBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: TextField(
         onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
@@ -105,7 +107,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen>
 
   Widget _buildTabBar() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgPage,
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primaryNavy,
@@ -282,7 +284,7 @@ class _StudentRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 1),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgCard,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Row(
@@ -452,9 +454,9 @@ class _AddUserSheetState extends ConsumerState<_AddUserSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
         child: Column(
           children: [

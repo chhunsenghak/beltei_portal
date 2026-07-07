@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/models/app_user.dart';
@@ -33,9 +34,29 @@ class AuthService {
   }
 
   Future<AppUser?> getProfile() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return null;
-    return _fetchProfile(user.id);
+    try {
+      final userResponse = await _client.auth.getUser().timeout(const Duration(seconds: 8));
+      final user = userResponse.user ?? _client.auth.currentUser;
+      if (user == null) return null;
+      return _fetchProfile(user.id);
+    } on AuthApiException catch (e) {
+      // Locally cached session refers to a user that no longer exists server-side
+      // (e.g. a local Supabase reset/reseed). Sign out so the router sends the
+      // user back to login instead of retrying forever against a dead session.
+      if (e.code == 'user_not_found' || e.statusCode == '403') {
+        debugPrint('getProfile: stale session, signing out');
+        await _client.auth.signOut();
+        return null;
+      }
+      debugPrint('getProfile auth error: $e');
+      return null;
+    } on TimeoutException catch (_) {
+      debugPrint('getProfile timed out');
+      return null;
+    } catch (e, st) {
+      debugPrint('getProfile error: $e\n$st');
+      return null;
+    }
   }
 
   Future<void> signOut() async {
@@ -51,7 +72,8 @@ class AuthService {
         .from('profiles')
         .select()
         .eq('id', userId)
-        .maybeSingle();
+        .maybeSingle()
+        .timeout(const Duration(seconds: 8));
     if (data == null) return null;
     return AppUser.fromMap(data);
   }

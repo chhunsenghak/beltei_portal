@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -8,8 +13,7 @@ import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/student_service.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
-
-const _kTabs = ['Overview', 'Attendance', 'Grades', 'Materials'];
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -29,7 +33,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _kTabs.length, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -40,6 +44,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final asyncCourses = ref.watch(studentCoursesProvider);
     final course = asyncCourses
         .whenData((list) =>
@@ -48,14 +53,15 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context, course),
+      appBar: _buildAppBar(context, course, l),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOverviewTab(course),
-          _buildAttendanceTab(),
-          _buildGradesTab(),
-          _buildMaterialsTab(),
+          _buildOverviewTab(course, l),
+          _buildAttendanceTab(l),
+          _buildGradesTab(l),
+          _buildAssignmentsTab(course, l),
+          _buildMaterialsTab(l),
         ],
       ),
     );
@@ -64,7 +70,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   // ── App bar ────────────────────────────────────────────────────────────────
 
   PreferredSizeWidget _buildAppBar(
-      BuildContext context, EnrolledCourse? course) {
+      BuildContext context, EnrolledCourse? course, AppLocalizations l) {
+    final tabs = [
+      l.courseDetailTabOverview,
+      l.courseDetailTabAttendance,
+      l.courseDetailTabGrades,
+      l.teacherDashboardQuickActionAssignments,
+      l.courseDetailTabMaterials,
+    ];
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -74,7 +87,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text(
-        course?.name ?? 'Course Detail',
+        course?.name ?? l.courseDetailFallbackTitle,
         style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy),
         overflow: TextOverflow.ellipsis,
       ),
@@ -94,14 +107,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.primaryNavy,
         indicatorWeight: 2.5,
-        tabs: _kTabs.map((t) => Tab(text: t)).toList(),
+        tabs: tabs.map((t) => Tab(text: t)).toList(),
       ),
     );
   }
 
   // ── Overview tab ───────────────────────────────────────────────────────────
 
-  Widget _buildOverviewTab(EnrolledCourse? course) {
+  Widget _buildOverviewTab(EnrolledCourse? course, AppLocalizations l) {
     if (course == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -110,15 +123,15 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildStatusCard(course),
+          _buildStatusCard(course, l),
           const SizedBox(height: 14),
-          _buildInfoRow(Icons.school_outlined, 'Credits',
-              '${course.credits} Academic Credits'),
+          _buildInfoRow(Icons.school_outlined, l.courseDetailCreditsLabel,
+              l.courseDetailAcademicCreditsValue(course.credits)),
           const SizedBox(height: 10),
           if (course.semesterName != null)
             _buildInfoRow(
               Icons.calendar_today_outlined,
-              'Semester',
+              l.courseDetailSemesterLabel,
               [
                 course.semesterName!,
                 if (course.semesterAcademicYear != null)
@@ -127,10 +140,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             ),
           if (course.semesterName != null) const SizedBox(height: 14),
           if (course.teacherName != null)
-            _buildTeacherCard(course.teacherName!),
+            _buildTeacherCard(course.teacherName!, l),
           if (course.attendanceRate != null) ...[
             const SizedBox(height: 14),
-            _buildAttendanceBadge(course.attendanceRate!),
+            _buildAttendanceBadge(course.attendanceRate!, l),
           ],
           const SizedBox(height: 24),
         ],
@@ -138,7 +151,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildStatusCard(EnrolledCourse course) {
+  Widget _buildStatusCard(EnrolledCourse course, AppLocalizations l) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -161,7 +174,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       BorderRadius.circular(AppSpacing.chipRadius),
                 ),
                 child: Text(
-                  course.isCurrentSemester ? 'CURRENT' : 'ENROLLED',
+                  course.isCurrentSemester
+                      ? l.courseDetailCurrentChip
+                      : l.courseDetailEnrolledChip,
                   style: AppTextStyles.label
                       .copyWith(color: Colors.white, fontSize: 11),
                 ),
@@ -201,12 +216,12 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildTeacherCard(String teacherName) {
+  Widget _buildTeacherCard(String teacherName, AppLocalizations l) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Instructor',
+          Text(l.courseDetailInstructorTitle,
               style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
           const SizedBox(height: 14),
           Row(
@@ -228,7 +243,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       Icon(Icons.email_outlined,
                           color: AppColors.primaryNavy, size: 16),
                       const SizedBox(width: 4),
-                      Text('Contact', style: AppTextStyles.link),
+                      Text(l.courseDetailContactLink, style: AppTextStyles.link),
                     ],
                   ),
                 ],
@@ -240,7 +255,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildAttendanceBadge(double rate) {
+  Widget _buildAttendanceBadge(double rate, AppLocalizations l) {
     final pct = (rate * 100).round();
     final isLow = rate < 0.75;
     return Container(
@@ -267,9 +282,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Attendance Rate', style: AppTextStyles.caption),
+              Text(l.courseDetailAttendanceRateLabel, style: AppTextStyles.caption),
               Text(
-                '$pct%${isLow ? ' — Below 75% threshold' : ''}',
+                isLow
+                    ? l.courseDetailAttendanceBelowThreshold(pct)
+                    : '$pct%',
                 style: AppTextStyles.h3.copyWith(
                     color: isLow
                         ? AppColors.statusRed
@@ -284,7 +301,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   // ── Attendance tab ─────────────────────────────────────────────────────────
 
-  Widget _buildAttendanceTab() {
+  Widget _buildAttendanceTab(AppLocalizations l) {
     final asyncRecords =
         ref.watch(studentCourseAttendanceProvider(widget.courseId));
 
@@ -297,11 +314,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             Icon(Icons.error_outline,
                 color: AppColors.statusRed, size: 40),
             const SizedBox(height: 8),
-            Text('Could not load attendance', style: AppTextStyles.body),
+            Text(l.loadErrorAttendance, style: AppTextStyles.body),
             TextButton(
               onPressed: () => ref.invalidate(
                   studentCourseAttendanceProvider(widget.courseId)),
-              child: const Text('Retry'),
+              child: Text(l.retry),
             ),
           ],
         ),
@@ -309,7 +326,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       data: (records) {
         if (records.isEmpty) {
           return Center(
-            child: Text('No attendance records yet.',
+            child: Text(l.courseDetailNoAttendanceRecords,
                 style:
                     AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
           );
@@ -329,9 +346,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildAttendanceSummaryCard(
-                  records.length, present, late, absent, rate),
+                  records.length, present, late, absent, rate, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              Text('Session History', style: AppTextStyles.h2),
+              Text(l.courseDetailSessionHistoryTitle, style: AppTextStyles.h2),
               const SizedBox(height: 12),
               _Card(
                 child: Column(
@@ -339,7 +356,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                     final isLast = e.key == records.length - 1;
                     return Column(
                       children: [
-                        _AttendanceRow(record: e.value),
+                        _AttendanceRow(record: e.value, l: l),
                         if (!isLast)
                           Divider(
                               height: 1, color: AppColors.divider),
@@ -356,8 +373,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildAttendanceSummaryCard(
-      int total, int present, int late, int absent, double rate) {
+  Widget _buildAttendanceSummaryCard(int total, int present, int late,
+      int absent, double rate, AppLocalizations l) {
     final isLow = rate < 0.75;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -368,7 +385,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ATTENDANCE RATE',
+          Text(l.courseDetailAttendanceRateAllCaps,
               style: AppTextStyles.label.copyWith(color: Colors.white70)),
           const SizedBox(height: 6),
           Row(
@@ -385,7 +402,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                     color: AppColors.statusRedBg,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text('Below 75%',
+                  child: Text(l.courseDetailBelowThresholdChip,
                       style: AppTextStyles.caption
                           .copyWith(color: AppColors.statusRed)),
                 ),
@@ -394,13 +411,13 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           const SizedBox(height: 16),
           Row(
             children: [
-              _AttendStat('Total', '$total', Colors.white70),
+              _AttendStat(l.courseDetailTotalLabel, '$total', Colors.white70),
               const SizedBox(width: 20),
-              _AttendStat('Present', '$present', AppColors.statusGreen),
+              _AttendStat(l.statusPresent, '$present', AppColors.statusGreen),
               const SizedBox(width: 20),
-              _AttendStat('Late', '$late', AppColors.statusAmber),
+              _AttendStat(l.statusLate, '$late', AppColors.statusAmber),
               const SizedBox(width: 20),
-              _AttendStat('Absent', '$absent', AppColors.statusRed),
+              _AttendStat(l.statusAbsent, '$absent', AppColors.statusRed),
             ],
           ),
         ],
@@ -410,7 +427,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   // ── Grades tab ─────────────────────────────────────────────────────────────
 
-  Widget _buildGradesTab() {
+  Widget _buildGradesTab(AppLocalizations l) {
     final asyncGrades = ref.watch(studentGradesProvider);
 
     return asyncGrades.when(
@@ -422,10 +439,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             Icon(Icons.error_outline,
                 color: AppColors.statusRed, size: 40),
             const SizedBox(height: 8),
-            Text('Could not load grades', style: AppTextStyles.body),
+            Text(l.loadErrorGrades, style: AppTextStyles.body),
             TextButton(
               onPressed: () => ref.invalidate(studentGradesProvider),
-              child: const Text('Retry'),
+              child: Text(l.retry),
             ),
           ],
         ),
@@ -444,7 +461,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
         if (grade == null) {
           return Center(
-            child: Text('No grades recorded yet.',
+            child: Text(l.courseDetailNoGradesRecorded,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary)),
           );
@@ -455,20 +472,21 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildGradeBanner(grade),
+              _buildGradeBanner(grade, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              Text('Score Breakdown', style: AppTextStyles.h2),
+              Text(l.courseDetailScoreBreakdownTitle, style: AppTextStyles.h2),
               const SizedBox(height: 12),
               _Card(
                 child: Column(
                   children: [
-                    _GradeRow('Midterm', grade.midterm),
+                    _GradeRow(l.courseDetailMidtermLabel, grade.midterm),
                     Divider(height: 1, color: AppColors.divider),
-                    _GradeRow('Assignment', grade.assignment),
+                    _GradeRow(l.courseDetailAssignmentLabel, grade.assignment),
                     Divider(height: 1, color: AppColors.divider),
-                    _GradeRow('Final Exam', grade.finalExam),
+                    _GradeRow(l.courseDetailFinalExamLabel, grade.finalExam),
                     Divider(height: 1, color: AppColors.divider),
-                    _GradeRow('Total', grade.total, isTotal: true),
+                    _GradeRow(l.courseDetailTotalLabel, grade.total,
+                        isTotal: true),
                   ],
                 ),
               ),
@@ -480,7 +498,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildGradeBanner(CourseGrade grade) {
+  Widget _buildGradeBanner(CourseGrade grade, AppLocalizations l) {
     final letterGrade = grade.letterGrade ?? '—';
     final Color gradeColor;
     if (letterGrade.startsWith('A')) {
@@ -507,18 +525,19 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('FINAL GRADE',
+                Text(l.courseDetailFinalGradeLabel,
                     style:
                         AppTextStyles.label.copyWith(color: Colors.white70)),
                 const SizedBox(height: 4),
                 Text(
                   grade.gpaPoints != null
-                      ? '${grade.gpaPoints!.toStringAsFixed(1)} GPA Points'
-                      : 'Not yet graded',
+                      ? l.courseDetailGpaPointsValue(
+                          grade.gpaPoints!.toStringAsFixed(1))
+                      : l.courseDetailNotYetGraded,
                   style: AppTextStyles.h3White,
                 ),
                 const SizedBox(height: 4),
-                Text('${grade.credits} Credits',
+                Text(l.courseDetailGradeCreditsValue(grade.credits),
                     style: AppTextStyles.captionWhite),
               ],
             ),
@@ -543,7 +562,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   // ── Materials tab ──────────────────────────────────────────────────────────
 
-  Widget _buildMaterialsTab() {
+  Widget _buildMaterialsTab(AppLocalizations l) {
     final asyncMaterials =
         ref.watch(courseMaterialsProvider(widget.courseId));
 
@@ -556,11 +575,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             Icon(Icons.error_outline,
                 color: AppColors.statusRed, size: 40),
             const SizedBox(height: 8),
-            Text('Could not load materials', style: AppTextStyles.body),
+            Text(l.courseDetailMaterialsLoadError, style: AppTextStyles.body),
             TextButton(
               onPressed: () =>
                   ref.invalidate(courseMaterialsProvider(widget.courseId)),
-              child: const Text('Retry'),
+              child: Text(l.retry),
             ),
           ],
         ),
@@ -574,7 +593,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 Icon(Icons.folder_open_outlined,
                     color: AppColors.textLabel, size: 48),
                 const SizedBox(height: 12),
-                Text('No materials uploaded yet.',
+                Text(l.courseDetailNoMaterialsUploaded,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textSecondary)),
               ],
@@ -591,7 +610,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
-                    Text('Course Materials', style: AppTextStyles.h2),
+                    Text(l.courseDetailMaterialsTitle, style: AppTextStyles.h2),
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -601,7 +620,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         borderRadius: BorderRadius.circular(
                             AppSpacing.chipRadius),
                       ),
-                      child: Text('${materials.length} Files',
+                      child: Text(
+                          l.courseDetailFilesCountValue(materials.length),
                           style: AppTextStyles.label
                               .copyWith(color: AppColors.primaryBlue)),
                     ),
@@ -612,7 +632,50 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             final item = materials[i - 1];
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _MaterialCard(item: item),
+              child: _MaterialCard(item: item, l: l),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAssignmentsTab(EnrolledCourse? course, AppLocalizations l) {
+    if (course == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final userAsync = ref.watch(currentUserProvider);
+    final studentId = userAsync.valueOrNull?.id;
+
+    if (studentId == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final assessmentsAsync = ref.watch(studentCourseAssessmentsProvider(course.classTermCourseId));
+
+    return assessmentsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text("Error loading assignments: $e")),
+      data: (assessments) {
+        if (assessments.isEmpty) {
+          return Center(
+            child: Text(
+              "No assignments found for this course.",
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          itemCount: assessments.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final assessment = assessments[index];
+            return _AssignmentItemWidget(
+              assessment: assessment,
+              studentId: studentId,
+              l: l,
             );
           },
         );
@@ -624,8 +687,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 // ── Attendance row ─────────────────────────────────────────────────────────────
 
 class _AttendanceRow extends StatelessWidget {
-  const _AttendanceRow({required this.record});
+  const _AttendanceRow({required this.record, required this.l});
   final AttendanceRecord record;
+  final AppLocalizations l;
 
   Color get _statusColor => switch (record.status) {
         AttendanceStatus.present => AppColors.statusGreen,
@@ -642,31 +706,16 @@ class _AttendanceRow extends StatelessWidget {
       };
 
   String get _statusLabel => switch (record.status) {
-        AttendanceStatus.present => 'Present',
-        AttendanceStatus.late => 'Late',
-        AttendanceStatus.absent => 'Absent',
-        AttendanceStatus.excused => 'Excused',
+        AttendanceStatus.present => l.statusPresent,
+        AttendanceStatus.late => l.statusLate,
+        AttendanceStatus.absent => l.statusAbsent,
+        AttendanceStatus.excused => l.statusExcused,
       };
 
   String _fmtDate(String iso) {
     try {
       final d = DateTime.parse(iso);
-      const months = [
-        '',
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      return '${months[d.month]} ${d.day}, ${d.year}';
+      return DateFormat.yMMMd(l.localeName).format(d);
     } catch (_) {
       return iso;
     }
@@ -761,8 +810,9 @@ class _GradeRow extends StatelessWidget {
 // ── Material card ──────────────────────────────────────────────────────────────
 
 class _MaterialCard extends StatelessWidget {
-  const _MaterialCard({required this.item});
+  const _MaterialCard({required this.item, required this.l});
   final CourseMaterialItem item;
+  final AppLocalizations l;
 
   IconData get _icon {
     final t = (item.fileType ?? '').toLowerCase();
@@ -793,22 +843,7 @@ class _MaterialCard extends StatelessWidget {
   String get _dateLabel {
     final d = item.uploadedAt;
     if (d == null) return '';
-    const months = [
-      '',
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[d.month]} ${d.day}, ${d.year}';
+    return DateFormat.yMMMd(l.localeName).format(d);
   }
 
   @override
@@ -849,8 +884,28 @@ class _MaterialCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.download_outlined,
-              color: AppColors.textLabel, size: 20),
+          IconButton(
+            icon: Icon(Icons.download_outlined,
+                color: AppColors.primaryBlue, size: 20),
+            onPressed: () async {
+              try {
+                final uri = Uri.parse(item.fileUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  throw 'Cannot launch URL';
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open file URL: $e')),
+                  );
+                }
+              }
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
         ],
       ),
     );
@@ -877,3 +932,487 @@ class _Card extends StatelessWidget {
     );
   }
 }
+
+class _AssignmentItemWidget extends ConsumerWidget {
+  const _AssignmentItemWidget({
+    required this.assessment,
+    required this.studentId,
+    required this.l,
+  });
+
+  final AssessmentItem assessment;
+  final String studentId;
+  final AppLocalizations l;
+
+  Color _getTypeColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return AppColors.primaryBlue;
+      case 'assignment':
+        return const Color(0xFF7C3AED);
+      case 'project':
+        return AppColors.statusGreen;
+      case 'exam':
+        return AppColors.statusRed;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  Color _getTypeBgColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'quiz':
+        return AppColors.statusBlueBg;
+      case 'assignment':
+        return const Color(0xFFF3E8FF);
+      case 'project':
+        return AppColors.statusGreenBg;
+      case 'exam':
+        return AppColors.statusRedBg;
+      default:
+        return AppColors.border;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final submissionAsync = ref.watch(studentAssessmentSubmissionProvider('${assessment.id}_$studentId'));
+    final submission = submissionAsync.valueOrNull;
+
+    String statusText = "Not Submitted";
+    Color statusColor = AppColors.textSecondary;
+    Color statusBg = AppColors.border;
+
+    if (submission != null) {
+      if (submission.grade != null) {
+        statusText = "Graded: ${submission.grade} / ${assessment.maxScore}";
+        statusColor = AppColors.statusGreen;
+        statusBg = AppColors.statusGreenBg;
+      } else {
+        statusText = "Submitted (Pending Grade)";
+        statusColor = AppColors.statusAmber;
+        statusBg = AppColors.statusAmberBg;
+      }
+    }
+
+    final formattedDueDate = assessment.dueDate != null
+        ? DateFormat('EEE, MMM d, y').format(assessment.dueDate!)
+        : 'No due date';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) => _SubmitAssignmentSheet(
+              assessment: assessment,
+              studentId: studentId,
+              submission: submission,
+              l: l,
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getTypeBgColor(assessment.type),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      assessment.type,
+                      style: AppTextStyles.label.copyWith(
+                        color: _getTypeColor(assessment.type),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: AppTextStyles.label.copyWith(
+                        color: statusColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                assessment.title,
+                style: AppTextStyles.bodySemiBold.copyWith(fontSize: 15, color: AppColors.primaryNavy),
+              ),
+              if (assessment.description != null && assessment.description!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  assessment.description!,
+                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textLabel),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Due: $formattedDueDate",
+                        style: AppTextStyles.caption.copyWith(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    "Max Score: ${assessment.maxScore}",
+                    style: AppTextStyles.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryNavy,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SubmitAssignmentSheet extends ConsumerStatefulWidget {
+  const _SubmitAssignmentSheet({
+    required this.assessment,
+    required this.studentId,
+    required this.submission,
+    required this.l,
+  });
+
+  final AssessmentItem assessment;
+  final String studentId;
+  final AssessmentSubmission? submission;
+  final AppLocalizations l;
+
+  @override
+  ConsumerState<_SubmitAssignmentSheet> createState() => _SubmitAssignmentSheetState();
+}
+
+class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> {
+  final _textController = TextEditingController();
+  XFile? _selectedFile;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.submission != null) {
+      _textController.text = widget.submission!.submissionText ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery);
+      if (file != null) {
+        setState(() {
+          _selectedFile = file;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking submission file: $e');
+    }
+  }
+
+  Future<void> _submit() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty && _selectedFile == null && widget.submission?.fileUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Please write a text response or pick a file to submit.",
+            style: AppTextStyles.body.copyWith(color: Colors.white)),
+        backgroundColor: AppColors.statusRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      String? finalFileUrl = widget.submission?.fileUrl;
+
+      if (_selectedFile != null) {
+        final bytes = await _selectedFile!.readAsBytes();
+        final fileExt = _selectedFile!.name.split('.').last;
+        final uniqueName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}';
+        final storagePath = 'submissions/${widget.assessment.id}/${widget.studentId}/$uniqueName';
+
+        await Supabase.instance.client.storage
+            .from('course-materials')
+            .uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: FileOptions(contentType: 'image/$fileExt'),
+            );
+
+        finalFileUrl = Supabase.instance.client.storage
+            .from('course-materials')
+            .getPublicUrl(storagePath);
+      }
+
+      await ref.read(studentServiceProvider).submitAssessment(
+        assessmentId: widget.assessment.id,
+        studentId: widget.studentId,
+        submissionText: text.isNotEmpty ? text : null,
+        fileUrl: finalFileUrl,
+      );
+
+      ref.invalidate(studentAssessmentSubmissionProvider('${widget.assessment.id}_${widget.studentId}'));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Assignment submitted successfully!",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Failed to submit: $e",
+              style: AppTextStyles.body.copyWith(color: Colors.white)),
+          backgroundColor: AppColors.statusRed,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = widget.submission;
+    final isGraded = sub?.grade != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bgPage,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        left: AppSpacing.screenPadding,
+        right: AppSpacing.screenPadding,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(widget.assessment.title, style: AppTextStyles.h2),
+            const SizedBox(height: 4),
+            Text(
+              "Max Score: ${widget.assessment.maxScore}",
+              style: AppTextStyles.caption.copyWith(color: AppColors.primaryNavy, fontWeight: FontWeight.w600),
+            ),
+            const Divider(height: 24),
+            if (isGraded) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.statusGreenBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.statusGreen.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Grade: ${sub!.grade} / ${widget.assessment.maxScore}",
+                      style: AppTextStyles.bodySemiBold.copyWith(color: AppColors.statusGreen),
+                    ),
+                    if (sub.feedback != null && sub.feedback!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        "Feedback: ${sub.feedback}",
+                        style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            Text("Submission Text", style: AppTextStyles.label),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _textController,
+              enabled: !isGraded && !_saving,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: "Write your submission text here...",
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text("Attachment File", style: AppTextStyles.label),
+            const SizedBox(height: 6),
+            if (isGraded)
+              if (sub?.fileUrl != null)
+                ListTile(
+                  leading: Icon(Icons.insert_drive_file_outlined, color: AppColors.primaryBlue),
+                  title: const Text("View submitted file"),
+                  trailing: Icon(Icons.open_in_new, color: AppColors.textLabel),
+                  onTap: () async {
+                    try {
+                      final uri = Uri.parse(sub!.fileUrl!);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } else {
+                        throw 'Cannot launch URL';
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Could not open file URL: $e')),
+                        );
+                      }
+                    }
+                  },
+                )
+              else
+                Text("No file attached", style: AppTextStyles.caption)
+            else ...[
+              GestureDetector(
+                onTap: _saving ? null : _pickFile,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+                    border: Border.all(
+                      color: _selectedFile != null || sub?.fileUrl != null
+                          ? AppColors.statusGreen
+                          : AppColors.border,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _selectedFile != null || sub?.fileUrl != null
+                            ? Icons.check_circle_outline
+                            : Icons.add_photo_alternate_outlined,
+                        color: _selectedFile != null || sub?.fileUrl != null
+                            ? AppColors.statusGreen
+                            : AppColors.primaryBlue,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _selectedFile != null
+                            ? "Selected: ${_selectedFile!.name}"
+                            : sub?.fileUrl != null
+                                ? "Existing attachment: file loaded"
+                                : "Tap to attach a file/image",
+                        style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_selectedFile != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() {
+                      _selectedFile = null;
+                    }),
+                    icon: Icon(Icons.clear, color: AppColors.statusRed, size: 14),
+                    label: Text("Clear File", style: TextStyle(color: AppColors.statusRed, fontSize: 11)),
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(height: 24),
+            if (!isGraded)
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.buttonHeight,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _submit,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(sub != null ? "Resubmit Assignment" : "Submit Assignment", style: AppTextStyles.button),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

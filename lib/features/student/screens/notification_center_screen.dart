@@ -6,8 +6,15 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
-const _kFilters = ['All', 'Grades', 'Attendance', 'Payment', 'Leave'];
+List<String> _kFilters(AppLocalizations l) => [
+      l.notificationsFilterAll,
+      l.notificationsFilterGrades,
+      l.notificationsFilterAttendance,
+      l.notificationsFilterPayment,
+      l.notificationsFilterLeave,
+    ];
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -38,13 +45,14 @@ class _NotificationCenterScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final notifsAsync = ref.watch(studentNotificationsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: Column(
         children: [
-          _buildFilterChips(),
+          _buildFilterChips(l),
           Expanded(
             child: notifsAsync.when(
               loading: () =>
@@ -56,13 +64,13 @@ class _NotificationCenterScreenState
                     Icon(Icons.error_outline,
                         color: AppColors.statusRed, size: 40),
                     const SizedBox(height: 8),
-                    Text('Could not load notifications',
+                    Text(l.notificationsLoadError,
                         style: AppTextStyles.bodyMedium),
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () => ref
                           .invalidate(studentNotificationsProvider),
-                      child: const Text('Retry'),
+                      child: Text(l.retry),
                     ),
                   ],
                 ),
@@ -71,11 +79,11 @@ class _NotificationCenterScreenState
                 final filtered = _applyFilter(notifications);
                 if (filtered.isEmpty) {
                   return Center(
-                    child: Text('No notifications here.',
+                    child: Text(l.notificationsEmptyState,
                         style: AppTextStyles.caption),
                   );
                 }
-                return _buildList(filtered);
+                return _buildList(filtered, l);
               },
             ),
           ),
@@ -84,14 +92,15 @@ class _NotificationCenterScreenState
     );
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(AppLocalizations l) {
+    final filters = _kFilters(l);
     return SizedBox(
       height: 50,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-        itemCount: _kFilters.length,
+        itemCount: filters.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final isActive = i == _filterIndex;
@@ -113,7 +122,7 @@ class _NotificationCenterScreenState
                         : AppColors.border),
               ),
               child: Text(
-                _kFilters[i],
+                filters[i],
                 style: AppTextStyles.bodySemiBold.copyWith(
                   color: isActive
                       ? Colors.white
@@ -128,7 +137,7 @@ class _NotificationCenterScreenState
     );
   }
 
-  Widget _buildList(List<NotificationRow> notifications) {
+  Widget _buildList(List<NotificationRow> notifications, AppLocalizations l) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       itemCount: notifications.length,
@@ -136,6 +145,7 @@ class _NotificationCenterScreenState
           Divider(color: AppColors.divider, height: 1),
       itemBuilder: (_, i) => _NotifTile(
         notif: notifications[i],
+        l: l,
         onTap: () {
           // Mark as read on tap
           ref
@@ -150,9 +160,10 @@ class _NotificationCenterScreenState
 // ── Notification tile ─────────────────────────────────────────────────────────
 
 class _NotifTile extends StatelessWidget {
-  const _NotifTile({required this.notif, required this.onTap});
+  const _NotifTile({required this.notif, required this.onTap, required this.l});
   final NotificationRow notif;
   final VoidCallback onTap;
+  final AppLocalizations l;
 
   IconData get _icon => switch (notif.type) {
         'grade' => Icons.grade_outlined,
@@ -188,10 +199,10 @@ class _NotifTile extends StatelessWidget {
   String _timeAgo(DateTime? createdAt) {
     if (createdAt == null) return '';
     final diff = DateTime.now().difference(createdAt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    return DateFormat('MMM d').format(createdAt);
+    if (diff.inMinutes < 60) return l.timeAgoMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l.timeAgoHours(diff.inHours);
+    if (diff.inDays == 1) return l.timeAgoYesterday;
+    return DateFormat('MMM d', l.localeName).format(createdAt);
   }
 
   @override

@@ -8,11 +8,11 @@ import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
 
 final _kQuickManagement = [
-  (icon: Icons.school_outlined,     label: 'Students',  route: '/admin/users'),
-  (icon: Icons.person_outlined,     label: 'Teachers',  route: '/admin/users'),
-  (icon: Icons.menu_book_outlined,  label: 'Courses',   route: '/admin/academic'),
-  (icon: Icons.class_outlined,      label: 'Classes',   route: '/admin/academic'),
-  (icon: Icons.how_to_reg_outlined, label: 'Enrollment',route: '/admin/academic'),
+  (icon: Icons.school_outlined,     label: 'Students',  route: '/admin/users?role=student'),
+  (icon: Icons.person_outlined,     label: 'Teachers',  route: '/admin/users?role=teacher'),
+  (icon: Icons.menu_book_outlined,  label: 'Courses',   route: '/admin/academic?tab=courses'),
+  (icon: Icons.class_outlined,      label: 'Classes',   route: '/admin/academic?tab=classes'),
+  (icon: Icons.how_to_reg_outlined, label: 'Enrollment',route: '/admin/academic?tab=enrollment'),
   (icon: Icons.payments_outlined,   label: 'Payments',  route: '/admin/finance'),
 ];
 
@@ -376,7 +376,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           children: [
             Text('Recent Leave Requests', style: AppTextStyles.h2),
             TextButton(
-              onPressed: () => context.go('/admin/academic'),
+              onPressed: () => context.go('/admin/academic?tab=leave'),
               child: Text('View All', style: AppTextStyles.link),
             ),
           ],

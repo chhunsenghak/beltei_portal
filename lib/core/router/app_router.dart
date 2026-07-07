@@ -27,16 +27,17 @@ import '../../features/teacher/screens/teacher_shell.dart';
 import '../../features/teacher/screens/teacher_dashboard_screen.dart';
 import '../../features/teacher/screens/teacher_course_list_screen.dart';
 import '../../features/teacher/screens/mark_attendance_screen.dart';
-import '../../features/teacher/screens/edit_attendance_screen.dart';
-import '../../features/teacher/screens/attendance_report_screen.dart';
 import '../../features/teacher/screens/grade_management_screen.dart';
 import '../../features/teacher/screens/create_assessment_screen.dart';
+import '../../features/teacher/screens/teacher_assessments_list_screen.dart';
 import '../../features/teacher/screens/upload_materials_screen.dart';
+import '../../features/teacher/screens/teacher_grading_screen.dart';
 import '../../features/teacher/screens/teacher_schedule_screen.dart';
 import '../../features/teacher/screens/leave_management_screen.dart';
 import '../../features/teacher/screens/leave_request_review_screen.dart';
 import '../../features/teacher/screens/teacher_student_analytics_screen.dart';
 import '../../features/teacher/screens/create_announcement_screen.dart';
+import '../../features/teacher/screens/teacher_notification_center_screen.dart';
 import '../../features/teacher/screens/teacher_profile_screen.dart';
 import '../../features/admin/screens/admin_shell.dart';
 import '../../features/admin/screens/admin_dashboard_screen.dart';
@@ -94,6 +95,7 @@ class AppRoutes {
   static const teacherSchedule = '/teacher/schedule';
   static const teacherStudents = '/teacher/students';
   static const teacherAlerts = '/teacher/alerts';
+  static const teacherAnalytics = '/teacher/analytics';
   static const teacherProfile = '/teacher/profile';
   static const teacherAnnouncement = '/teacher/alerts/announcement';
 
@@ -237,24 +239,15 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.teacherCourses,
-          builder: (context, state) => const TeacherCourseListScreen(),
+          builder: (context, state) {
+            final action = state.uri.queryParameters['action'];
+            return TeacherCourseListScreen(action: action);
+          },
           routes: [
             GoRoute(
               path: ':id/attendance',
               builder: (context, state) =>
                   MarkAttendanceScreen(courseId: state.pathParameters['id']!),
-              routes: [
-                GoRoute(
-                  path: 'edit',
-                  builder: (context, state) =>
-                      EditAttendanceScreen(courseId: state.pathParameters['id']!),
-                ),
-                GoRoute(
-                  path: 'report',
-                  builder: (context, state) =>
-                      AttendanceReportScreen(courseId: state.pathParameters['id']!),
-                ),
-              ],
             ),
             GoRoute(
               path: ':id/grades',
@@ -262,9 +255,24 @@ final appRouter = GoRouter(
                   GradeManagementScreen(courseId: state.pathParameters['id']!),
             ),
             GoRoute(
-              path: ':id/assessments/create',
+              path: ':id/assessments',
               builder: (context, state) =>
-                  CreateAssessmentScreen(courseId: state.pathParameters['id']!),
+                  TeacherAssessmentsListScreen(courseId: state.pathParameters['id']!),
+              routes: [
+                GoRoute(
+                  path: 'create',
+                  builder: (context, state) =>
+                      CreateAssessmentScreen(courseId: state.pathParameters['id']!),
+                ),
+                GoRoute(
+                  path: ':assessmentId/submissions',
+                  builder: (context, state) =>
+                      TeacherGradingScreen(
+                        courseId: state.pathParameters['id']!,
+                        assessmentId: state.pathParameters['assessmentId']!,
+                      ),
+                ),
+              ],
             ),
             GoRoute(
               path: ':id/materials',
@@ -290,13 +298,17 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.teacherAlerts,
-          builder: (context, state) => const TeacherStudentAnalyticsScreen(),
+          builder: (context, state) => const TeacherNotificationCenterScreen(),
           routes: [
             GoRoute(
               path: 'announcement',
               builder: (context, state) => const CreateAnnouncementScreen(),
             ),
           ],
+        ),
+        GoRoute(
+          path: AppRoutes.teacherAnalytics,
+          builder: (context, state) => const TeacherStudentAnalyticsScreen(),
         ),
         GoRoute(
           path: AppRoutes.teacherProfile,
@@ -315,7 +327,10 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.adminUsers,
-          builder: (context, state) => const UserManagementScreen(),
+          builder: (context, state) {
+            final role = state.uri.queryParameters['role'];
+            return UserManagementScreen(initialRole: role);
+          },
           routes: [
             GoRoute(
               path: 'students/:id',
@@ -331,7 +346,10 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: AppRoutes.adminAcademic,
-          builder: (context, state) => const AcademicManagementScreen(),
+          builder: (context, state) {
+            final tab = state.uri.queryParameters['tab'];
+            return AcademicManagementScreen(initialTab: tab);
+          },
           routes: [
             GoRoute(
               path: 'courses/:id',

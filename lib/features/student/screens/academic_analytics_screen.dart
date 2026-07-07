@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final asyncGrades = ref.watch(studentGradesProvider);
     final asyncProfile = ref.watch(studentProfileProvider);
     final asyncCourses = ref.watch(studentCoursesProvider);
@@ -29,10 +31,10 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load grades', style: AppTextStyles.body),
+              Text(l.loadErrorGrades, style: AppTextStyles.body),
               TextButton(
                 onPressed: () => ref.invalidate(studentGradesProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -88,7 +90,7 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
           final progressPct =
               (totalEarned / totalRequired).clamp(0.0, 1.0);
           final degreeName =
-              profile?.majorName ?? 'Degree Program';
+              profile?.majorName ?? l.analyticsDefaultDegreeName;
 
           // Current semester courses for performance table
           final currentCourses =
@@ -100,22 +102,22 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTitle(),
+                _buildTitle(l),
                 const SizedBox(height: AppSpacing.md),
-                _buildCGPACard(cgpa, delta, trendSpots),
+                _buildCGPACard(cgpa, delta, trendSpots, l),
                 const SizedBox(height: AppSpacing.sectionGap),
                 _buildDegreeProgress(
-                    progressPct, totalEarned, totalRequired, degreeName),
+                    progressPct, totalEarned, totalRequired, degreeName, l),
                 if (trendSpots.length >= 2) ...[
                   const SizedBox(height: AppSpacing.sectionGap),
-                  _buildGPATrend(trendSpots, validSems),
+                  _buildGPATrend(trendSpots, validSems, l),
                 ],
                 if (sorted.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sectionGap),
-                  _buildSemesterComparison(sorted),
+                  _buildSemesterComparison(sorted, l),
                 ],
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildCoursePerformance(currentCourses),
+                _buildCoursePerformance(currentCourses, l),
                 const SizedBox(height: 24),
               ],
             ),
@@ -127,33 +129,32 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
 
   // ── Title ──────────────────────────────────────────────────────────────────
 
-  Widget _buildTitle() {
+  Widget _buildTitle(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Academic Performance', style: AppTextStyles.h1),
-        Text('Insights and progress tracking',
-            style: AppTextStyles.caption),
+        Text(l.analyticsTitle, style: AppTextStyles.h1),
+        Text(l.analyticsSubtitle, style: AppTextStyles.caption),
       ],
     );
   }
 
   // ── CGPA card ──────────────────────────────────────────────────────────────
 
-  Widget _buildCGPACard(
-      double cgpa, double delta, List<FlSpot> trendSpots) {
+  Widget _buildCGPACard(double cgpa, double delta, List<FlSpot> trendSpots,
+      AppLocalizations l) {
     final hasData = trendSpots.isNotEmpty;
     final positive = delta >= 0;
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CURRENT CGPA', style: AppTextStyles.label),
+          Text(l.analyticsCurrentCgpaLabel, style: AppTextStyles.label),
           const SizedBox(height: 6),
           Row(
             children: [
               Text(
-                cgpa > 0 ? cgpa.toStringAsFixed(2) : 'N/A',
+                cgpa > 0 ? cgpa.toStringAsFixed(2) : l.profileNa,
                 style: AppTextStyles.metric.copyWith(
                     color: AppColors.primaryNavy, fontSize: 36),
               ),
@@ -182,7 +183,8 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${positive ? '+' : ''}${delta.toStringAsFixed(2)} vs last sem',
+                        l.analyticsGpaDeltaLabel(
+                            '${positive ? '+' : ''}${delta.toStringAsFixed(2)}'),
                         style: AppTextStyles.caption.copyWith(
                           color: positive
                               ? AppColors.statusGreen
@@ -231,14 +233,14 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
 
   // ── Degree progress ────────────────────────────────────────────────────────
 
-  Widget _buildDegreeProgress(
-      double pct, int earned, int required, String degreeName) {
+  Widget _buildDegreeProgress(double pct, int earned, int required,
+      String degreeName, AppLocalizations l) {
     final remaining = (required - earned).clamp(0, required);
     final statusLabel = pct >= 1.0
-        ? 'Completed'
+        ? l.statusCompleted
         : pct >= 0.5
-            ? 'On Track'
-            : 'In Progress';
+            ? l.analyticsStatusOnTrack
+            : l.analyticsStatusInProgress;
     final statusColor = pct >= 1.0
         ? AppColors.statusGreen
         : pct >= 0.5
@@ -252,9 +254,9 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Degree Progress', style: AppTextStyles.h2),
+              Text(l.analyticsDegreeProgressTitle, style: AppTextStyles.h2),
               Text(
-                '${(pct * 100).round()}%',
+                l.analyticsPercentComplete((pct * 100).round()),
                 style: AppTextStyles.h3
                     .copyWith(color: AppColors.primaryNavy),
               ),
@@ -275,13 +277,15 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildProgressStat(
-                  'Earned', '$earned / $required', AppColors.primaryBlue),
+              _buildProgressStat(l.analyticsEarnedLabel,
+                  l.analyticsEarnedValue(earned, required),
+                  AppColors.primaryBlue),
               const SizedBox(width: 24),
-              _buildProgressStat(
-                  'Required', '$remaining Credits', AppColors.textPrimary),
+              _buildProgressStat(l.analyticsRequiredLabel,
+                  l.analyticsRemainingCreditsValue(remaining),
+                  AppColors.textPrimary),
               const SizedBox(width: 24),
-              _buildProgressStat('Status', statusLabel, statusColor),
+              _buildProgressStat(l.analyticsStatusLabel, statusLabel, statusColor),
             ],
           ),
         ],
@@ -303,7 +307,7 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
   // ── GPA Trend chart ────────────────────────────────────────────────────────
 
   Widget _buildGPATrend(
-      List<FlSpot> spots, List<SemesterGrades> semesters) {
+      List<FlSpot> spots, List<SemesterGrades> semesters, AppLocalizations l) {
     final cgpaSpots =
         spots.map((s) => FlSpot(s.x, (s.y - 0.1).clamp(0.0, 4.0))).toList();
     return _Card(
@@ -312,11 +316,11 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Text('GPA Trend Analysis', style: AppTextStyles.h2),
+              Text(l.analyticsGpaTrendTitle, style: AppTextStyles.h2),
               const Spacer(),
-              _buildLegendDot(AppColors.primaryNavy, 'Term GPA'),
+              _buildLegendDot(AppColors.primaryNavy, l.analyticsLegendTermGpa),
               const SizedBox(width: 12),
-              _buildLegendDot(AppColors.primaryBlue, 'CGPA'),
+              _buildLegendDot(AppColors.primaryBlue, l.analyticsLegendCgpa),
             ],
           ),
           const SizedBox(height: 20),
@@ -407,7 +411,8 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
 
   // ── Semester comparison bar chart ──────────────────────────────────────────
 
-  Widget _buildSemesterComparison(List<SemesterGrades> semesters) {
+  Widget _buildSemesterComparison(
+      List<SemesterGrades> semesters, AppLocalizations l) {
     final labels = semesters.map((s) {
       final name = s.semesterName;
       final year = s.academicYear.length >= 4
@@ -421,8 +426,8 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Semester Comparison', style: AppTextStyles.h2),
-          Text('GPA per semester',
+          Text(l.analyticsSemesterComparisonTitle, style: AppTextStyles.h2),
+          Text(l.analyticsSemesterComparisonSubtitle,
               style: AppTextStyles.caption),
           const SizedBox(height: 20),
           SizedBox(
@@ -487,23 +492,24 @@ class AcademicAnalyticsScreen extends ConsumerWidget {
 
   // ── Course performance table ───────────────────────────────────────────────
 
-  Widget _buildCoursePerformance(List<EnrolledCourse> courses) {
+  Widget _buildCoursePerformance(
+      List<EnrolledCourse> courses, AppLocalizations l) {
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Current Semester Courses', style: AppTextStyles.h2),
+          Text(l.analyticsCurrentCoursesTitle, style: AppTextStyles.h2),
           const SizedBox(height: 4),
           if (courses.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text('No courses enrolled this semester.',
+              child: Text(l.analyticsNoCoursesMessage,
                   style: AppTextStyles.body
                       .copyWith(color: AppColors.textSecondary)),
             )
           else ...[
             Row(
-              children: ['COURSE NAME', 'CODE']
+              children: [l.analyticsCourseNameHeader, l.analyticsCourseCodeHeader]
                   .map((h) => Expanded(
                       child: Text(h, style: AppTextStyles.label)))
                   .toList(),

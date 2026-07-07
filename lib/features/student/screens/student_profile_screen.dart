@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/providers/locale_provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/student_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 class StudentProfileScreen extends ConsumerWidget {
   const StudentProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final asyncProfile = ref.watch(studentProfileProvider);
     final asyncGrades = ref.watch(studentGradesProvider);
 
@@ -25,13 +30,13 @@ class StudentProfileScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('Failed to load profile: $e',
+            child: Text(l.profileLoadError(e),
                 style: AppTextStyles.body, textAlign: TextAlign.center),
           ),
         ),
         data: (profile) {
           if (profile == null) {
-            return _buildProfileNotFound(context, ref);
+            return _buildProfileNotFound(context, ref, l);
           }
           final gpa = asyncGrades
               .whenData((semesters) => _cumulativeGpa(semesters))
@@ -40,22 +45,22 @@ class StudentProfileScreen extends ConsumerWidget {
           return SingleChildScrollView(
             child: Column(
               children: [
-                _buildProfileHeader(profile),
+                _buildProfileHeader(context, profile, l),
                 Padding(
                   padding: const EdgeInsets.all(AppSpacing.screenPadding),
                   child: Column(
                     children: [
-                      _buildPersonalInfo(profile),
+                      _buildPersonalInfo(context, profile, l),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildAcademicInfo(profile, gpa),
+                      _buildAcademicInfo(context, profile, gpa, l),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildContactInfo(profile),
+                      _buildContactInfo(context, profile, l),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildEmergencyContact(profile),
+                      _buildEmergencyContact(context, profile, l),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildAccountSettings(context),
+                      _buildAccountSettings(context, ref, l),
                       const SizedBox(height: AppSpacing.sectionGap),
-                      _buildLogoutButton(context),
+                      _buildLogoutButton(context, l),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -68,7 +73,8 @@ class StudentProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileNotFound(BuildContext context, WidgetRef ref) {
+  Widget _buildProfileNotFound(
+      BuildContext context, WidgetRef ref, AppLocalizations l) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -86,13 +92,12 @@ class StudentProfileScreen extends ConsumerWidget {
                   color: AppColors.statusRed, size: 36),
             ),
             const SizedBox(height: 20),
-            Text('Profile Not Found',
+            Text(l.profileNotFoundTitle,
                 style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy),
                 textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
-              'Your student record could not be loaded. '
-              'This may be a temporary issue or your account may not be fully set up yet.',
+              l.profileNotFoundMessage,
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
@@ -101,7 +106,7 @@ class StudentProfileScreen extends ConsumerWidget {
             ElevatedButton.icon(
               onPressed: () => ref.invalidate(studentProfileProvider),
               icon: const Icon(Icons.refresh, size: 18, color: Colors.white),
-              label: Text('Try Again', style: AppTextStyles.button),
+              label: Text(l.profileTryAgain, style: AppTextStyles.button),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryNavy,
                 minimumSize: const Size(double.infinity, 48),
@@ -117,7 +122,7 @@ class StudentProfileScreen extends ConsumerWidget {
               },
               icon: Icon(Icons.logout,
                   size: 18, color: AppColors.statusRed),
-              label: Text('Sign Out',
+              label: Text(l.profileSignOut,
                   style: AppTextStyles.button
                       .copyWith(color: AppColors.statusRed)),
               style: OutlinedButton.styleFrom(
@@ -148,22 +153,18 @@ class StudentProfileScreen extends ConsumerWidget {
     return totalCredits > 0 ? totalPoints / totalCredits : 0.0;
   }
 
-  String _formatDate(String? isoDate) {
-    if (isoDate == null || isoDate.isEmpty) return 'N/A';
+  String _formatDate(String? isoDate, AppLocalizations l) {
+    if (isoDate == null || isoDate.isEmpty) return l.profileNa;
     final dt = DateTime.tryParse(isoDate);
     if (dt == null) return isoDate;
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    return DateFormat.yMMMd(l.localeName).format(dt);
   }
 
-  String _statusLabel(StudentStatus status) => switch (status) {
-        StudentStatus.active => 'Active',
-        StudentStatus.inactive => 'Inactive',
-        StudentStatus.graduated => 'Graduated',
-        StudentStatus.suspended => 'Suspended',
+  String _statusLabel(StudentStatus status, AppLocalizations l) => switch (status) {
+        StudentStatus.active => l.statusActive,
+        StudentStatus.inactive => l.statusInactive,
+        StudentStatus.graduated => l.statusGraduated,
+        StudentStatus.suspended => l.statusSuspended,
       };
 
   Color _statusColor(StudentStatus status) => switch (status) {
@@ -180,7 +181,8 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Profile header ─────────────────────────────────────────────────────────
 
-  Widget _buildProfileHeader(StudentProfile profile) {
+  Widget _buildProfileHeader(
+      BuildContext context, StudentProfile profile, AppLocalizations l) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -207,23 +209,12 @@ class StudentProfileScreen extends ConsumerWidget {
                       child:
                           const Icon(Icons.person, color: Colors.white, size: 48),
                     ),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child:
-                    const Icon(Icons.edit, color: Colors.white, size: 12),
-              ),
             ],
           ),
           const SizedBox(height: 12),
           Text(profile.fullName, style: AppTextStyles.h1White),
           const SizedBox(height: 4),
-          Text('ID: ${profile.studentCode}',
+          Text(l.profileIdLabel(profile.studentCode),
               style: AppTextStyles.captionWhite),
           const SizedBox(height: 6),
           if (profile.facultyName != null)
@@ -254,19 +245,20 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Personal info ──────────────────────────────────────────────────────────
 
-  Widget _buildPersonalInfo(StudentProfile profile) {
+  Widget _buildPersonalInfo(
+      BuildContext context, StudentProfile profile, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.person_outline,
-      title: 'Personal Information',
+      title: l.profilePersonalInfoTitle,
       children: [
-        _InfoRow(label: 'FULL NAME', value: profile.fullName),
+        _InfoRow(label: l.profileFullNameLabel, value: profile.fullName),
         _InfoRow(
-            label: 'DATE OF BIRTH',
-            value: _formatDate(profile.dateOfBirth)),
-        _InfoRow(label: 'GENDER', value: profile.gender ?? 'N/A'),
+            label: l.profileDateOfBirthLabel,
+            value: _formatDate(profile.dateOfBirth, l)),
+        _InfoRow(label: l.profileGenderLabel, value: profile.gender ?? l.profileNa),
         _InfoRow(
-            label: 'NATIONALITY',
-            value: profile.nationality ?? 'N/A',
+            label: l.profileNationalityLabel,
+            value: profile.nationality ?? l.profileNa,
             isLast: true),
       ],
     );
@@ -274,20 +266,22 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Academic info ──────────────────────────────────────────────────────────
 
-  Widget _buildAcademicInfo(StudentProfile profile, double gpa) {
+  Widget _buildAcademicInfo(BuildContext context, StudentProfile profile,
+      double gpa, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.school_outlined,
-      title: 'Academic Information',
+      title: l.profileAcademicInfoTitle,
       children: [
-        _InfoRow(label: 'MAJOR', value: profile.majorName ?? 'N/A'),
+        _InfoRow(label: l.profileMajorLabel, value: profile.majorName ?? l.profileNa),
         _InfoRow(
-            label: 'YEAR LEVEL', value: 'Year ${profile.yearLevel}'),
+            label: l.profileYearLevelLabel,
+            value: l.profileYearLevelValue(profile.yearLevel)),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('ACADEMIC STATUS', style: AppTextStyles.label),
+              Text(l.profileAcademicStatusLabel, style: AppTextStyles.label),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -298,7 +292,7 @@ class StudentProfileScreen extends ConsumerWidget {
                       BorderRadius.circular(AppSpacing.chipRadius),
                 ),
                 child: Text(
-                  _statusLabel(profile.status),
+                  _statusLabel(profile.status, l),
                   style: AppTextStyles.caption.copyWith(
                       color: _statusColor(profile.status),
                       fontWeight: FontWeight.w600),
@@ -312,10 +306,10 @@ class StudentProfileScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('GPA', style: AppTextStyles.label),
+              Text(l.profileGpaLabel, style: AppTextStyles.label),
               const SizedBox(height: 4),
               Text(
-                gpa > 0 ? '${gpa.toStringAsFixed(2)} / 4.00' : 'N/A',
+                gpa > 0 ? l.profileGpaValue(gpa.toStringAsFixed(2)) : l.profileNa,
                 style: AppTextStyles.metricSmall.copyWith(
                     color: AppColors.primaryNavy, fontSize: 20),
               ),
@@ -328,17 +322,18 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Contact info ───────────────────────────────────────────────────────────
 
-  Widget _buildContactInfo(StudentProfile profile) {
+  Widget _buildContactInfo(
+      BuildContext context, StudentProfile profile, AppLocalizations l) {
     return _SectionCard(
       icon: Icons.contact_phone_outlined,
-      title: 'Contact Information',
+      title: l.profileContactInfoTitle,
       children: [
         _IconInfoRow(icon: Icons.email_outlined, value: profile.email),
         _IconInfoRow(
-            icon: Icons.phone_outlined, value: profile.phone ?? 'N/A'),
+            icon: Icons.phone_outlined, value: profile.phone ?? l.profileNa),
         _IconInfoRow(
             icon: Icons.location_on_outlined,
-            value: profile.address ?? 'N/A',
+            value: profile.address ?? l.profileNa,
             isLast: true),
       ],
     );
@@ -346,7 +341,8 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Emergency contact ──────────────────────────────────────────────────────
 
-  Widget _buildEmergencyContact(StudentProfile profile) {
+  Widget _buildEmergencyContact(
+      BuildContext context, StudentProfile profile, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -362,19 +358,19 @@ class StudentProfileScreen extends ConsumerWidget {
               Icon(Icons.emergency_outlined,
                   color: AppColors.statusRed, size: 18),
               const SizedBox(width: 8),
-              Text('Emergency Contact', style: AppTextStyles.h3),
+              Text(l.profileEmergencyContactTitle, style: AppTextStyles.h3),
             ],
           ),
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Contact',
+              Text(l.profileContactLabel,
                   style: AppTextStyles.body
                       .copyWith(color: AppColors.textSecondary)),
               Flexible(
                 child: Text(
-                  profile.emergencyContact ?? 'N/A',
+                  profile.emergencyContact ?? l.profileNa,
                   style: AppTextStyles.bodyMedium
                       .copyWith(color: AppColors.primaryBlue),
                   textAlign: TextAlign.end,
@@ -389,19 +385,22 @@ class StudentProfileScreen extends ConsumerWidget {
 
   // ── Account settings ───────────────────────────────────────────────────────
 
-  Widget _buildAccountSettings(BuildContext context) {
+  Widget _buildAccountSettings(
+      BuildContext context, WidgetRef ref, AppLocalizations l) {
+    final locale = ref.watch(localeProvider);
+    final themeMode = ref.watch(themeModeProvider);
     final items = [
       (
         icon: Icons.lock_outline,
-        title: 'Change Password',
-        subtitle: 'Update your account password',
+        title: l.profileChangePassword,
+        subtitle: l.profileChangePasswordSubtitle,
         onTap: () {}
       ),
       (
         icon: Icons.notifications_outlined,
-        title: 'Notification Settings',
-        subtitle: 'Manage app alerts and emails',
-        onTap: () {}
+        title: l.profileNotificationSettings,
+        subtitle: l.profileNotificationSettingsSubtitle,
+        onTap: () => context.push(AppRoutes.notificationCenter)
       ),
     ];
 
@@ -416,7 +415,7 @@ class StudentProfileScreen extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Account Settings', style: AppTextStyles.h3),
+            child: Text(l.profileAccountSettingsTitle, style: AppTextStyles.h3),
           ),
           ...items.asMap().entries.map((e) {
             final isLast = e.key == items.length - 1;
@@ -445,14 +444,14 @@ class StudentProfileScreen extends ConsumerWidget {
           ListTile(
             leading: Icon(Icons.language_outlined,
                 color: AppColors.primaryNavy, size: 22),
-            title: Text('Language Settings',
+            title: Text(l.profileLanguageSettings,
                 style: AppTextStyles.bodyMedium),
-            subtitle: Text('Choose your preferred language',
+            subtitle: Text(l.profileLanguageSettingsSubtitle,
                 style: AppTextStyles.caption),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('English',
+                Text(locale.languageCode == 'km' ? 'ភាសាខ្មែរ' : 'English',
                     style: AppTextStyles.bodyMedium
                         .copyWith(color: AppColors.textSecondary)),
                 Icon(Icons.chevron_right,
@@ -460,16 +459,131 @@ class StudentProfileScreen extends ConsumerWidget {
               ],
             ),
             dense: true,
-            onTap: () {},
+            onTap: () => _showLanguagePicker(context, ref, locale, l),
+          ),
+          Divider(
+              color: AppColors.divider, height: 1, indent: 16),
+          ListTile(
+            leading: Icon(Icons.dark_mode_outlined,
+                color: AppColors.primaryNavy, size: 22),
+            title: Text(l.settingsAppearanceTitle,
+                style: AppTextStyles.bodyMedium),
+            subtitle: Text("Choose your preferred theme",
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  switch (themeMode) {
+                    ThemeMode.light => l.settingsThemeLight,
+                    ThemeMode.dark => l.settingsThemeDark,
+                    ThemeMode.system => l.settingsThemeSystem,
+                  },
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                Icon(Icons.chevron_right,
+                    color: AppColors.textLabel),
+              ],
+            ),
+            dense: true,
+            onTap: () => _showThemePicker(context, ref, themeMode, l),
           ),
         ],
       ),
     );
   }
 
+  // ── Theme picker ───────────────────────────────────────────────────────────
+
+  void _showThemePicker(
+      BuildContext context, WidgetRef ref, ThemeMode currentMode, AppLocalizations l) {
+    final options = [
+      (mode: ThemeMode.light, label: l.settingsThemeLight),
+      (mode: ThemeMode.dark, label: l.settingsThemeDark),
+      (mode: ThemeMode.system, label: l.settingsThemeSystem),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(l.settingsAppearanceTitle, style: AppTextStyles.h3),
+              ),
+              ...options.map((opt) {
+                final isSelected = currentMode == opt.mode;
+                return ListTile(
+                  title: Text(opt.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(themeModeProvider.notifier).setThemeMode(opt.mode);
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Language picker ────────────────────────────────────────────────────────
+
+  void _showLanguagePicker(
+      BuildContext context, WidgetRef ref, Locale locale, AppLocalizations l) {
+    final options = [
+      (code: 'en', label: 'English'),
+      (code: 'km', label: 'ភាសាខ្មែរ'),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(l.profileChooseLanguage, style: AppTextStyles.h3),
+              ),
+              ...options.map((opt) {
+                final isSelected = locale.languageCode == opt.code;
+                return ListTile(
+                  title: Text(opt.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(localeProvider.notifier).setLocale(Locale(opt.code));
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Logout ─────────────────────────────────────────────────────────────────
 
-  Widget _buildLogoutButton(BuildContext context) {
+  Widget _buildLogoutButton(BuildContext context, AppLocalizations l) {
     return GestureDetector(
       onTap: () async {
         await Supabase.instance.client.auth.signOut();
@@ -479,7 +593,7 @@ class StudentProfileScreen extends ConsumerWidget {
         children: [
           Icon(Icons.logout, color: AppColors.statusRed, size: 20),
           const SizedBox(width: 8),
-          Text('Logout',
+          Text(l.profileLogout,
               style:
                   AppTextStyles.bodyMedium.copyWith(color: AppColors.statusRed)),
         ],

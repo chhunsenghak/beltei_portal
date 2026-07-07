@@ -119,7 +119,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
   Widget _buildNavRow(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgPage,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -138,7 +138,7 @@ class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
 
   Widget _buildProfileHeader(BuildContext context, AdminTeacherDetail detail) {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgCard,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       child: Column(
         children: [

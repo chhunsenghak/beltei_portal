@@ -85,29 +85,55 @@ final courseDetailProvider =
   return ref.read(adminServiceProvider).getCourseDetail(courseId);
 });
 
-final adminEnrollmentProvider =
-    FutureProvider<List<AdminEnrollmentRecord>>((ref) async {
-  return ref.read(adminServiceProvider).getEnrollmentData();
+final adminClassTermsProvider =
+    FutureProvider<List<AdminClassTerm>>((ref) async {
+  return ref.read(adminServiceProvider).getClassTerms();
 });
+
+// All classes (cohorts), independent of term — used to pick an existing
+// class when adding a new term for the next semester.
+final adminAllClassesProvider =
+    FutureProvider<List<AdminClass>>((ref) async {
+  return ref.read(adminServiceProvider).getClasses();
+});
+
+class AdminAttendanceFilter {
+  final String? courseId;
+  final String? semesterId;
+  final String? studentId;
+
+  const AdminAttendanceFilter({this.courseId, this.semesterId, this.studentId});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AdminAttendanceFilter &&
+          runtimeType == other.runtimeType &&
+          courseId == other.courseId &&
+          semesterId == other.semesterId &&
+          studentId == other.studentId;
+
+  @override
+  int get hashCode => Object.hash(courseId, semesterId, studentId);
+}
 
 final adminAttendanceProvider =
-    FutureProvider<List<AdminAttendanceRecord>>((ref) async {
-  return ref.read(adminServiceProvider).getAttendanceRecords();
+    FutureProvider.family<List<AdminAttendanceRecord>, AdminAttendanceFilter>((ref, filter) async {
+  return ref.read(adminServiceProvider).getAttendanceRecords(
+    courseId: filter.courseId,
+    semesterId: filter.semesterId,
+    studentId: filter.studentId,
+  );
 });
 
-final courseEnrollmentsProvider =
-    FutureProvider.family<List<CourseEnrollmentEntry>, String>((ref, courseId) async {
-  return ref.read(adminServiceProvider).getCourseEnrollments(courseId);
+final classTermEnrollmentsProvider =
+    FutureProvider.family<List<CourseEnrollmentEntry>, String>((ref, classTermId) async {
+  return ref.read(adminServiceProvider).getClassTermEnrollments(classTermId);
 });
 
-final classEnrollmentsProvider =
-    FutureProvider.family<List<CourseEnrollmentEntry>, String>((ref, classId) async {
-  return ref.read(adminServiceProvider).getClassEnrollments(classId);
-});
-
-final classesForCourseProvider =
-    FutureProvider.family<List<AdminClass>, String>((ref, courseId) async {
-  return ref.read(adminServiceProvider).getClasses(courseId);
+final classTermCoursesForCourseProvider =
+    FutureProvider.family<List<AdminClassTermCourse>, String>((ref, courseId) async {
+  return ref.read(adminServiceProvider).getClassTermCoursesForCourse(courseId);
 });
 
 final adminAnalyticsProvider =

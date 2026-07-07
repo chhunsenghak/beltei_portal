@@ -4,15 +4,15 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import 'course_management_screen.dart';
 import 'faculty_department_screen.dart';
-import 'academic_year_management_screen.dart';
-import 'semester_management_screen.dart';
+import 'academic_calendar_screen.dart';
 import 'enrollment_management_screen.dart';
 import 'class_management_screen.dart';
 import 'attendance_management_screen.dart';
 import 'global_leave_requests_screen.dart';
 
 class AcademicManagementScreen extends StatefulWidget {
-  const AcademicManagementScreen({super.key});
+  const AcademicManagementScreen({super.key, this.initialTab});
+  final String? initialTab;
 
   @override
   State<AcademicManagementScreen> createState() =>
@@ -20,12 +20,25 @@ class AcademicManagementScreen extends StatefulWidget {
 }
 
 class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = switch (widget.initialTab) {
+      'calendar' => 1,
+      'courses' => 2,
+      'classes' => 3,
+      'enrollment' => 4,
+      'attendance' => 5,
+      'leave' => 6,
+      _ => 0,
+    };
+  }
 
   static const _tabs = [
     (label: 'Faculty',    icon: Icons.account_balance_outlined),
-    (label: 'Academic Years', icon: Icons.calendar_today_outlined),
-    (label: 'Semesters',  icon: Icons.date_range_outlined),
+    (label: 'Academic Calendar', icon: Icons.calendar_month_outlined),
     (label: 'Courses',    icon: Icons.menu_book_outlined),
     (label: 'Classes',    icon: Icons.class_outlined),
     (label: 'Enrollment', icon: Icons.how_to_reg_outlined),
@@ -35,8 +48,7 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
 
   static const _bodies = [
     FacultyDepartmentScreen(),
-    AcademicYearManagementScreen(),
-    SemesterManagementScreen(),
+    AcademicCalendarScreen(),
     CourseManagementScreen(),
     ClassManagementScreen(),
     EnrollmentManagementScreen(),
@@ -59,7 +71,7 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
 
   Widget _buildSecondaryNav() {
     return Container(
-      color: Colors.white,
+      color: AppColors.bgCard,
       child: Column(
         children: [
           SizedBox(

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,7 @@ class _AttendanceHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     final calendarAsync = ref.watch(studentAttendanceCalendarProvider);
 
     return Scaffold(
@@ -50,7 +53,7 @@ class _AttendanceHistoryScreenState
               Image.asset('assets/images/beltei_logo.png',
                   height: 48, fit: BoxFit.contain),
               const SizedBox(width: 10),
-              Text('BELTEI Portal',
+              Text(l.appTitle,
                   style: AppTextStyles.h3
                       .copyWith(color: AppColors.primaryNavy)),
             ],
@@ -66,11 +69,11 @@ class _AttendanceHistoryScreenState
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load attendance', style: AppTextStyles.body),
+              Text(l.loadErrorAttendance, style: AppTextStyles.body),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(studentAttendanceCalendarProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
@@ -80,14 +83,14 @@ class _AttendanceHistoryScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatsRow(calendarMap),
+              _buildStatsRow(calendarMap, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildCalendar(calendarMap),
+              _buildCalendar(calendarMap, l),
               const SizedBox(height: AppSpacing.sectionGap),
-              _buildLegend(),
+              _buildLegend(l),
               if (_selectedDay != null) ...[
                 const SizedBox(height: AppSpacing.sectionGap),
-                _buildSelectedDayCard(calendarMap),
+                _buildSelectedDayCard(calendarMap, l),
               ],
               const SizedBox(height: 24),
             ],
@@ -99,7 +102,7 @@ class _AttendanceHistoryScreenState
 
   // ── Stats row ──────────────────────────────────────────────────────────────
 
-  Widget _buildStatsRow(Map<String, AttendanceStatus> map) {
+  Widget _buildStatsRow(Map<String, AttendanceStatus> map, AppLocalizations l) {
     int present = 0, absent = 0;
     for (final s in map.values) {
       if (s == AttendanceStatus.present) present++;
@@ -111,18 +114,18 @@ class _AttendanceHistoryScreenState
 
     return Row(
       children: [
-        _StatCard('Attendance', '$pct%', AppColors.primaryNavy, Icons.check_circle_outline),
+        _StatCard(l.attendanceHistoryOverallRateLabel, '$pct%', AppColors.primaryNavy, Icons.check_circle_outline),
         const SizedBox(width: 10),
-        _StatCard('Present', '$present', AppColors.statusGreen, Icons.thumb_up_outlined),
+        _StatCard(l.statusPresent, '$present', AppColors.statusGreen, Icons.thumb_up_outlined),
         const SizedBox(width: 10),
-        _StatCard('Absent', '$absent', AppColors.statusRed, Icons.cancel_outlined),
+        _StatCard(l.statusAbsent, '$absent', AppColors.statusRed, Icons.cancel_outlined),
       ],
     );
   }
 
   // ── Calendar ───────────────────────────────────────────────────────────────
 
-  Widget _buildCalendar(Map<String, AttendanceStatus> map) {
+  Widget _buildCalendar(Map<String, AttendanceStatus> map, AppLocalizations l) {
     final now = DateTime.now();
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -134,7 +137,7 @@ class _AttendanceHistoryScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Attendance History', style: AppTextStyles.h2),
+          Text(l.attendanceHistoryCalendarTitle, style: AppTextStyles.h2),
           const SizedBox(height: 4),
           TableCalendar(
             firstDay: DateTime(now.year - 1, 1),
@@ -249,7 +252,7 @@ class _AttendanceHistoryScreenState
 
   // ── Selected day card ──────────────────────────────────────────────────────
 
-  Widget _buildSelectedDayCard(Map<String, AttendanceStatus> map) {
+  Widget _buildSelectedDayCard(Map<String, AttendanceStatus> map, AppLocalizations l) {
     if (_selectedDay == null) return const SizedBox.shrink();
     final d = _selectedDay!;
     final key =
@@ -273,14 +276,14 @@ class _AttendanceHistoryScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${d.day} ${_kMonthNames[d.month]} ${d.year}',
+                  DateFormat('d MMM y', l.localeName).format(d),
                   style: AppTextStyles.bodyMedium,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   status == null
-                      ? 'No attendance recorded'
-                      : _statusLabel(status),
+                      ? l.attendanceHistoryNoRecordForDay
+                      : _statusLabel(status, l),
                   style: AppTextStyles.caption.copyWith(
                     color: status == null
                         ? AppColors.textSecondary
@@ -295,11 +298,11 @@ class _AttendanceHistoryScreenState
     );
   }
 
-  static String _statusLabel(AttendanceStatus s) => switch (s) {
-        AttendanceStatus.present => 'Present',
-        AttendanceStatus.absent => 'Absent',
-        AttendanceStatus.late => 'Late',
-        AttendanceStatus.excused => 'Excused Absence',
+  static String _statusLabel(AttendanceStatus s, AppLocalizations l) => switch (s) {
+        AttendanceStatus.present => l.statusPresent,
+        AttendanceStatus.absent => l.statusAbsent,
+        AttendanceStatus.late => l.statusLate,
+        AttendanceStatus.excused => l.attendanceHistoryExcusedAbsenceLabel,
       };
 
   static Color _statusColor(AttendanceStatus s) => switch (s) {
@@ -309,20 +312,15 @@ class _AttendanceHistoryScreenState
         AttendanceStatus.excused => AppColors.primaryBlue,
       };
 
-  static const _kMonthNames = [
-    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-
   // ── Legend ─────────────────────────────────────────────────────────────────
 
-  Widget _buildLegend() {
+  Widget _buildLegend(AppLocalizations l) {
     final items = [
-      (color: AppColors.primaryNavy, label: 'Present'),
-      (color: AppColors.statusRed, label: 'Absent'),
-      (color: AppColors.statusAmber, label: 'Late'),
-      (color: AppColors.primaryBlue.withValues(alpha: 0.7), label: 'Excused'),
-      (color: AppColors.statusGrayBg, label: 'No Record'),
+      (color: AppColors.primaryNavy, label: l.statusPresent),
+      (color: AppColors.statusRed, label: l.statusAbsent),
+      (color: AppColors.statusAmber, label: l.statusLate),
+      (color: AppColors.primaryBlue.withValues(alpha: 0.7), label: l.statusExcused),
+      (color: AppColors.statusGrayBg, label: l.attendanceHistoryNoRecordLegendLabel),
     ];
 
     return Wrap(

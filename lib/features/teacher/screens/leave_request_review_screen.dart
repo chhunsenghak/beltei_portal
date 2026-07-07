@@ -7,21 +7,22 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _fmtDate(String? iso) {
+String _fmtDate(String? iso, String locale) {
   if (iso == null) return '—';
   try {
-    return DateFormat('MMM d, yyyy').format(DateTime.parse(iso));
+    return DateFormat('MMM d, yyyy', locale).format(DateTime.parse(iso));
   } catch (_) {
     return iso;
   }
 }
 
-String _fmtDateTime(DateTime? dt) {
+String _fmtDateTime(DateTime? dt, String locale) {
   if (dt == null) return '—';
-  return DateFormat('MMM d, yyyy • hh:mm a').format(dt);
+  return DateFormat('MMM d, yyyy • hh:mm a', locale).format(dt);
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ class LeaveRequestReviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final leaveAsync = ref.watch(leaveDetailProvider(requestId));
 
     return Scaffold(
@@ -44,7 +46,7 @@ class LeaveRequestReviewScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Leave Request Details', style: AppTextStyles.h3),
+        title: Text(l.leaveReviewAppBarTitle, style: AppTextStyles.h3),
       ),
       body: leaveAsync.when(
         loading: () =>
@@ -56,19 +58,19 @@ class LeaveRequestReviewScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load request',
+              Text(l.leaveDetailLoadError,
                   style: AppTextStyles.bodyMedium),
               TextButton(
                 onPressed: () =>
                     ref.invalidate(leaveDetailProvider(requestId)),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
         ),
         data: (leave) => leave == null
-            ? const Center(child: Text('Request not found.'))
-            : _LeaveDetailBody(leave: leave),
+            ? Center(child: Text(l.leaveDetailNotFound))
+            : _LeaveDetailBody(leave: leave, l: l),
       ),
     );
   }
@@ -77,8 +79,9 @@ class LeaveRequestReviewScreen extends ConsumerWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _LeaveDetailBody extends StatelessWidget {
-  const _LeaveDetailBody({required this.leave});
+  const _LeaveDetailBody({required this.leave, required this.l});
   final StudentLeaveDetail leave;
+  final AppLocalizations l;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +129,7 @@ class _LeaveDetailBody extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Only administrators can approve or reject student leave requests.',
+              l.leaveReviewViewOnlyBanner,
               style: AppTextStyles.body.copyWith(
                   color: AppColors.statusAmber, height: 1.4),
             ),
@@ -154,7 +157,7 @@ class _LeaveDetailBody extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(leave.studentName, style: AppTextStyles.h2),
-          Text('ID: ${leave.studentCode}', style: AppTextStyles.caption),
+          Text(l.profileIdLabel(leave.studentCode), style: AppTextStyles.caption),
           const SizedBox(height: 8),
           _buildStatusBadge(),
         ],
@@ -174,9 +177,9 @@ class _LeaveDetailBody extends StatelessWidget {
       _ => AppColors.statusAmberBg,
     };
     final label = switch (leave.status) {
-      LeaveStatus.approved => 'Approved',
-      LeaveStatus.rejected => 'Rejected',
-      _ => 'Pending Review',
+      LeaveStatus.approved => l.leaveDashboardStatusApproved,
+      LeaveStatus.rejected => l.leaveDashboardStatusRejected,
+      _ => l.createLeaveSummaryStatusValue,
     };
     return Container(
       padding:
@@ -203,15 +206,15 @@ class _LeaveDetailBody extends StatelessWidget {
             : AppColors.statusRed;
 
     return _SectionCard(
-      title: 'Attendance Summary',
+      title: l.leaveReviewAttendanceSummaryTitle,
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Overall Rate', style: AppTextStyles.bodyMedium),
+              Text(l.dashboardOverallRateLabel, style: AppTextStyles.bodyMedium),
               Text(
-                leave.totalAttendanceDays > 0 ? '$pct%' : 'N/A',
+                leave.totalAttendanceDays > 0 ? '$pct%' : l.profileNa,
                 style: AppTextStyles.bodyMedium.copyWith(color: rateColor),
               ),
             ],
@@ -232,10 +235,10 @@ class _LeaveDetailBody extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total Records (Sem)',
+              Text(l.leaveReviewTotalRecordsLabel,
                   style: AppTextStyles.body),
               Text(
-                '${leave.totalAttendanceDays} Sessions',
+                l.leaveReviewSessionsCountValue(leave.totalAttendanceDays),
                 style: AppTextStyles.bodyMedium,
               ),
             ],
@@ -248,8 +251,8 @@ class _LeaveDetailBody extends StatelessWidget {
   // ── Leave details ──────────────────────────────────────────────────────────
 
   Widget _buildLeaveDetails() {
-    final startFmt = _fmtDate(leave.startDate);
-    final endFmt = _fmtDate(leave.endDate);
+    final startFmt = _fmtDate(leave.startDate, l.localeName);
+    final endFmt = _fmtDate(leave.endDate, l.localeName);
 
     int days = 1;
     try {
@@ -285,7 +288,7 @@ class _LeaveDetailBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('LEAVE CATEGORY', style: AppTextStyles.label),
+                    Text(l.leaveReviewCategoryLabel, style: AppTextStyles.label),
                     const SizedBox(height: 4),
                     Text(leave.type, style: AppTextStyles.bodyMedium),
                   ],
@@ -294,9 +297,9 @@ class _LeaveDetailBody extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('SUBMITTED', style: AppTextStyles.label),
+                  Text(l.leaveReviewSubmittedLabel, style: AppTextStyles.label),
                   const SizedBox(height: 4),
-                  Text(_fmtDateTime(leave.createdAt),
+                  Text(_fmtDateTime(leave.createdAt, l.localeName),
                       style: AppTextStyles.caption,
                       textAlign: TextAlign.right),
                 ],
@@ -313,7 +316,7 @@ class _LeaveDetailBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('START DATE', style: AppTextStyles.label),
+                    Text(l.createLeaveStartDateLabel, style: AppTextStyles.label),
                     const SizedBox(height: 2),
                     Text(startFmt, style: AppTextStyles.bodyMedium),
                   ],
@@ -323,16 +326,28 @@ class _LeaveDetailBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('END DATE', style: AppTextStyles.label),
+                    Text(l.createLeaveEndDateLabel, style: AppTextStyles.label),
                     const SizedBox(height: 2),
                     Text(endFmt, style: AppTextStyles.bodyMedium),
-                    Text('$days Day${days == 1 ? '' : 's'}',
+                    Text(l.leaveReviewDaysCountValue(days),
                         style: AppTextStyles.caption),
                   ],
                 ),
               ),
             ],
           ),
+          if (leave.sessionNumber != null) ...[
+            const SizedBox(height: 14),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.leaveReviewSessionLabel, style: AppTextStyles.label),
+                const SizedBox(height: 2),
+                Text(l.leaveSessionNumbered(leave.sessionNumber!),
+                    style: AppTextStyles.bodyMedium),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -355,9 +370,9 @@ class _LeaveDetailBody extends StatelessWidget {
 
   Widget _buildReason() {
     return _SectionCard(
-      title: 'Reason',
+      title: l.leaveReviewReasonTitle,
       child: Text(
-        '"${leave.reason}"',
+        l.leaveReviewReasonQuoted(leave.reason),
         style: AppTextStyles.body
             .copyWith(fontStyle: FontStyle.italic, height: 1.6),
       ),
@@ -370,7 +385,7 @@ class _LeaveDetailBody extends StatelessWidget {
     final url = leave.docUrl!;
     final isPdf = url.toLowerCase().endsWith('.pdf');
     return _SectionCard(
-      title: 'Attachment',
+      title: l.leaveReviewAttachmentTitle,
       child: Container(
         width: double.infinity,
         height: 100,
@@ -407,18 +422,23 @@ class _LeaveDetailBody extends StatelessWidget {
   Widget _buildStatusPanel() {
     if (leave.status == LeaveStatus.pending) {
       return _SectionCard(
-        title: 'Decision',
-        child: Row(
+        title: l.leaveReviewDecisionTitle,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.hourglass_empty_outlined,
-                color: AppColors.statusAmber, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Awaiting admin review. Only administrators can approve or reject leave requests.',
-                style: AppTextStyles.body
-                    .copyWith(color: AppColors.textSecondary, height: 1.4),
-              ),
+            Row(
+              children: [
+                Icon(Icons.hourglass_empty_outlined,
+                    color: AppColors.statusAmber, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    l.leaveReviewAwaitingReviewText,
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary, height: 1.4),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -429,10 +449,10 @@ class _LeaveDetailBody extends StatelessWidget {
     final color =
         isApproved ? AppColors.statusGreen : AppColors.statusRed;
     final icon = isApproved ? Icons.check_circle_outline : Icons.cancel_outlined;
-    final label = isApproved ? 'Approved' : 'Rejected';
+    final label = isApproved ? l.leaveDashboardStatusApproved : l.leaveDashboardStatusRejected;
 
     return _SectionCard(
-      title: 'Decision',
+      title: l.leaveReviewDecisionTitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -443,7 +463,7 @@ class _LeaveDetailBody extends StatelessWidget {
               Text(label,
                   style: AppTextStyles.bodyMedium.copyWith(color: color)),
               const Spacer(),
-              Text(_fmtDateTime(leave.reviewedAt),
+              Text(_fmtDateTime(leave.reviewedAt, l.localeName),
                   style: AppTextStyles.caption),
             ],
           ),
@@ -452,7 +472,7 @@ class _LeaveDetailBody extends StatelessWidget {
             const SizedBox(height: 10),
             Divider(color: AppColors.border),
             const SizedBox(height: 10),
-            Text('REVIEWER NOTES', style: AppTextStyles.label),
+            Text(l.leaveReviewReviewerNotesLabel, style: AppTextStyles.label),
             const SizedBox(height: 4),
             Text(leave.reviewNotes!,
                 style:

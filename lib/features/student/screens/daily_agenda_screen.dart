@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/student_providers.dart';
 import '../../../core/services/student_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -15,18 +17,9 @@ class DailyAgendaScreen extends ConsumerWidget {
     'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
   ];
 
-  static const _kMonthName = [
-    '', 'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-
-  static const _kDayName = [
-    '', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-    'Friday', 'Saturday', 'Sunday',
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context)!;
     final coursesAsync = ref.watch(studentCoursesProvider);
     final today = DateTime.now();
     final todayAbbr = _kDayAbbr[today.weekday - 1];
@@ -41,7 +34,7 @@ class DailyAgendaScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios, size: 18),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Daily Agenda', style: AppTextStyles.h3),
+        title: Text(l.agendaAppBarTitle, style: AppTextStyles.h3),
       ),
       body: coursesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -52,26 +45,26 @@ class DailyAgendaScreen extends ConsumerWidget {
               Icon(Icons.error_outline,
                   color: AppColors.statusRed, size: 40),
               const SizedBox(height: 8),
-              Text('Could not load schedule', style: AppTextStyles.body),
+              Text(l.loadErrorSchedule, style: AppTextStyles.body),
               TextButton(
                 onPressed: () => ref.invalidate(studentCoursesProvider),
-                child: const Text('Retry'),
+                child: Text(l.retry),
               ),
             ],
           ),
         ),
         data: (courses) {
-          final agenda = _buildAgenda(courses, todayAbbr);
+          final agenda = _buildAgenda(courses, todayAbbr, l);
           return SingleChildScrollView(
             padding:
                 const EdgeInsets.all(AppSpacing.screenPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDateBanner(today, agenda.length),
+                _buildDateBanner(today, agenda.length, l),
                 const SizedBox(height: AppSpacing.sectionGap),
                 if (agenda.isEmpty)
-                  _buildEmptyState(todayAbbr)
+                  _buildEmptyState(l)
                 else
                   ...agenda.map((a) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -101,7 +94,8 @@ class DailyAgendaScreen extends ConsumerWidget {
         String teacher,
         String code,
         String sortKey
-      })> _buildAgenda(List<EnrolledCourse> courses, String todayAbbr) {
+      })> _buildAgenda(
+      List<EnrolledCourse> courses, String todayAbbr, AppLocalizations l) {
     final agenda = <
         ({
           String time,
@@ -117,7 +111,7 @@ class DailyAgendaScreen extends ConsumerWidget {
         if ((slot['day'] as String?) == todayAbbr) {
           final start = slot['start'] as String? ?? '';
           agenda.add((
-            time: _formatTime(start),
+            time: _formatTime(start, l),
             title: course.name,
             room: slot['room'] as String? ?? '',
             teacher: course.teacherName ?? '',
@@ -134,20 +128,19 @@ class DailyAgendaScreen extends ConsumerWidget {
 
   // ── Time formatter ─────────────────────────────────────────────────────────
 
-  static String _formatTime(String hhmm) {
+  static String _formatTime(String hhmm, AppLocalizations l) {
     if (hhmm.isEmpty) return '';
     final parts = hhmm.split(':');
     if (parts.length < 2) return hhmm;
     final hour = int.tryParse(parts[0]) ?? 0;
-    final min = parts[1];
-    final suffix = hour < 12 ? 'AM' : 'PM';
-    final h = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-    return '$h:$min $suffix';
+    final min = int.tryParse(parts[1]) ?? 0;
+    final dt = DateTime(2000, 1, 1, hour, min);
+    return DateFormat.jm(l.localeName).format(dt);
   }
 
   // ── Date banner ────────────────────────────────────────────────────────────
 
-  Widget _buildDateBanner(DateTime today, int count) {
+  Widget _buildDateBanner(DateTime today, int count, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -161,16 +154,17 @@ class DailyAgendaScreen extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_kDayName[today.weekday], style: AppTextStyles.h2White),
+              Text(DateFormat.EEEE(l.localeName).format(today),
+                  style: AppTextStyles.h2White),
               Text(
-                '${_kMonthName[today.month]} ${today.day}, ${today.year}',
+                DateFormat.yMMMMd(l.localeName).format(today),
                 style: AppTextStyles.captionWhite,
               ),
             ],
           ),
           const Spacer(),
           Text(
-            count == 0 ? 'No Classes' : '$count ${count == 1 ? 'Class' : 'Classes'}',
+            l.agendaClassCount(count),
             style: AppTextStyles.bodyWhite,
           ),
         ],
@@ -180,7 +174,7 @@ class DailyAgendaScreen extends ConsumerWidget {
 
   // ── Empty state ────────────────────────────────────────────────────────────
 
-  Widget _buildEmptyState(String dayAbbr) {
+  Widget _buildEmptyState(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 48),
       alignment: Alignment.center,
@@ -189,9 +183,9 @@ class DailyAgendaScreen extends ConsumerWidget {
           Icon(Icons.event_available_outlined,
               size: 48, color: AppColors.textLabel),
           const SizedBox(height: 12),
-          Text('No classes today', style: AppTextStyles.h3),
+          Text(l.noClassesToday, style: AppTextStyles.h3),
           const SizedBox(height: 4),
-          Text('Enjoy your free day!',
+          Text(l.agendaEmptySubtitle,
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textSecondary)),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_provider.dart';
 import '../services/teacher_service.dart';
+import '../supabase/database.types.dart';
 
 final teacherServiceProvider =
     Provider<TeacherService>((ref) => TeacherService());
@@ -25,6 +26,13 @@ final teacherStudentLeavesProvider =
   return ref
       .read(teacherServiceProvider)
       .getStudentLeaveRequests(user.id);
+});
+
+final teacherNotificationsProvider =
+    FutureProvider<List<NotificationRow>>((ref) async {
+  final user = await ref.watch(currentUserProvider.future);
+  if (user == null) return [];
+  return ref.read(teacherServiceProvider).getNotifications(user.id);
 });
 
 final courseStudentsProvider =
@@ -68,3 +76,22 @@ final courseAnalyticsProvider =
     FutureProvider.family<CourseAnalyticsData, String>((ref, courseId) async {
   return ref.read(teacherServiceProvider).getCourseAnalytics(courseId);
 });
+
+final allAttendanceProvider =
+    FutureProvider.family<Map<String, String>, String>((ref, courseId) async {
+  return ref.read(teacherServiceProvider).getAllAttendance(courseId);
+});
+
+final courseAssessmentsProvider =
+    FutureProvider.family<List<AssessmentItem>, String>((ref, classTermCourseId) async {
+  return ref.read(teacherServiceProvider).getAssessments(classTermCourseId);
+});
+
+final assessmentSubmissionsProvider =
+    FutureProvider.family<List<SubmissionListItem>, String>((ref, arg) async {
+  final parts = arg.split('_');
+  final classTermCourseId = parts[0];
+  final assessmentId = parts[1];
+  return ref.read(teacherServiceProvider).getAssessmentSubmissions(classTermCourseId, assessmentId);
+});
+

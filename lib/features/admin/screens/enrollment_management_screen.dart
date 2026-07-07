@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
+import '../../../shared/widgets/enroll_student_sheet.dart';
 
 // ── File-level helpers ─────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ class _EnrollmentManagementScreenState
     extends ConsumerState<EnrollmentManagementScreen> {
   String _filter = 'All';
 
-  List<AdminEnrollmentRecord> _applyFilter(List<AdminEnrollmentRecord> all) {
+  List<AdminClassTerm> _applyFilter(List<AdminClassTerm> all) {
     switch (_filter) {
       case 'Under 50%':
         return all.where((r) => r.pct < 0.5).toList();
@@ -95,7 +96,7 @@ class _EnrollmentManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final enrollAsync = ref.watch(adminEnrollmentProvider);
+    final termsAsync = ref.watch(adminClassTermsProvider);
     ref.watch(adminStudentsProvider);
     ref.watch(adminSemestersProvider);
 
@@ -106,7 +107,7 @@ class _EnrollmentManagementScreenState
         backgroundColor: AppColors.primaryBlue,
         child: const Icon(Icons.person_add_outlined, color: Colors.white),
       ),
-      body: enrollAsync.when(
+      body: termsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Column(
@@ -116,25 +117,25 @@ class _EnrollmentManagementScreenState
               const SizedBox(height: 8),
               Text('Could not load enrollment data', style: AppTextStyles.bodyMedium),
               TextButton(
-                onPressed: () => ref.invalidate(adminEnrollmentProvider),
+                onPressed: () => ref.invalidate(adminClassTermsProvider),
                 child: const Text('Retry'),
               ),
             ],
           ),
         ),
-        data: (allRecords) {
-          final filtered = _applyFilter(allRecords);
+        data: (allTerms) {
+          final filtered = _applyFilter(allTerms);
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             children: [
               _buildActivePeriodCard(),
               const SizedBox(height: 12),
-              _buildStatsCard(allRecords),
+              _buildStatsCard(allTerms),
               const SizedBox(height: 20),
               Text('Class Enrollment',
                   style: AppTextStyles.h2.copyWith(color: AppColors.primaryNavy)),
               const SizedBox(height: 4),
-              Text('Capacity tracking across all active classes',
+              Text('Capacity tracking across all active class terms',
                   style: AppTextStyles.caption),
               const SizedBox(height: 12),
               _buildFilterChips(),
@@ -155,7 +156,7 @@ class _EnrollmentManagementScreenState
                 ...filtered.map((r) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _EnrollmentCard(
-                        record: r,
+                        term: r,
                         barColor: _barColor(r.pct),
                         onViewStudents: () => _showClassStudentsSheet(context, r),
                       ),
@@ -224,11 +225,11 @@ class _EnrollmentManagementScreenState
     );
   }
 
-  Widget _buildStatsCard(List<AdminEnrollmentRecord> records) {
-    final totalEnrolled = records.fold(0, (s, r) => s + r.enrolled);
-    final totalSeats    = records.fold(0, (s, r) => s + r.maxStudents);
+  Widget _buildStatsCard(List<AdminClassTerm> terms) {
+    final totalEnrolled = terms.fold(0, (s, r) => s + r.enrolledCount);
+    final totalSeats    = terms.fold(0, (s, r) => s + r.maxStudents);
     final available     = totalSeats - totalEnrolled;
-    final fullCount     = records.where((r) => r.pct >= 1.0).length;
+    final fullCount     = terms.where((r) => r.pct >= 1.0).length;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -265,7 +266,7 @@ class _EnrollmentManagementScreenState
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primaryNavy : Colors.white,
+                  color: isSelected ? AppColors.primaryNavy : AppColors.bgCard,
                   borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
                   border: Border.all(
                       color: isSelected ? AppColors.primaryNavy : AppColors.border),
@@ -286,24 +287,24 @@ class _EnrollmentManagementScreenState
 
   Future<void> _showEnrollSheet(BuildContext context) async {
     final students = ref.read(adminStudentsProvider).valueOrNull ?? [];
-    final records  = ref.read(adminEnrollmentProvider).valueOrNull ?? [];
+    final terms    = ref.read(adminClassTermsProvider).valueOrNull ?? [];
     final semesters = ref.read(adminSemestersProvider).valueOrNull ?? [];
 
-    // Filter classes to current semester if available
+    // Filter class terms to current semester if available
     final currentSemId = semesters.where((s) => s.isCurrent).firstOrNull?.id;
-    final classesToShow = currentSemId != null
-        ? records.where((r) => r.semesterId == currentSemId).toList()
-        : records;
+    final termsToShow = currentSemId != null
+        ? terms.where((r) => r.semesterId == currentSemId).toList()
+        : terms;
 
     AdminStudent? selectedStudent;
-    AdminEnrollmentRecord? selectedClass;
+    AdminClassTerm? selectedTerm;
     String searchQuery = '';
     bool saving = false;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
@@ -329,7 +330,7 @@ class _EnrollmentManagementScreenState
                   if (currentSemId != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Showing classes for current semester',
+                      'Showing class terms for current semester',
                       style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue),
                     ),
                   ],
@@ -352,7 +353,7 @@ class _EnrollmentManagementScreenState
                       Container(
                         constraints: const BoxConstraints(maxHeight: 200),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.bgCard,
                           borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
                           border: Border.all(color: AppColors.border),
                         ),
@@ -426,7 +427,7 @@ class _EnrollmentManagementScreenState
 
                   const SizedBox(height: 12),
 
-                  // Class dropdown
+                  // Class term dropdown
                   Text('Class',
                       style: AppTextStyles.caption
                           .copyWith(fontSize: 11, color: AppColors.textSecondary)),
@@ -438,23 +439,23 @@ class _EnrollmentManagementScreenState
                       border: Border.all(color: AppColors.border),
                     ),
                     child: DropdownButtonHideUnderline(
-                      child: DropdownButton<AdminEnrollmentRecord>(
-                        value: selectedClass,
+                      child: DropdownButton<AdminClassTerm>(
+                        value: selectedTerm,
                         isExpanded: true,
                         hint: Text('Select class',
                             style: AppTextStyles.caption.copyWith(color: AppColors.textLabel)),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        items: classesToShow
+                        items: termsToShow
                             .map((r) => DropdownMenuItem(
                                   value: r,
                                   child: Text(
-                                    '${r.courseCode}-${r.classCode} · ${_shiftLabel(r.shift)} · ${r.courseName}',
+                                    '${r.classCode} · ${_shiftLabel(r.shift)} · ${r.courses.map((c) => c.courseCode).join(', ')}',
                                     style: AppTextStyles.body,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ))
                             .toList(),
-                        onChanged: (v) => setSheet(() => selectedClass = v),
+                        onChanged: (v) => setSheet(() => selectedTerm = v),
                       ),
                     ),
                   ),
@@ -470,24 +471,24 @@ class _EnrollmentManagementScreenState
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
-                      onPressed: (saving || selectedStudent == null || selectedClass == null)
+                      onPressed: (saving || selectedStudent == null || selectedTerm == null)
                           ? null
                           : () async {
                               setSheet(() => saving = true);
                               try {
                                 await ref.read(adminServiceProvider).enrollStudent(
                                   studentId: selectedStudent!.id,
-                                  classId: selectedClass!.classId,
+                                  classTermId: selectedTerm!.id,
                                 );
-                                ref.invalidate(adminEnrollmentProvider);
+                                ref.invalidate(adminClassTermsProvider);
                                 ref.invalidate(
-                                    classEnrollmentsProvider(selectedClass!.classId));
+                                    classTermEnrollmentsProvider(selectedTerm!.id));
                                 if (ctx.mounted) Navigator.pop(ctx);
                               } catch (e) {
                                 setSheet(() => saving = false);
                                 if (ctx.mounted) {
                                   final msg = e.toString().contains('unique')
-                                      ? 'Student is already enrolled in this course for the semester.'
+                                      ? 'Student is already enrolled in this class for the semester.'
                                       : 'Error: $e';
                                   ScaffoldMessenger.of(ctx).showSnackBar(
                                     SnackBar(
@@ -518,18 +519,18 @@ class _EnrollmentManagementScreenState
   // ── Class students sheet ───────────────────────────────────────────────────
 
   Future<void> _showClassStudentsSheet(
-      BuildContext context, AdminEnrollmentRecord record) async {
+      BuildContext context, AdminClassTerm term) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => _CourseStudentsSheet(
-        record: record,
-        onDropped: () {
-          ref.invalidate(adminEnrollmentProvider);
-          ref.invalidate(classEnrollmentsProvider(record.classId));
+      builder: (ctx) => _ClassTermStudentsSheet(
+        term: term,
+        onRosterChanged: () {
+          ref.invalidate(adminClassTermsProvider);
+          ref.invalidate(classTermEnrollmentsProvider(term.id));
         },
       ),
     );
@@ -569,21 +570,27 @@ class _StatDivider extends StatelessWidget {
 
 class _EnrollmentCard extends StatelessWidget {
   const _EnrollmentCard({
-    required this.record,
+    required this.term,
     required this.barColor,
     required this.onViewStudents,
   });
 
-  final AdminEnrollmentRecord record;
+  final AdminClassTerm term;
   final Color barColor;
   final VoidCallback onViewStudents;
 
   @override
   Widget build(BuildContext context) {
-    final pct      = record.pct;
+    final pct      = term.pct;
     final pctLabel = '${(pct * 100).toInt()}%';
     final isFull   = pct >= 1.0;
-    final shiftCol = _shiftColor(record.shift);
+    final shiftCol = _shiftColor(term.shift);
+    final courseCodes = term.courses.map((c) => c.courseCode).join(', ');
+    final teacherNames = term.courses
+        .map((c) => c.teacherName)
+        .whereType<String>()
+        .toSet()
+        .join(', ');
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -603,7 +610,7 @@ class _EnrollmentCard extends StatelessWidget {
                   color: barColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
                 ),
-                child: Text(record.courseCode,
+                child: Text(term.classCode,
                     style: AppTextStyles.label
                         .copyWith(color: barColor, letterSpacing: 0.5)),
               ),
@@ -614,16 +621,16 @@ class _EnrollmentCard extends StatelessWidget {
                   color: shiftCol.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
                 ),
-                child: Text(_shiftLabel(record.shift),
+                child: Text(_shiftLabel(term.shift),
                     style: AppTextStyles.label
                         .copyWith(color: shiftCol, fontSize: 10)),
               ),
               const SizedBox(width: 6),
-              _programChip(record.programType),
+              _programChip(term.programType),
               const SizedBox(width: 6),
-              _scheduleChip(record.scheduleType),
+              _scheduleChip(term.scheduleType),
               const Spacer(),
-              Text('${record.enrolled} / ${record.maxStudents}',
+              Text('${term.enrolledCount} / ${term.maxStudents}',
                   style: AppTextStyles.bodySemiBold.copyWith(
                       color: isFull ? AppColors.statusRed : AppColors.textPrimary)),
             ],
@@ -632,7 +639,9 @@ class _EnrollmentCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(record.courseName, style: AppTextStyles.bodyMedium),
+                child: Text(
+                    courseCodes.isEmpty ? 'No courses attached yet' : courseCodes,
+                    style: AppTextStyles.bodyMedium),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -641,13 +650,13 @@ class _EnrollmentCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: Text('Class ${record.classCode}',
+                child: Text('Year ${term.yearLevel}',
                     style: AppTextStyles.caption.copyWith(fontSize: 10)),
               ),
             ],
           ),
           const SizedBox(height: 2),
-          Text(record.teacherName ?? 'No teacher assigned',
+          Text(teacherNames.isEmpty ? 'No teacher assigned' : teacherNames,
               style: AppTextStyles.caption),
           const SizedBox(height: 10),
           Row(
@@ -687,23 +696,23 @@ class _EnrollmentCard extends StatelessWidget {
   }
 }
 
-// ── Class students bottom sheet ───────────────────────────────────────────────
+// ── Class term students bottom sheet ──────────────────────────────────────────
 
-class _CourseStudentsSheet extends ConsumerStatefulWidget {
-  const _CourseStudentsSheet({required this.record, required this.onDropped});
-  final AdminEnrollmentRecord record;
-  final VoidCallback onDropped;
+class _ClassTermStudentsSheet extends ConsumerStatefulWidget {
+  const _ClassTermStudentsSheet({required this.term, required this.onRosterChanged});
+  final AdminClassTerm term;
+  final VoidCallback onRosterChanged;
 
   @override
-  ConsumerState<_CourseStudentsSheet> createState() => _CourseStudentsSheetState();
+  ConsumerState<_ClassTermStudentsSheet> createState() => _ClassTermStudentsSheetState();
 }
 
-class _CourseStudentsSheetState extends ConsumerState<_CourseStudentsSheet> {
+class _ClassTermStudentsSheetState extends ConsumerState<_ClassTermStudentsSheet> {
   final Set<String> _dropping = {};
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(classEnrollmentsProvider(widget.record.classId));
+    final async = ref.watch(classTermEnrollmentsProvider(widget.term.id));
 
     return DraggableScrollableSheet(
       expand: false,
@@ -713,7 +722,7 @@ class _CourseStudentsSheetState extends ConsumerState<_CourseStudentsSheet> {
       builder: (ctx, scrollCtrl) => Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -727,15 +736,38 @@ class _CourseStudentsSheetState extends ConsumerState<_CourseStudentsSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text(widget.record.courseName,
-                    style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
-                const SizedBox(height: 2),
-                Text(
-                  '${widget.record.courseCode}-${widget.record.classCode} · '
-                  '${_shiftLabel(widget.record.shift)} · '
-                  '${widget.record.enrolled} enrolled',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue),
-                ),
+                Row(children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.term.classCode,
+                            style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_shiftLabel(widget.term.shift)} · '
+                          '${widget.term.enrolledCount} enrolled',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => showEnrollStudentSheet(
+                      context,
+                      classTermId: widget.term.id,
+                      onEnrolled: () {
+                        ref.invalidate(classTermEnrollmentsProvider(widget.term.id));
+                        ref.invalidate(adminClassTermsProvider);
+                        widget.onRosterChanged();
+                      },
+                    ),
+                    icon: Icon(Icons.person_add_outlined, size: 18, color: AppColors.primaryBlue),
+                    label: Text('Add',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
               ],
             ),
           ),
@@ -809,8 +841,8 @@ class _CourseStudentsSheetState extends ConsumerState<_CourseStudentsSheet> {
       builder: (ctx) => AlertDialog(
         title: const Text('Drop Student?'),
         content: Text(
-          'Remove ${entry.studentName} from ${widget.record.courseName} '
-          '(${_shiftLabel(widget.record.shift)} Class ${widget.record.classCode})?',
+          'Remove ${entry.studentName} from ${widget.term.classCode} '
+          '(${_shiftLabel(widget.term.shift)})?',
         ),
         actions: [
           TextButton(
@@ -827,8 +859,8 @@ class _CourseStudentsSheetState extends ConsumerState<_CourseStudentsSheet> {
     setState(() => _dropping.add(entry.enrollmentId));
     try {
       await ref.read(adminServiceProvider).dropEnrollment(entry.enrollmentId);
-      ref.invalidate(classEnrollmentsProvider(widget.record.classId));
-      widget.onDropped();
+      ref.invalidate(classTermEnrollmentsProvider(widget.term.id));
+      widget.onRosterChanged();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

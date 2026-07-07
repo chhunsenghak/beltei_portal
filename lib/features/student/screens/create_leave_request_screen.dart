@@ -5,8 +5,49 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/student_providers.dart';
+import '../../../core/services/student_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 enum _LeaveType { medical, personal, family, other }
+
+const _kWeekdayAbbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// One weekday can carry more than one class session (e.g. a morning slot and
+// an afternoon slot, possibly from different enrolled courses), which is why
+// a leave request needs to pick a specific session rather than always
+// meaning "the whole day."
+class _DaySession {
+  const _DaySession({required this.course, required this.start, required this.end});
+  final EnrolledCourse course;
+  final String start;
+  final String end;
+}
+
+Map<String, List<_DaySession>> _buildDaySessionMap(List<EnrolledCourse> courses) {
+  final map = <String, List<_DaySession>>{};
+  for (final course in courses) {
+    if (!course.isCurrentSemester) continue;
+    for (final entry in course.schedule) {
+      final day = entry['day'] as String?;
+      final start = entry['start'] as String?;
+      final end = entry['end'] as String?;
+      if (day == null || start == null || end == null) continue;
+      map.putIfAbsent(day, () => [])
+          .add(_DaySession(course: course, start: start, end: end));
+    }
+  }
+  for (final sessions in map.values) {
+    sessions.sort((a, b) => a.start.compareTo(b.start));
+  }
+  return map;
+}
+
+// While courses haven't loaded yet (or the student has none this semester),
+// fall back to a plain Mon-Fri rule rather than blocking date selection.
+bool _isSelectableDay(DateTime date, Map<String, List<_DaySession>> daySessionMap) {
+  if (daySessionMap.isEmpty) return date.weekday <= DateTime.friday;
+  return daySessionMap.containsKey(_kWeekdayAbbr[date.weekday - 1]);
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +65,7 @@ class _CreateLeaveRequestScreenState
   final _reasonController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
+  int? _sessionNumber; // null = full day
   bool _isSubmitting = false;
   bool _submitted = false;
 
@@ -52,17 +94,63 @@ class _CreateLeaveRequestScreenState
   String _isoDate(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  // Sessions of the currently selected day, when start == end (single-day
+  // request) — the only case a specific session can be picked for.
+  List<_DaySession> _singleDaySessions(Map<String, List<_DaySession>> daySessionMap) {
+    if (_startDate == null || _endDate == null || _startDate != _endDate) return const [];
+    return daySessionMap[_kWeekdayAbbr[_startDate!.weekday - 1]] ?? const [];
+  }
+
+  List<EnrolledCourse> _affectedCourses(Map<String, List<_DaySession>> daySessionMap) {
+    if (_startDate == null || _endDate == null) return [];
+    final singleDaySessions = _singleDaySessions(daySessionMap);
+    if (_sessionNumber != null &&
+        _sessionNumber! >= 1 &&
+        _sessionNumber! <= singleDaySessions.length) {
+      return [singleDaySessions[_sessionNumber! - 1].course];
+    }
+    final seen = <String>{};
+    final result = <EnrolledCourse>[];
+    for (var d = _startDate!;
+        !d.isAfter(_endDate!);
+        d = d.add(const Duration(days: 1))) {
+      final sessions = daySessionMap[_kWeekdayAbbr[d.weekday - 1]] ?? const [];
+      for (final s in sessions) {
+        if (seen.add(s.course.courseId)) result.add(s.course);
+      }
+    }
+    return result;
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  Future<void> _pickDate(bool isStart) async {
+  DateTime _firstSelectableFrom(
+      DateTime start, Map<String, List<_DaySession>> daySessionMap) {
+    var d = start;
+    for (var i = 0; i < 14; i++) {
+      if (_isSelectableDay(d, daySessionMap)) return d;
+      d = d.add(const Duration(days: 1));
+    }
+    return start;
+  }
+
+  Future<void> _pickDate(
+      bool isStart, Map<String, List<_DaySession>> daySessionMap) async {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = isStart ? today : (_startDate ?? today);
+    final candidate = isStart
+        ? (_startDate ?? firstDate)
+        : (_endDate ?? _startDate ?? firstDate);
+    final initialDate = _firstSelectableFrom(
+        candidate.isBefore(firstDate) ? firstDate : candidate, daySessionMap);
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: isStart
-          ? (_startDate ?? now)
-          : (_endDate ?? _startDate ?? now),
-      firstDate: now,
+      initialDate: initialDate,
+      firstDate: firstDate,
       lastDate: DateTime(now.year + 1),
+      selectableDayPredicate: (d) => _isSelectableDay(d, daySessionMap),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: ColorScheme.light(
@@ -72,28 +160,38 @@ class _CreateLeaveRequestScreenState
       ),
     );
     if (picked == null) return;
+    final normalized = DateTime(picked.year, picked.month, picked.day);
     setState(() {
       if (isStart) {
-        _startDate = picked;
-        if (_endDate != null && _endDate!.isBefore(picked)) {
-          _endDate = picked;
+        _startDate = normalized;
+        if (_endDate != null && _endDate!.isBefore(normalized)) {
+          _endDate = normalized;
         }
       } else {
-        _endDate = picked;
+        _endDate = normalized;
       }
+      _sessionNumber = null;
     });
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) async {
     if (!_isValid) {
-      _showSnackBar('Please fill in all required fields.',
+      _showSnackBar(l.createLeaveValidationRequiredFields,
           isError: true);
+      return;
+    }
+
+    if (daySessionMap.isNotEmpty &&
+        (!_isSelectableDay(_startDate!, daySessionMap) ||
+            !_isSelectableDay(_endDate!, daySessionMap))) {
+      _showSnackBar(l.createLeaveNoClassOnDateError, isError: true);
       return;
     }
 
     final user = ref.read(currentUserProvider).valueOrNull;
     if (user == null) {
-      _showSnackBar('Session expired. Please log in again.',
+      _showSnackBar(l.createLeaveSessionExpiredError,
           isError: true);
       return;
     }
@@ -106,12 +204,13 @@ class _CreateLeaveRequestScreenState
             reason: _reasonController.text.trim(),
             startDate: _isoDate(_startDate!),
             endDate: _isoDate(_endDate!),
+            sessionNumber: _sessionNumber,
           );
       ref.invalidate(studentLeaveRequestsProvider);
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Failed to submit request. Please try again.',
+        _showSnackBar(l.createLeaveSubmitError,
             isError: true);
       }
     } finally {
@@ -137,31 +236,45 @@ class _CreateLeaveRequestScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (_submitted) return _buildSuccessScreen();
+    final l = AppLocalizations.of(context)!;
+    final coursesAsync = ref.watch(studentCoursesProvider);
+    final daySessionMap = _buildDaySessionMap(coursesAsync.valueOrNull ?? const []);
+    if (_submitted) return _buildSuccessScreen(l, daySessionMap);
+
+    final affectedCourses = _affectedCourses(daySessionMap);
+    final singleDaySessions = _singleDaySessions(daySessionMap);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, l),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildPolicyBanner(),
+            _buildPolicyBanner(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildLeaveTypeGrid(),
+            _buildLeaveTypeGrid(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildDateFields(),
+            _buildDateFields(l, daySessionMap),
             if (_startDate != null && _endDate != null) ...[
               const SizedBox(height: 8),
-              _buildDurationChip(),
+              _buildDurationChip(l),
+            ],
+            if (singleDaySessions.length > 1) ...[
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildSessionPicker(l, singleDaySessions),
+            ],
+            if (affectedCourses.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sectionGap),
+              _buildAffectedCourses(affectedCourses, l),
             ],
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildReasonField(),
+            _buildReasonField(l),
             const SizedBox(height: AppSpacing.sectionGap),
-            _buildAttachmentArea(),
+            _buildAttachmentArea(l),
             const SizedBox(height: AppSpacing.xl),
-            _buildSubmitButton(),
+            _buildSubmitButton(l, daySessionMap),
             const SizedBox(height: 24),
           ],
         ),
@@ -169,7 +282,7 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations l) {
     return AppBar(
       backgroundColor: AppColors.bgPage,
       elevation: 0,
@@ -178,11 +291,11 @@ class _CreateLeaveRequestScreenState
         icon: const Icon(Icons.arrow_back_ios, size: 18),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text('New Leave Request', style: AppTextStyles.h3),
+      title: Text(l.createLeaveAppBarTitle, style: AppTextStyles.h3),
     );
   }
 
-  Widget _buildPolicyBanner() {
+  Widget _buildPolicyBanner(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -198,10 +311,10 @@ class _CreateLeaveRequestScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Academic Policy', style: AppTextStyles.h3White),
+                Text(l.createLeavePolicyBannerTitle, style: AppTextStyles.h3White),
                 const SizedBox(height: 4),
                 Text(
-                  'Submit leave requests at least 24 hours in advance, except for medical emergencies.',
+                  l.createLeavePolicyBannerMessage,
                   style: AppTextStyles.bodyWhite.copyWith(height: 1.4),
                 ),
               ],
@@ -212,12 +325,12 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildLeaveTypeGrid() {
+  Widget _buildLeaveTypeGrid(AppLocalizations l) {
     final types = [
-      (type: _LeaveType.medical,  icon: Icons.local_hospital_outlined,   label: 'Medical'),
-      (type: _LeaveType.personal, icon: Icons.person_outline,            label: 'Personal'),
-      (type: _LeaveType.family,   icon: Icons.family_restroom_outlined,  label: 'Family'),
-      (type: _LeaveType.other,    icon: Icons.more_horiz,                label: 'Other'),
+      (type: _LeaveType.medical,  icon: Icons.local_hospital_outlined,   label: l.createLeaveTypeMedical),
+      (type: _LeaveType.personal, icon: Icons.person_outline,            label: l.createLeaveTypePersonal),
+      (type: _LeaveType.family,   icon: Icons.family_restroom_outlined,  label: l.createLeaveTypeFamily),
+      (type: _LeaveType.other,    icon: Icons.more_horiz,                label: l.createLeaveTypeOther),
     ];
 
     return Column(
@@ -278,17 +391,100 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildDateFields() {
+  Widget _buildDateFields(
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     return Column(
       children: [
-        _buildDateTile('START DATE', _startDate, () => _pickDate(true)),
+        _buildDateTile(l.createLeaveStartDateLabel, _startDate,
+            () => _pickDate(true, daySessionMap), l),
         const SizedBox(height: 12),
-        _buildDateTile('END DATE', _endDate, () => _pickDate(false)),
+        _buildDateTile(l.createLeaveEndDateLabel, _endDate,
+            () => _pickDate(false, daySessionMap), l),
       ],
     );
   }
 
-  Widget _buildDateTile(String label, DateTime? date, VoidCallback onTap) {
+  Widget _buildSessionPicker(AppLocalizations l, List<_DaySession> sessions) {
+    final options = <(int?, String)>[
+      (null, l.leaveSessionFullDay),
+      for (var i = 0; i < sessions.length; i++)
+        (i + 1, '${l.leaveSessionNumbered(i + 1)} (${sessions[i].start}–${sessions[i].end})'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l.createLeaveSessionSectionLabel, style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final (value, label) = opt;
+            final isSelected = _sessionNumber == value;
+            return GestureDetector(
+              onTap: () => setState(() => _sessionNumber = value),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primaryNavy.withValues(alpha: 0.08)
+                      : AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primaryNavy : AppColors.border,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(label,
+                    style: AppTextStyles.caption.copyWith(
+                        color: isSelected ? AppColors.primaryNavy : AppColors.textSecondary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAffectedCourses(List<EnrolledCourse> courses, AppLocalizations l) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l.createLeaveAffectedCoursesLabel, style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: courses.map((c) {
+            return Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.statusBlueBg,
+                borderRadius: BorderRadius.circular(AppSpacing.chipRadius),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.menu_book_outlined,
+                      size: 14, color: AppColors.primaryBlue),
+                  const SizedBox(width: 6),
+                  Text('${c.name} (${c.code})',
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateTile(String label, DateTime? date, VoidCallback onTap, AppLocalizations l) {
     final hasValue = date != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +512,7 @@ class _CreateLeaveRequestScreenState
               children: [
                 Expanded(
                   child: Text(
-                    date != null ? _formatDate(date) : 'dd/mm/yyyy',
+                    date != null ? _formatDate(date) : l.createLeaveDatePlaceholder,
                     style: AppTextStyles.body.copyWith(
                       color: hasValue
                           ? AppColors.textPrimary
@@ -337,7 +533,7 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildDurationChip() {
+  Widget _buildDurationChip(AppLocalizations l) {
     return Container(
       padding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -352,7 +548,7 @@ class _CreateLeaveRequestScreenState
               color: AppColors.primaryBlue, size: 14),
           const SizedBox(width: 6),
           Text(
-            'Duration: $_totalDays day${_totalDays == 1 ? '' : 's'}',
+            l.createLeaveDurationChipLabel(_totalDays),
             style: AppTextStyles.caption.copyWith(
                 color: AppColors.primaryBlue,
                 fontWeight: FontWeight.w600),
@@ -362,37 +558,36 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildReasonField() {
+  Widget _buildReasonField(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('REASON FOR LEAVE', style: AppTextStyles.label),
+        Text(l.createLeaveReasonSectionLabel, style: AppTextStyles.label),
         const SizedBox(height: 8),
         TextField(
           controller: _reasonController,
           maxLines: 5,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText:
-                'Briefly describe why you are requesting leave...',
+          decoration: InputDecoration(
+            hintText: l.createLeaveReasonHint,
             alignLabelWithHint: true,
           ),
         ),
         const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
-          child: Text('${_reasonController.text.length} chars',
+          child: Text(l.createLeaveCharCount(_reasonController.text.length),
               style: AppTextStyles.caption),
         ),
       ],
     );
   }
 
-  Widget _buildAttachmentArea() {
+  Widget _buildAttachmentArea(AppLocalizations l) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ATTACHMENTS (OPTIONAL)', style: AppTextStyles.label),
+        Text(l.createLeaveAttachmentsSectionLabel, style: AppTextStyles.label),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -410,7 +605,7 @@ class _CreateLeaveRequestScreenState
                   color: AppColors.textLabel, size: 32),
               const SizedBox(height: 8),
               Text(
-                'Tap to upload medical certificates or letters',
+                l.createLeaveAttachmentsHint,
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textSecondary),
                 textAlign: TextAlign.center,
@@ -422,7 +617,8 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildSubmitButton() {
+  Widget _buildSubmitButton(
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     return AnimatedOpacity(
       opacity: _isValid ? 1.0 : 0.5,
       duration: const Duration(milliseconds: 200),
@@ -430,7 +626,7 @@ class _CreateLeaveRequestScreenState
         width: double.infinity,
         height: AppSpacing.buttonHeight,
         child: ElevatedButton.icon(
-          onPressed: _isSubmitting ? null : _submit,
+          onPressed: _isSubmitting ? null : () => _submit(l, daySessionMap),
           icon: _isSubmitting
               ? const SizedBox(
                   width: 16,
@@ -440,7 +636,7 @@ class _CreateLeaveRequestScreenState
                 )
               : const Icon(Icons.send_outlined, size: 18),
           label: Text(
-              _isSubmitting ? 'Submitting...' : 'Submit Request',
+              _isSubmitting ? l.createLeaveSubmittingButton : l.createLeaveSubmitButton,
               style: AppTextStyles.button),
         ),
       ),
@@ -449,8 +645,10 @@ class _CreateLeaveRequestScreenState
 
   // ── Success screen ─────────────────────────────────────────────────────────
 
-  Widget _buildSuccessScreen() {
+  Widget _buildSuccessScreen(
+      AppLocalizations l, Map<String, List<_DaySession>> daySessionMap) {
     final leaveLabel = _leaveType?.name.capitalize ?? '';
+    final affectedCourses = _affectedCourses(daySessionMap);
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: SafeArea(
@@ -470,25 +668,25 @@ class _CreateLeaveRequestScreenState
                     color: AppColors.statusGreen, size: 44),
               ),
               const SizedBox(height: 24),
-              Text('Request Submitted!',
+              Text(l.createLeaveSuccessTitle,
                   style: AppTextStyles.h1,
                   textAlign: TextAlign.center),
               const SizedBox(height: 12),
               Text(
-                'Your $leaveLabel leave request has been submitted and is pending review.',
+                l.createLeaveSuccessMessage(leaveLabel),
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary, height: 1.6),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              _buildSummaryCard(leaveLabel),
+              _buildSummaryCard(leaveLabel, l, affectedCourses),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: AppSpacing.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Back to Leave Requests',
+                  child: Text(l.createLeaveBackToListButton,
                       style: AppTextStyles.button),
                 ),
               ),
@@ -499,7 +697,8 @@ class _CreateLeaveRequestScreenState
     );
   }
 
-  Widget _buildSummaryCard(String leaveLabel) {
+  Widget _buildSummaryCard(String leaveLabel, AppLocalizations l,
+      List<EnrolledCourse> affectedCourses) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -509,15 +708,25 @@ class _CreateLeaveRequestScreenState
       ),
       child: Column(
         children: [
-          _summaryRow('Type', '$leaveLabel Leave'),
+          _summaryRow(l.createLeaveSummaryTypeLabel, l.createLeaveSummaryTypeValue(leaveLabel)),
           Divider(color: AppColors.divider, height: 20),
-          _summaryRow('Period',
+          _summaryRow(l.createLeaveSummaryPeriodLabel,
               '${_formatDate(_startDate!)} → ${_formatDate(_endDate!)}'),
           Divider(color: AppColors.divider, height: 20),
-          _summaryRow('Duration',
-              '$_totalDays day${_totalDays == 1 ? '' : 's'}'),
+          _summaryRow(l.createLeaveSummaryDurationLabel,
+              l.createLeaveSummaryDurationValue(_totalDays)),
+          if (_sessionNumber != null) ...[
+            Divider(color: AppColors.divider, height: 20),
+            _summaryRow(l.createLeaveSummarySessionLabel,
+                l.leaveSessionNumbered(_sessionNumber!)),
+          ],
+          if (affectedCourses.isNotEmpty) ...[
+            Divider(color: AppColors.divider, height: 20),
+            _summaryRow(l.createLeaveSummaryCoursesLabel,
+                affectedCourses.map((c) => c.code).join(', ')),
+          ],
           Divider(color: AppColors.divider, height: 20),
-          _summaryRow('Status', 'Pending Review'),
+          _summaryRow(l.createLeaveSummaryStatusLabel, l.createLeaveSummaryStatusValue),
         ],
       ),
     );
