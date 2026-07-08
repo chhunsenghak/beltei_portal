@@ -1,9 +1,9 @@
 # Environment / secrets
 .env
 
-# Local dev scripts (platform-specific, not for CI)
-seed.ps1
-reset-db.ps1
+# # Local dev scripts (platform-specific, not for CI)
+# seed.ps1
+# reset-db.ps1
 
 # Supabase scratch queries
 supabase/snippets/
