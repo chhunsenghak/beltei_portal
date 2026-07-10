@@ -3,10 +3,11 @@ name: Deploy Flutter Web to Vercel
 on:
   push:
     branches:
-      - main 
+      - main # Triggers automatically when develop is merged into main
 
 jobs:
-  deploy:
+  build:
+    name: Build Flutter Web Application
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,10 +25,35 @@ jobs:
           touch .env
           flutter build web --release
 
+      - name: Archive Production Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Vercel (Requires QA Sign-off)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production # <--- This links to the environment rule you made in Step 1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Deploy to Vercel
-        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }} --yes
+      - name: Link and Deploy to Vercel
+        run: |
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prod --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
