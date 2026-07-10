@@ -52,19 +52,23 @@ jobs:
 
       - name: Link and Deploy to Vercel
         run: |
-          # 1. Pull the official remote dashboard sync token settings
+          # 1. Pull project configuration AND production environment variables from Vercel
           vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           
-          # 2. Re-create the mandatory structural pipeline folders
-          mkdir -p .vercel/output/static
+          # 2. Extract the variables Vercel downloaded into your required build format
+          # This reads Vercel's downloaded variables and writes them to your local .env file
+          if [ -f .vercel/.env.production.local ]; then
+            cp .vercel/.env.production.local build/web/.env
+          fi
           
-          # 3. Create the minimalist config.json required by Vercel's Build Output API
+          # 3. Re-create Vercel pipeline structures
+          mkdir -p .vercel/output/static
           echo '{"version": 3}' > .vercel/output/config.json
           
-          # 4. Copy the compiled Flutter contents into the static routing area
+          # 4. Copy the compiled contents along with the newly injected secure .env file
           cp -r build/web/* .vercel/output/static/
           
-          # 5. Execute the distribution engine
+          # 5. Complete deployment
           vercel deploy --prod --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
