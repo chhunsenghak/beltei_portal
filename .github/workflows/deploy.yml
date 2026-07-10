@@ -3,7 +3,7 @@ name: Deploy Flutter Web to Vercel
 on:
   push:
     branches:
-      - main # Triggers automatically when develop is merged into main
+      - main # Triggers automatically when your develop branch merges into main
 
 jobs:
   build:
@@ -13,30 +13,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Vercel CLI to fetch environment
+        run: npm install --global vercel@latest
+
+      - name: Pull Remote Environment Configuration
+        run: |
+          # Downloads the secure environment variables you saved on the Vercel Web Dashboard
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Build Web App
+      - name: Build Web App with Injected Variables
         run: |
           flutter config --enable-web
           flutter pub get
-          touch .env
-          flutter build web --release
+          
+          # Check if Vercel secrets exist, and compile them natively into the code
+          if [ -f .vercel/.env.production.local ]; then
+            flutter build web --release --dart-define-from-file=.vercel/.env.production.local
+          else
+            flutter build web --release
+          fi
 
       - name: Archive Production Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: web-build
-          path: build/web/ # Grabs only the contents inside the web folder
+          path: build/web/
           retention-days: 1
 
   deploy:
     name: Deploy to Vercel (Requires QA Sign-off)
     needs: build
     runs-on: ubuntu-latest
-    environment: production
+    environment: production # Links to your GitHub environment review gatekeeper rule
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -52,24 +68,19 @@ jobs:
 
       - name: Link and Deploy to Vercel
         run: |
-          # 1. Pull the official project settings and production secrets from Vercel
+          # 1. Pull the official project settings
           vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           
-          # 2. Inject Vercel dashboard environment variables back into your static asset bundle
-          if [ -f .vercel/.env.production.local ]; then
-            cp .vercel/.env.production.local build/web/.env
-          fi
-          
-          # 3. Create the mandatory Vercel prebuilt framework directories
+          # 2. Create the mandatory Vercel prebuilt framework directory
           mkdir -p .vercel/output/static
           
-          # 4. Generate config.json with fallback routing (Fixes 404 errors on refresh/deep-links)
+          # 3. Generate a config file that handles clean routing (fixes 404 errors on browser refresh)
           echo '{"version": 3, "routes": [{"handle": "filesystem"}, {"src": "/.*", "dest": "/index.html"}]}' > .vercel/output/config.json
           
-          # 5. Copy the actual files directly into the root static folder
+          # 4. Copy the raw files directly into the root static staging folder
           cp -r build/web/. .vercel/output/static/
           
-          # 6. Push the prebuilt container live
+          # 5. Push the prebuilt app container live instantly
           vercel deploy --prod --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

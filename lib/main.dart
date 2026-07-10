@@ -7,7 +7,9 @@ import 'app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+  // await dotenv.load(fileName: '.env');
+  final String supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  final String supabaseKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
   await Supabase.initialize(
     url: supabaseUrl,
     publishableKey: supabaseAnonKey,
