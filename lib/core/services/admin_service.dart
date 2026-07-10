@@ -2360,7 +2360,7 @@ class AdminService {
 
   Future<void> createMajor({
     required String name,
-    required String departmentId,
+    String? departmentId,
   }) async {
     await _db.from('majors').insert({
       'name': name.trim(),

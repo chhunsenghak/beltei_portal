@@ -279,6 +279,7 @@ class TeacherProfileScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AppLocalizations l) {
     final locale = ref.watch(localeProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final brandColor = ref.watch(brandColorProvider);
     return _SectionCard(
       icon: Icons.settings_outlined,
       title: l.profileAccountSettingsTitle,
@@ -337,6 +338,26 @@ class TeacherProfileScreen extends ConsumerWidget {
             ),
             onTap: () => _showThemePicker(context, ref, themeMode, l),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.palette_outlined,
+                color: AppColors.primaryNavy, size: 20),
+            title: Text('Theme Color', style: AppTextStyles.body),
+            subtitle: Text("Choose your primary accent color",
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  brandColor.label,
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.textSecondary),
+              ],
+            ),
+            onTap: () => _showBrandColorPicker(context, ref, brandColor, l),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -349,11 +370,63 @@ class TeacherProfileScreen extends ConsumerWidget {
                       .copyWith(color: AppColors.statusRed)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppColors.statusRed),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Brand Color picker ─────────────────────────────────────────────────────
+
+  void _showBrandColorPicker(
+      BuildContext context, WidgetRef ref, BrandColor currentColor, AppLocalizations l) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text('Choose Theme Color', style: AppTextStyles.h3),
+              ),
+              ...BrandColor.values.map((colorOption) {
+                final isSelected = currentColor == colorOption;
+                return ListTile(
+                  leading: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? colorOption.darkColor
+                          : colorOption.lightColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: Text(colorOption.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(brandColorProvider.notifier).setBrandColor(colorOption);
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }

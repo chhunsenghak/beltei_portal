@@ -11,6 +11,7 @@ import '../../../core/services/student_service.dart';
 import '../../../core/supabase/database.types.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../../shared/utils/responsive.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,18 +50,30 @@ class StudentDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.screenPadding),
         children: [
-          _buildQuickActions(context, l),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildAcademicSummary(ref, l),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildAttendanceOverview(ref, l),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildFinancialSummary(context, ref, l),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildRecentActivities(context, ref, l),
-          const SizedBox(height: 24),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildQuickActions(context, l),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildAcademicSummary(ref, l),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildAttendanceOverview(ref, l),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildFinancialSummary(context, ref, l),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildRecentActivities(context, ref, l),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -589,7 +602,7 @@ class _SummaryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: Responsive.getSummaryGridColumns(context),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,

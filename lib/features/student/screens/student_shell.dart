@@ -7,6 +7,7 @@ import '../../../core/providers/admin_providers.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/router/app_router.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/utils/responsive.dart';
 
 class StudentShell extends ConsumerWidget {
   const StudentShell({super.key, required this.child});
@@ -78,7 +79,11 @@ class StudentShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(themeModeProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final keyedChild = KeyedSubtree(
+      key: ValueKey(themeMode),
+      child: child,
+    );
     final matchedLoc = GoRouterState.of(context).matchedLocation;
     final showHeader = matchedLoc == AppRoutes.studentHome ||
                        matchedLoc == AppRoutes.courseList ||
@@ -88,14 +93,245 @@ class StudentShell extends ConsumerWidget {
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromLocation(location);
 
+    if (Responsive.isWide(context)) {
+      return Scaffold(
+        body: Row(
+          children: [
+            _buildSidebar(context, ref, currentIndex),
+            VerticalDivider(width: 1, color: AppColors.border, thickness: 1),
+            Expanded(
+              child: keyedChild,
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: Column(
         children: [
           if (showHeader) _buildShellHeader(context, ref),
-          Expanded(child: child),
+          Expanded(child: keyedChild),
         ],
       ),
       bottomNavigationBar: _BottomNav(currentIndex: currentIndex),
+    );
+  }
+
+  Widget _buildSidebar(BuildContext context, WidgetRef ref, int active) {
+    final l = AppLocalizations.of(context)!;
+    final logoUrl = ref.watch(appSettingsProvider).valueOrNull?.logoUrl;
+    final labels = [l.navHome, l.navCourses, l.navSchedule, l.navAlerts, l.navProfile];
+
+    return Container(
+      width: 260,
+      color: AppColors.bgCard,
+      child: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Row(
+                children: [
+                  logoUrl != null
+                      ? Image.network(logoUrl, height: 44, fit: BoxFit.contain)
+                      : Image.asset(
+                          'assets/images/beltei_logo.png',
+                          height: 44,
+                          fit: BoxFit.contain,
+                        ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l.appTitle,
+                      style: AppTextStyles.h3.copyWith(
+                        color: AppColors.primaryNavy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _BottomNav._items.length,
+              itemBuilder: (context, i) {
+                final isActive = i == active;
+                final item = _BottomNav._items[i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: InkWell(
+                    onTap: () => context.go(_BottomNav._routes[i]),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? AppColors.primaryNavy.withValues(alpha: 0.08)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isActive ? item.activeIcon : item.icon,
+                            color: isActive
+                                ? AppColors.primaryNavy
+                                : AppColors.textSecondary,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              labels[i],
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: isActive
+                                    ? AppColors.primaryNavy
+                                    : AppColors.textSecondary,
+                                fontWeight: isActive
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          if (isActive)
+                            Container(
+                              width: 4,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryNavy,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.school_outlined, color: AppColors.primaryNavy, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Student Account',
+                    style: AppTextStyles.bodySemiBold,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+                  offset: const Offset(0, -100),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'profile',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
+                          const SizedBox(width: 10),
+                          Text(l.navProfile),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'theme',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? Icons.light_mode_outlined
+                                : Icons.dark_mode_outlined,
+                            size: 18,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(Theme.of(context).brightness == Brightness.dark ? 'Light Mode' : 'Dark Mode'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.logout,
+                            size: 18,
+                            color: AppColors.statusRed,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            l.logoutTitle,
+                            style: TextStyle(color: AppColors.statusRed),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (value) {
+                    if (value == 'profile') {
+                      context.go(AppRoutes.studentProfile);
+                    } else if (value == 'theme') {
+                      final notifier = ref.read(themeModeProvider.notifier);
+                      final current = Theme.of(context).brightness;
+                      notifier.setThemeMode(
+                        current == Brightness.dark ? ThemeMode.light : ThemeMode.dark,
+                      );
+                    } else if (value == 'logout') {
+                      _confirmLogout(context);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l.logoutTitle),
+        content: Text(l.logoutConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.statusRed),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/login');
+            },
+            child: Text(l.logoutTitle),
+          ),
+        ],
+      ),
     );
   }
 }

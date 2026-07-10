@@ -1,6 +1,15 @@
 # BELTEI PORTAL
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A comprehensive academic portal system designed for BELTEI International University, providing tailored workspaces for Admins, Teachers, and Students to manage courses, class schedules, grading, attendance, and leave requests.
+
+## Tech Stack
+
+- **Client / Mobile**: Flutter (Dart)
+- **State Management**: Riverpod (`flutter_riverpod`)
+- **Routing**: GoRouter (`go_router`)
+- **Backend / Database**: Supabase (PostgreSQL, Auth, Storage, Row-Level Security)
+- **Local Utilities**: `flutter_dotenv` (environment variables), `shared_preferences` (local key-value cache)
+- **Libraries & Reports**: `pdf` / `printing` (document exports), `excel` (report exports), `fl_chart` (analytics charts)
 
 ## Commands
 
@@ -39,48 +48,34 @@ supabase login
 # 2. Link to the remote project
 supabase link --project-ref devqlpzjanbekxlrbozp
 
-# 3. Start local Supabase (requires Docker)
+# 3. Reset database (drop all tables and data)
+"y" | supabase db reset --linked
+
+# 4. Seed database with test data
+.\seed.ps1
+
+# 5. Start local Supabase (requires Docker)
 supabase start
 
-# 4. Apply all migrations to the local database
+# 6. Apply all migrations to the local database
 supabase db reset
 ```
 
 ### Credentials
 
-After `supabase start`, run `supabase status` to get local credentials:
+The app loads environment variables from a `.env` file at the project root.
 
-```
-Project URL:  http://127.0.0.1:54321
-Publishable:  sb_publishable_...   ← use this as supabaseAnonKey for local
-Secret:       sb_secret_...        ← never use in Flutter app
-Studio:       http://127.0.0.1:54323
-```
+```powershell
+# 1. Copy the example environment template
+copy .env.example .env
 
-Configure in `lib/core/supabase/supabase_config.dart`:
+# 2. View local credentials (after starting supabase)
+supabase status
 
-```dart
-// Local development
-const String supabaseUrl = 'http://127.0.0.1:54321';
-const String supabaseAnonKey = 'sb_publishable_...'; // from supabase status
-
-// Remote (production) — uncomment to switch
-// const String supabaseUrl = 'https://devqlpzjanbekxlrbozp.supabase.co';
-// const String supabaseAnonKey = 'sb_publishable_...'; // from Supabase Dashboard → API keys
-```
-
-> **Note:** The remote `Publishable` key is in the Supabase Dashboard under **Project Settings → API keys**. The old name was "anon key" — same thing.
-
-### Create a Local Test User
-
-1. Open Local Studio: `http://127.0.0.1:54323`
-2. Go to **Authentication → Users → Add user**
-3. Fill in email + password, check **Auto confirm user**
-4. Set the role in SQL Editor:
-
-```sql
-UPDATE profiles SET role = 'admin', full_name = 'System Admin'
-WHERE email = 'your@email.com';
+# 3. Update the .env file with the appropriate keys:
+# - SUPABASE_URL: Project URL / API URL
+# - SUPABASE_ANON_KEY: anon key (Publishable)
+# - SUPABASE_SERVICE_ROLE_KEY: service_role key
 ```
 
 ### Migration Workflow
@@ -121,15 +116,15 @@ supabase migration list # List all migrations and their status
 ```
 supabase/
   migrations/           ← SQL migration files (version-controlled)
+  seeder/               ← Dart database seeder
 lib/core/
   supabase/
-    supabase_config.dart  ← URL + key (switch local ↔ remote here)
-    database.types.dart   ← Dart models for all 14 DB tables
+    supabase_config.dart  ← URL + key (loads from .env)
+    database.types.dart   ← Dart models for all 18 DB tables
   services/
     auth_service.dart     ← signIn, signOut, getProfile
   providers/
     auth_provider.dart    ← Riverpod providers
-supabase_schema.sql       ← Reference copy of the full schema
 ```
 
 ### Database Tables
@@ -152,6 +147,8 @@ supabase_schema.sql       ← Reference copy of the full schema
 | `notifications` | Per-user notifications |
 | `course_materials` | Uploaded files per course |
 | `announcements` | Teacher announcements per course |
+| `assessments` | Class/course assignments & assessments |
+| `assessment_submissions` | Student submissions and grades for assessments |
 
 ---
 
@@ -176,8 +173,8 @@ beltei_portal/
 │   │   ├── services/
 │   │   │   └── auth_service.dart        # signIn, signOut, getProfile
 │   │   ├── supabase/
-│   │   │   ├── supabase_config.dart     # URL + key (local ↔ remote toggle)
-│   │   │   └── database.types.dart      # Dart models for all 16 DB tables
+│   │   │   ├── supabase_config.dart     # URL + key (loads from .env)
+│   │   │   └── database.types.dart      # Dart models for all 18 DB tables
 │   │   └── theme/
 │   │       └── app_theme.dart           # MaterialTheme
 │   ├── features/
@@ -193,11 +190,11 @@ beltei_portal/
 │   │   │       ├── student_shell.dart   # Bottom nav shell
 │   │   │       └── …
 │   │   ├── teacher/
-│   │   │   └── screens/                 # 15 screens (courses, grading, attendance…)
+│   │   │   └── screens/
 │   │   │       ├── teacher_shell.dart
 │   │   │       └── …
 │   │   └── admin/
-│   │       └── screens/                 # 21 screens (users, academic, finance…)
+│   │       └── screens/
 │   │           ├── admin_shell.dart
 │   │           └── …
 │   └── shared/
@@ -210,60 +207,36 @@ beltei_portal/
 │   ├── config.toml                      # Supabase CLI config
 │   └── migrations/
 │       └── 20260625170516_initial_schema.sql
-├── supabase_schema.sql                  # Reference copy of full schema
 ├── assets/
 │   └── images/
 │       └── beltei_logo.png
 └── pubspec.yaml
 ```
 
-### Screen Count
+## Features by User Role
 
-| Role | Screens |
-|---|---|
-| Admin | 21 |
-| Student | 19 |
-| Teacher | 15 |
-| Auth | 3 |
-| **Total** | **58** |
+### 🔑 Admin Features
+- **Dashboard & Analytics**: View high-level university statistics, institutional reports, and general quick actions.
+- **User Management**: Manage profile types, view/edit detailed student (`student_detail_screen`) and teacher (`teacher_detail_screen`) information.
+- **Academic Management**: Configure academic calendars, faculties, departments, majors, academic years, semesters, and courses.
+- **Class & Enrollment Management**: Create and configure classes, manage curriculum/schedules, and handle student enrollment registrations.
+- **Attendance & Leave Control**: Monitor class attendance logs, review globally submitted student and teacher leave requests.
+- **Financial Control (View Only)**: View student invoices, payment history, and logs (under development).
+- **System Settings**: Access global application configurations.
 
-### Routing (GoRouter)
+### 👨‍🏫 Teacher Features
+- **Dashboard & Schedule**: Review daily schedule, personal classes, and active student metrics.
+- **Course & Material Hub**: Upload course materials and files, post announcements for specific courses/classes.
+- **Attendance Management**: Mark and edit student attendance records.
+- **Assessment & Grading**: Create assignments/assessments, track submissions, and grade student work with feedback.
+- **Analytics**: Track student performance statistics and course grade distributions.
+- **Leave Requests**: Request leaves of absence and monitor approval status.
 
-`lib/core/router/app_router.dart` is the single source of truth for navigation. Route path constants live in the `AppRoutes` class. The app has four top-level zones:
+### 🎓 Student Features
+- **Personal Dashboard**: Track academic GPA, attendance health, upcoming schedule, and notifications.
+- **Classroom Hub**: View active courses, class schedules, and download course materials.
+- **Grades & Analytics**: Check semester-by-semester grade details and analyze academic progression/analytics.
+- **Attendance Logs**: Access personal attendance history and details.
+- **Leave Requests**: Submit leave requests and monitor approvals.
+- **Finance & Payments (View Only)**: View pending/paid invoices and fee details (online payment process not implemented).
 
-- **Auth zone** (`/`, `/login`, `/forgot-password`) — plain `GoRoute`s
-- **Student zone** (`/student/...`) — `ShellRoute` wrapping `StudentShell` (bottom nav)
-- **Teacher zone** (`/teacher/...`) — `ShellRoute` wrapping `TeacherShell` (bottom nav)
-- **Admin zone** (`/admin/...`) — `ShellRoute` wrapping `AdminShell` (bottom nav)
-
-Auth redirect: unauthenticated users are automatically sent to `/login` via the router's `redirect` callback + `_AuthNotifier` (ChangeNotifier that listens to Supabase auth state changes). After login, `AuthService` fetches the user's role from the `profiles` table and routes to the correct shell.
-
-### Feature Structure
-
-`lib/features/<role>/screens/` — all screens for that role live flat in this directory. Screens currently use inline `const` mock data at the top of each file (named `_k*` by convention). When wiring up real data, that mock data is the replacement target.
-
-`lib/shared/widgets/` — four reusable widgets:
-- `BelteiAppBar` — custom app bar (Container-based) that guarantees 16 px left alignment matching `AppSpacing.screenPadding`. Pass `showSearch`/`showNotification` flags or a custom `actions` list.
-- `StatusBadge` — pill badge; accepts a `BadgeType` enum value.
-- `SectionHeader` — section title with optional action link.
-- `InfoCard` — bordered card container.
-
-### Design Tokens
-
-All design constants live in `lib/core/constants/`. Never use magic numbers for colors, spacing, or typography:
-
-| File | Exports |
-|---|---|
-| `app_colors.dart` | `AppColors.primaryNavy`, `AppColors.statusGreen`, etc. |
-| `app_text_styles.dart` | `AppTextStyles.h1`, `AppTextStyles.body`, etc. (Inter via google_fonts) |
-| `app_spacing.dart` | `AppSpacing.screenPadding` (16), `AppSpacing.cardRadius` (12), etc. |
-
-### AppBar Rules
-
-- **Tab screens** (root destinations inside a ShellRoute): use `BelteiAppBar()` or set `automaticallyImplyLeading: false` to prevent Flutter inserting a 56 px back button.
-- **Detail screens** pushed on top: set `leading:` explicitly and `automaticallyImplyLeading: false`.
-- **Dashboard screens** with `SliverAppBar`: always include `automaticallyImplyLeading: false` and `titleSpacing: 0`, with title wrapped in `Padding(left: 16)`.
-
-### Assets
-
-`assets/images/beltei_logo.png` — referenced via `Image.asset(...)`. The `assets/images/` directory is registered under `flutter.assets` in `pubspec.yaml`.

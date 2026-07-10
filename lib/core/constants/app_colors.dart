@@ -8,8 +8,16 @@ class AppColors {
   static Brightness get brightness => _brightness;
   static bool get _isDark => _brightness == Brightness.dark;
 
+  static Color _brandLightColor = const Color(0xFF1A237E);
+  static Color _brandDarkColor = const Color(0xFF5C6BC0);
+
+  static void setBrandColors(Color light, Color dark) {
+    _brandLightColor = light;
+    _brandDarkColor = dark;
+  }
+
   // Primary
-  static Color get primaryNavy => _isDark ? const Color(0xFF5C6BC0) : const Color(0xFF1A237E);
+  static Color get primaryNavy => _isDark ? _brandDarkColor : _brandLightColor;
   static Color get primaryBlue => _isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB);
   static Color get accentGold => _isDark ? const Color(0xFFE8B93A) : const Color(0xFFD4A017);
 
