@@ -21,6 +21,7 @@ jobs:
         run: |
           flutter config --enable-web
           flutter pub get
+          touch .env
           flutter build web --release
 
       - name: Install Vercel CLI
