@@ -408,6 +408,7 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
 
   Widget _buildAppearanceSection(ThemeMode mode) {
     final l = AppLocalizations.of(context)!;
+    final currentBrandColor = ref.watch(brandColorProvider);
     return _SettingsSection(
       icon: Icons.dark_mode_outlined,
       title: l.settingsAppearanceTitle,
@@ -450,6 +451,50 @@ class _SystemSettingsScreenState extends ConsumerState<SystemSettingsScreen> {
                     ),
                   ),
                 ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+        Text('Theme Color', style: AppTextStyles.bodySemiBold),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: BrandColor.values.map((colorOption) {
+            final isSelected = currentBrandColor == colorOption;
+            return GestureDetector(
+              onTap: () => ref.read(brandColorProvider.notifier).setBrandColor(colorOption),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? colorOption.darkColor
+                      : colorOption.lightColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected
+                        ? (Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black)
+                        : Colors.transparent,
+                    width: 2.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: isSelected
+                    ? const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 16,
+                      )
+                    : null,
               ),
             );
           }).toList(),

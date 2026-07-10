@@ -6,6 +6,7 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
 import '../../../core/services/admin_service.dart';
+import '../../../shared/utils/responsive.dart';
 
 final _kQuickManagement = [
   (icon: Icons.school_outlined,     label: 'Students',  route: '/admin/users?role=student'),
@@ -39,34 +40,46 @@ class AdminDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.screenPadding),
         children: [
-          Text('Overview', style: AppTextStyles.h1),
-          const SizedBox(height: 14),
-          statsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => _buildStatsError(ref),
-            data: (stats) => _buildStatsGrid(stats),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Overview', style: AppTextStyles.h1),
+                    const SizedBox(height: 14),
+                    statsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => _buildStatsError(ref),
+                      data: (stats) => _buildStatsGrid(context, stats),
+                    ),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildEnrollmentTrends(analytics),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    statsAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (stats) => _buildAttendanceAndRevenue(stats, analytics),
+                    ),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildAcademicPerformance(analytics),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildQuickManagement(context),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    leavesAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (leaves) => _buildRecentLeaves(context, leaves),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildEnrollmentTrends(analytics),
-          const SizedBox(height: AppSpacing.sectionGap),
-          statsAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (stats) => _buildAttendanceAndRevenue(stats, analytics),
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildAcademicPerformance(analytics),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildQuickManagement(context),
-          const SizedBox(height: AppSpacing.sectionGap),
-          leavesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (leaves) => _buildRecentLeaves(context, leaves),
-          ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -96,7 +109,7 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   // ── Stats grid ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsGrid(AdminStats stats) {
+  Widget _buildStatsGrid(BuildContext context, AdminStats stats) {
     final items = [
       (icon: Icons.school_outlined, label: 'Total\nStudents', value: '${stats.studentCount}', color: AppColors.primaryBlue),
       (icon: Icons.person_outlined, label: 'Active\nTeachers', value: '${stats.teacherCount}', color: AppColors.primaryNavy),
@@ -106,7 +119,7 @@ class AdminDashboardScreen extends ConsumerWidget {
       (icon: Icons.calendar_month_outlined, label: 'Current\nSemester', value: stats.currentSemester.split(',').first, color: AppColors.statusRed),
     ];
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: Responsive.getStatsGridColumns(context),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,

@@ -495,11 +495,11 @@ class _FacultyDepartmentScreenState
                     hint: 'e.g. Software Engineering'),
                 const SizedBox(height: 12),
                 _SheetDropdown<String?>(
-                  label: 'Faculty *',
+                  label: 'Faculty',
                   value: faculties.any((f) => f.id == selectedFacultyId)
                       ? selectedFacultyId
                       : null,
-                  hint: 'Select faculty',
+                  hint: 'Select faculty (optional)',
                   items: faculties
                       .map((f) => DropdownMenuItem<String?>(
                             value: f.id,
@@ -516,13 +516,13 @@ class _FacultyDepartmentScreenState
                 if (selectedFacultyId != null) ...[
                   const SizedBox(height: 12),
                   _SheetDropdown<String?>(
-                    label: 'Department *',
+                    label: 'Department',
                     value: filteredDepts.any((d) => d.id == selectedDeptId)
                         ? selectedDeptId
                         : null,
                     hint: filteredDepts.isEmpty
                         ? 'No departments in this faculty'
-                        : 'Select department',
+                        : 'Select department (optional)',
                     items: filteredDepts
                         .map((d) => DropdownMenuItem<String?>(
                               value: d.id,
@@ -551,11 +551,11 @@ class _FacultyDepartmentScreenState
                         ? null
                         : () async {
                             final name = nameCtrl.text.trim();
-                            if (name.isEmpty || selectedDeptId == null) {
+                            if (name.isEmpty) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 const SnackBar(
                                     content: Text(
-                                        'Major name and department are required')),
+                                        'Major name is required')),
                               );
                               return;
                             }
@@ -565,7 +565,7 @@ class _FacultyDepartmentScreenState
                                   .read(adminServiceProvider)
                                   .createMajor(
                                       name: name,
-                                      departmentId: selectedDeptId!);
+                                      departmentId: selectedDeptId);
                               ref.invalidate(adminMajorsProvider);
                               ref.invalidate(adminFacultiesProvider);
                               if (ctx.mounted) Navigator.pop(ctx);

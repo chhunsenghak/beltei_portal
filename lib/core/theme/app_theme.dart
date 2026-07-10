@@ -91,5 +91,16 @@ class AppTheme {
       elevation: 0,
       type: BottomNavigationBarType.fixed,
     ),
+    scrollbarTheme: ScrollbarThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.hovered)) {
+          return AppColors.textSecondary.withValues(alpha: 0.6);
+        }
+        return AppColors.textSecondary.withValues(alpha: 0.3);
+      }),
+      thickness: WidgetStateProperty.all(8.0),
+      radius: const Radius.circular(4.0),
+      interactive: true,
+    ),
   );
 }

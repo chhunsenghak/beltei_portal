@@ -48,10 +48,16 @@ supabase login
 # 2. Link to the remote project
 supabase link --project-ref devqlpzjanbekxlrbozp
 
-# 3. Start local Supabase (requires Docker)
+# 3. Reset database (drop all tables and data)
+"y" | supabase db reset --linked
+
+# 4. Seed database with test data
+.\seed.ps1
+
+# 5. Start local Supabase (requires Docker)
 supabase start
 
-# 4. Apply all migrations to the local database
+# 6. Apply all migrations to the local database
 supabase db reset
 ```
 

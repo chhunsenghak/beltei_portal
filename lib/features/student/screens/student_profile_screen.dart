@@ -389,6 +389,7 @@ class StudentProfileScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AppLocalizations l) {
     final locale = ref.watch(localeProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final brandColor = ref.watch(brandColorProvider);
     final items = [
       (
         icon: Icons.lock_outline,
@@ -489,6 +490,30 @@ class StudentProfileScreen extends ConsumerWidget {
             dense: true,
             onTap: () => _showThemePicker(context, ref, themeMode, l),
           ),
+          Divider(
+              color: AppColors.divider, height: 1, indent: 16),
+          ListTile(
+            leading: Icon(Icons.palette_outlined,
+                color: AppColors.primaryNavy, size: 22),
+            title: Text('Theme Color',
+                style: AppTextStyles.bodyMedium),
+            subtitle: Text("Choose your primary accent color",
+                style: AppTextStyles.caption),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  brandColor.label,
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                Icon(Icons.chevron_right,
+                    color: AppColors.textLabel),
+              ],
+            ),
+            dense: true,
+            onTap: () => _showBrandColorPicker(context, ref, brandColor, l),
+          ),
         ],
       ),
     );
@@ -527,6 +552,55 @@ class StudentProfileScreen extends ConsumerWidget {
                       : null,
                   onTap: () {
                     ref.read(themeModeProvider.notifier).setThemeMode(opt.mode);
+                    Navigator.of(ctx).pop();
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Brand Color picker ─────────────────────────────────────────────────────
+
+  void _showBrandColorPicker(
+      BuildContext context, WidgetRef ref, BrandColor currentColor, AppLocalizations l) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text('Choose Theme Color', style: AppTextStyles.h3),
+              ),
+              ...BrandColor.values.map((colorOption) {
+                final isSelected = currentColor == colorOption;
+                return ListTile(
+                  leading: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? colorOption.darkColor
+                          : colorOption.lightColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  title: Text(colorOption.label, style: AppTextStyles.body),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: AppColors.primaryNavy)
+                      : null,
+                  onTap: () {
+                    ref.read(brandColorProvider.notifier).setBrandColor(colorOption);
                     Navigator.of(ctx).pop();
                   },
                 );

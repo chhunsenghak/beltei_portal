@@ -90,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildCard() {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 420),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
         color: AppColors.bgCard,

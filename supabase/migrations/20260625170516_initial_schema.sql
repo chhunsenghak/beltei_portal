@@ -22,14 +22,14 @@ CREATE TABLE profiles (
 -- ── Faculties & Departments ──────────────────────────────────────────────────
 
 CREATE TABLE faculties (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name        TEXT NOT NULL,
   code        TEXT NOT NULL UNIQUE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE departments (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   faculty_id  UUID REFERENCES faculties(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   code        TEXT NOT NULL UNIQUE,
@@ -71,7 +71,7 @@ CREATE TABLE teachers (
 -- ── Semesters ────────────────────────────────────────────────────────────────
 
 CREATE TABLE semesters (
-  id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name           TEXT NOT NULL,
   academic_year  TEXT NOT NULL,
   start_date     DATE NOT NULL,
@@ -83,7 +83,7 @@ CREATE TABLE semesters (
 -- ── Courses ──────────────────────────────────────────────────────────────────
 
 CREATE TABLE courses (
-  id             UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   code           TEXT NOT NULL UNIQUE,
   name           TEXT NOT NULL,
   credits        INTEGER NOT NULL DEFAULT 3,
@@ -101,7 +101,7 @@ CREATE TABLE courses (
 -- ── Enrollments ──────────────────────────────────────────────────────────────
 
 CREATE TABLE enrollments (
-  id           UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id   UUID REFERENCES students(id) ON DELETE CASCADE,
   course_id    UUID REFERENCES courses(id) ON DELETE CASCADE,
   semester_id  UUID REFERENCES semesters(id),
@@ -114,7 +114,7 @@ CREATE TABLE enrollments (
 -- ── Grades ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE grades (
-  id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id    UUID REFERENCES students(id) ON DELETE CASCADE,
   course_id     UUID REFERENCES courses(id) ON DELETE CASCADE,
   semester_id   UUID REFERENCES semesters(id),
@@ -133,7 +133,7 @@ CREATE TABLE grades (
 -- ── Attendance ───────────────────────────────────────────────────────────────
 
 CREATE TABLE attendance (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id  UUID REFERENCES students(id) ON DELETE CASCADE,
   course_id   UUID REFERENCES courses(id) ON DELETE CASCADE,
   date        DATE NOT NULL,
@@ -147,7 +147,7 @@ CREATE TABLE attendance (
 -- ── Leave Requests ───────────────────────────────────────────────────────────
 
 CREATE TABLE leave_requests (
-  id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   requester_id    UUID REFERENCES profiles(id) ON DELETE CASCADE,
   requester_type  TEXT NOT NULL CHECK (requester_type IN ('student', 'teacher')),
   type            TEXT NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE leave_requests (
 -- ── Finance ──────────────────────────────────────────────────────────────────
 
 CREATE TABLE invoices (
-  id           UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   student_id   UUID REFERENCES students(id) ON DELETE CASCADE,
   semester_id  UUID REFERENCES semesters(id),
   description  TEXT NOT NULL,
@@ -179,7 +179,7 @@ CREATE TABLE invoices (
 );
 
 CREATE TABLE payments (
-  id               UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   invoice_id       UUID REFERENCES invoices(id),
   student_id       UUID REFERENCES students(id),
   amount           DECIMAL(10,2) NOT NULL,
@@ -193,7 +193,7 @@ CREATE TABLE payments (
 -- ── Notifications ────────────────────────────────────────────────────────────
 
 CREATE TABLE notifications (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id     UUID REFERENCES profiles(id) ON DELETE CASCADE,
   title       TEXT NOT NULL,
   body        TEXT NOT NULL,
@@ -206,7 +206,7 @@ CREATE TABLE notifications (
 -- ── Course Materials ─────────────────────────────────────────────────────────
 
 CREATE TABLE course_materials (
-  id           UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   course_id    UUID REFERENCES courses(id) ON DELETE CASCADE,
   teacher_id   UUID REFERENCES teachers(id),
   title        TEXT NOT NULL,
@@ -220,7 +220,7 @@ CREATE TABLE course_materials (
 -- ── Announcements ────────────────────────────────────────────────────────────
 
 CREATE TABLE announcements (
-  id          UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id          UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   teacher_id  UUID REFERENCES teachers(id),
   course_id   UUID REFERENCES courses(id),
   title       TEXT NOT NULL,

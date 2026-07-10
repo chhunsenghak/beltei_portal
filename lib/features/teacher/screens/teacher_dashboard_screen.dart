@@ -9,6 +9,7 @@ import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/utils/responsive.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,57 +38,70 @@ class TeacherDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.screenPadding),
         children: [
-          // Header
-          profileAsync.when(
-            loading: () => _buildHeaderSkeleton(),
-            error: (_, _) => _buildHeaderPlaceholder(l),
-            data: (p) =>
-                p == null ? _buildHeaderPlaceholder(l) : _buildHeader(p, l),
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          // Stats
-          Builder(builder: (_) {
-            final courses = coursesAsync.valueOrNull ?? [];
-            final leaves = leavesAsync.valueOrNull ?? [];
-            final isLoading =
-                coursesAsync.isLoading || leavesAsync.isLoading;
-            if (isLoading) return _buildStatsLoading();
-            return _buildStatsGrid(
-              courses.length,
-              courses.fold(0, (s, c) => s + c.studentCount),
-              leaves
-                  .where((l) => l.status == LeaveStatus.pending)
-                  .length,
-              courses.where((c) => c.hasTodayClass()).length,
-              l,
-            );
-          }),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _buildQuickActions(context, l),
-          const SizedBox(height: AppSpacing.sectionGap),
-          // Today's schedule
-          coursesAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (courses) => _buildTodaySchedule(context, courses, l),
-          ),
-          const SizedBox(height: AppSpacing.sectionGap),
-          // Pending leaves (view-only)
-          leavesAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (leaves) => _buildPendingLeaves(
-              context,
-              leaves
-                  .where((l) => l.status == LeaveStatus.pending)
-                  .take(3)
-                  .toList(),
-              l,
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    profileAsync.when(
+                      loading: () => _buildHeaderSkeleton(),
+                      error: (_, _) => _buildHeaderPlaceholder(l),
+                      data: (p) =>
+                          p == null ? _buildHeaderPlaceholder(l) : _buildHeader(p, l),
+                    ),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    // Stats
+                    Builder(builder: (ctx) {
+                      final courses = coursesAsync.valueOrNull ?? [];
+                      final leaves = leavesAsync.valueOrNull ?? [];
+                      final isLoading =
+                          coursesAsync.isLoading || leavesAsync.isLoading;
+                      if (isLoading) return _buildStatsLoading();
+                      return _buildStatsGrid(
+                        ctx,
+                        courses.length,
+                        courses.fold(0, (s, c) => s + c.studentCount),
+                        leaves
+                            .where((l) => l.status == LeaveStatus.pending)
+                            .length,
+                        courses.where((c) => c.hasTodayClass()).length,
+                        l,
+                      );
+                    }),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    _buildQuickActions(context, l),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    // Today's schedule
+                    coursesAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (courses) => _buildTodaySchedule(context, courses, l),
+                    ),
+                    const SizedBox(height: AppSpacing.sectionGap),
+                    // Pending leaves (view-only)
+                    leavesAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (leaves) => _buildPendingLeaves(
+                        context,
+                        leaves
+                            .where((l) => l.status == LeaveStatus.pending)
+                            .take(3)
+                            .toList(),
+                        l,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -193,7 +207,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsGrid(int courses, int students, int pendingLeaves,
+  Widget _buildStatsGrid(BuildContext context, int courses, int students, int pendingLeaves,
       int todayClasses, AppLocalizations l) {
     final items = [
       (
@@ -222,7 +236,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
       ),
     ];
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: Responsive.getSummaryGridColumns(context),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,

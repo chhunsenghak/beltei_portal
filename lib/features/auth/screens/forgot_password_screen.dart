@@ -244,6 +244,7 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: const BoxConstraints(maxWidth: 420),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
