@@ -29,14 +29,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: web-build
-          path: build/web/
+          path: build/web/ # Grabs only the contents inside the web folder
           retention-days: 1
 
   deploy:
     name: Deploy to Vercel (Requires QA Sign-off)
     needs: build
     runs-on: ubuntu-latest
-    environment: production # <--- This links to the environment rule you made in Step 1
+    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -45,30 +45,31 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: web-build
-          path: build/web/
+          path: build/web/ # Flattens files directly into this directory path
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Link and Deploy to Vercel
         run: |
-          # 1. Pull project configuration AND production environment variables from Vercel
+          # 1. Pull the official project settings and production secrets from Vercel
           vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           
-          # 2. Extract the variables Vercel downloaded into your required build format
-          # This reads Vercel's downloaded variables and writes them to your local .env file
+          # 2. Inject Vercel dashboard environment variables back into your static asset bundle
           if [ -f .vercel/.env.production.local ]; then
             cp .vercel/.env.production.local build/web/.env
           fi
           
-          # 3. Re-create Vercel pipeline structures
+          # 3. Create the mandatory Vercel prebuilt framework directories
           mkdir -p .vercel/output/static
-          echo '{"version": 3}' > .vercel/output/config.json
           
-          # 4. Copy the compiled contents along with the newly injected secure .env file
-          cp -r build/web/* .vercel/output/static/
+          # 4. Generate config.json with fallback routing (Fixes 404 errors on refresh/deep-links)
+          echo '{"version": 3, "routes": [{"handle": "filesystem"}, {"src": "/.*", "dest": "/index.html"}]}' > .vercel/output/config.json
           
-          # 5. Complete deployment
+          # 5. Copy the actual files directly into the root static folder
+          cp -r build/web/. .vercel/output/static/
+          
+          # 6. Push the prebuilt container live
           vercel deploy --prod --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
