@@ -34,15 +34,27 @@ jobs:
           flutter config --enable-web
           flutter pub get
           
-          # Check if Vercel secrets exist, copy them to a standard root .env file, and compile
-          if [ -f .vercel/.env.production.local ]; then
-            echo "Vercel environment file found. Preparing for Flutter..."
-            cp .vercel/.env.production.local .env
-            flutter build web --release --dart-define-from-file=.env
-          else
-            echo "Warning: Vercel environment file not found. Building without variables."
-            flutter build web --release
+          # 1. Check if the Vercel environment file even exists
+          if [ ! -f .vercel/.env.production.local ]; then
+            echo "❌ ERROR: Vercel environment configuration file was not found!"
+            exit 1
           fi
+
+          # 2. Extract and source variables from the Vercel environment file
+          export $(cat .vercel/.env.production.local | sed 's/\r$//' | xargs)
+
+          # 3. Fail early if required variables are empty strings
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ ERROR: Found environment file, but SUPABASE_URL or SUPABASE_ANON_KEY is missing/empty!"
+            exit 1
+          fi
+
+          echo "✅ Environment variables verified. Compiling Flutter Web Application..."
+          
+          # 4. Build injecting the raw variables explicitly via --dart-define
+          flutter build web --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - name: Archive Production Artifacts
         uses: actions/upload-artifact@v4
