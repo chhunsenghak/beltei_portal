@@ -34,10 +34,13 @@ jobs:
           flutter config --enable-web
           flutter pub get
           
-          # Check if Vercel secrets exist, and compile them natively into the code
+          # Check if Vercel secrets exist, copy them to a standard root .env file, and compile
           if [ -f .vercel/.env.production.local ]; then
-            flutter build web --release --dart-define-from-file=.vercel/.env.production.local
+            echo "Vercel environment file found. Preparing for Flutter..."
+            cp .vercel/.env.production.local .env
+            flutter build web --release --dart-define-from-file=.env
           else
+            echo "Warning: Vercel environment file not found. Building without variables."
             flutter build web --release
           fi
 
