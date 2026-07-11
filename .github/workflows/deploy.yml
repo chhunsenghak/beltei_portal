@@ -3,7 +3,7 @@ name: Deploy Flutter Web to Vercel
 on:
   push:
     branches:
-      - main # Triggers automatically when your develop branch merges into main
+      - main # Triggers automatically when your branch merges into main
 
 jobs:
   build:
@@ -12,17 +12,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Vercel CLI to fetch environment
-        run: npm install --global vercel@latest
-
-      - name: Pull Remote Environment Configuration
-        run: |
-          # Downloads the secure environment variables you saved on the Vercel Web Dashboard
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -34,27 +23,18 @@ jobs:
           flutter config --enable-web
           flutter pub get
           
-          # 1. Check if the Vercel environment file even exists
-          if [ ! -f .vercel/.env.production.local ]; then
-            echo "❌ ERROR: Vercel environment configuration file was not found!"
+          # 1. Fail early if GitHub secrets are missing to avoid broken builds
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "❌ ERROR: GitHub Secrets SUPABASE_URL or SUPABASE_ANON_KEY are missing!"
             exit 1
           fi
 
-          # 2. Extract and source variables from the Vercel environment file
-          export $(cat .vercel/.env.production.local | sed 's/\r$//' | xargs)
-
-          # 3. Fail early if required variables are empty strings
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "❌ ERROR: Found environment file, but SUPABASE_URL or SUPABASE_ANON_KEY is missing/empty!"
-            exit 1
-          fi
-
-          echo "✅ Environment variables verified. Compiling Flutter Web Application..."
+          echo "✅ GitHub Secrets verified. Compiling Flutter Web Application..."
           
-          # 4. Build injecting the raw variables explicitly via --dart-define
+          # 2. Build injecting the secrets natively into the binary
           flutter build web --release \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
 
       - name: Archive Production Artifacts
         uses: actions/upload-artifact@v4
