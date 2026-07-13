@@ -39,5 +39,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-unsigned
-          path: build/ios/iphoneos/
+          path: build/ios/
           retention-days: 5
