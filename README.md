@@ -243,3 +243,13 @@ beltei_portal/
 - **Leave Requests**: Submit leave requests and monitor approvals.
 - **Finance & Payments (View Only)**: View pending/paid invoices and fee details (online payment process not implemented).
 
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [docs/project_overview.md](docs/project_overview.md) | Full project scope, tech choices (with rationale), and implemented features |
+| [docs/deployment.md](docs/deployment.md) | Production deployment workflow (GitHub Actions → Vercel) |
+| [docs/admin_features.md](docs/admin_features.md) | Admin screen-by-screen feature reference |
+

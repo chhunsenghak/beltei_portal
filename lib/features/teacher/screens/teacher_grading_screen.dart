@@ -427,7 +427,7 @@ class _GradeSubmissionSheetState extends State<_GradeSubmissionSheet> {
                             throw 'Cannot launch URL';
                           }
                         } catch (e) {
-                          if (mounted) {
+                          if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Could not open file URL: $e')),
                             );

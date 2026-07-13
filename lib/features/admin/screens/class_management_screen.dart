@@ -2279,12 +2279,10 @@ class _DatePickerField extends StatelessWidget {
     required this.date,
     required this.hint,
     required this.onPick,
-    this.onClear,
   });
   final DateTime? date;
   final String hint;
   final VoidCallback onPick;
-  final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -2320,11 +2318,6 @@ class _DatePickerField extends StatelessWidget {
               ),
             ),
           ),
-          if (date != null && onClear != null)
-            IconButton(
-              icon: Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
-              onPressed: onClear,
-            ),
         ],
       ),
     );
