@@ -391,6 +391,7 @@ void main() async {
       required String startDate,
       required List<Map<String, dynamic>> semesterCoursesList,
     }) async {
+      final sem = await supabase.from('semesters').select('start_date, end_date').eq('id', semesterId).single();
       final ct = await supabase.from('class_terms').insert({
         'class_id': classId,
         'semester_id': semesterId,
@@ -400,6 +401,8 @@ void main() async {
         'room': 'E101',
         'max_students': 30,
         'status': 'active',
+        'start_date': sem['start_date'],
+        'end_date': sem['end_date'],
       }).select().single();
       final pastTermId = ct['id'] as String;
 
@@ -573,6 +576,7 @@ void main() async {
 
     // ── 13. Active Year 4 Semester 1 Class Term ─────────────────────────────
     print('\n🗂  Seeding active Year 4 Semester 1 Class Term offering...');
+    final activeSem = await supabase.from('semesters').select('start_date, end_date').eq('id', semY4S1Id).single();
     final activeClassTerm = await supabase.from('class_terms').insert({
       'class_id': classId,
       'semester_id': semY4S1Id,
@@ -582,6 +586,8 @@ void main() async {
       'room': 'E101',
       'max_students': 30,
       'status': 'active',
+      'start_date': activeSem['start_date'],
+      'end_date': activeSem['end_date'],
     }).select().single();
     final activeTermId = activeClassTerm['id'] as String;
 

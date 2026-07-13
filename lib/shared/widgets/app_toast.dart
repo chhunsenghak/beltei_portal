@@ -19,7 +19,7 @@ void showSuccessToast(BuildContext context, String message) {
       content: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
           border: Border(left: BorderSide(color: AppColors.statusGreen, width: 4)),
           boxShadow: [

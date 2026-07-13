@@ -5,7 +5,6 @@ import '../../../core/constants/app_text_styles.dart';
 import 'course_management_screen.dart';
 import 'faculty_department_screen.dart';
 import 'academic_calendar_screen.dart';
-import 'enrollment_management_screen.dart';
 import 'class_management_screen.dart';
 import 'attendance_management_screen.dart';
 import 'global_leave_requests_screen.dart';
@@ -29,9 +28,8 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
       'calendar' => 1,
       'courses' => 2,
       'classes' => 3,
-      'enrollment' => 4,
-      'attendance' => 5,
-      'leave' => 6,
+      'attendance' => 4,
+      'leave' => 5,
       _ => 0,
     };
   }
@@ -41,7 +39,6 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
     (label: 'Academic Calendar', icon: Icons.calendar_month_outlined),
     (label: 'Courses',    icon: Icons.menu_book_outlined),
     (label: 'Classes',    icon: Icons.class_outlined),
-    (label: 'Enrollment', icon: Icons.how_to_reg_outlined),
     (label: 'Attendance', icon: Icons.fact_check_outlined),
     (label: 'Leave',      icon: Icons.event_busy_outlined),
   ];
@@ -51,7 +48,6 @@ class _AcademicManagementScreenState extends State<AcademicManagementScreen> {
     AcademicCalendarScreen(),
     CourseManagementScreen(),
     ClassManagementScreen(),
-    EnrollmentManagementScreen(),
     AttendanceManagementScreen(),
     GlobalLeaveRequestsScreen(),
   ];

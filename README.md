@@ -10,6 +10,7 @@ A comprehensive academic portal system designed for BELTEI International Univers
 - **Backend / Database**: Supabase (PostgreSQL, Auth, Storage, Row-Level Security)
 - **Local Utilities**: `flutter_dotenv` (environment variables), `shared_preferences` (local key-value cache)
 - **Libraries & Reports**: `pdf` / `printing` (document exports), `excel` (report exports), `fl_chart` (analytics charts)
+- **Deployment**: Vercel (`vercel`)
 
 ## Commands
 
@@ -22,6 +23,8 @@ flutter test test/path/to/test.dart  # Run a single test
 flutter build apk        # Android release build
 flutter build web        # Web release build
 ```
+
+
 
 After adding new assets to `pubspec.yaml`, a full restart (`flutter run`) is required — hot reload will not pick up new assets.
 

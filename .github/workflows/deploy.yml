@@ -3,10 +3,11 @@ name: Deploy Flutter Web to Vercel
 on:
   push:
     branches:
-      - main 
+      - main # Triggers automatically when your branch merges into main
 
 jobs:
-  deploy:
+  build:
+    name: Build Flutter Web Application
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,16 +18,65 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Build Web App
+      - name: Build Web App with Injected Variables
         run: |
           flutter config --enable-web
           flutter pub get
-          flutter build web --release
+          
+          # 1. Fail early if GitHub secrets are missing to avoid broken builds
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "❌ ERROR: GitHub Secrets SUPABASE_URL or SUPABASE_ANON_KEY are missing!"
+            exit 1
+          fi
+
+          echo "✅ GitHub Secrets verified. Compiling Flutter Web Application..."
+          
+          # 2. Build injecting the secrets natively into the binary
+          flutter build web --release \
+            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+
+      - name: Archive Production Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Vercel (Requires QA Sign-off)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production # Links to your GitHub environment review gatekeeper rule
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: build/web/ # Flattens files directly into this directory path
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Deploy to Vercel
-        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --scope=${{ secrets.VERCEL_ORG_ID }} --yes
+      - name: Link and Deploy to Vercel
+        run: |
+          # 1. Pull the official project settings
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          
+          # 2. Create the mandatory Vercel prebuilt framework directory
+          mkdir -p .vercel/output/static
+          
+          # 3. Generate a config file that handles clean routing (fixes 404 errors on browser refresh)
+          echo '{"version": 3, "routes": [{"handle": "filesystem"}, {"src": "/.*", "dest": "/index.html"}]}' > .vercel/output/config.json
+          
+          # 4. Copy the raw files directly into the root static staging folder
+          cp -r build/web/. .vercel/output/static/
+          
+          # 5. Push the prebuilt app container live instantly
+          vercel deploy --prod --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

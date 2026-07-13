@@ -222,7 +222,6 @@ class AdminSemester {
   final String academicYear;
   final String startDate;
   final String endDate;
-  final bool isCurrent;
   final bool registrationOpen;
   final int classCount;
 
@@ -233,19 +232,30 @@ class AdminSemester {
     required this.academicYear,
     required this.startDate,
     required this.endDate,
-    required this.isCurrent,
     required this.registrationOpen,
     this.classCount = 0,
   });
 
+  bool get isCurrent {
+    try {
+      final now = DateTime.now();
+      final start = DateTime.parse(startDate);
+      final end = DateTime.parse(endDate);
+      return now.isAfter(start.subtract(const Duration(days: 7))) &&
+          now.isBefore(end.add(const Duration(days: 7)));
+    } catch (_) {
+      return false;
+    }
+  }
+
   String get statusLabel {
-    if (isCurrent) return 'ACTIVE';
     try {
       final now = DateTime.now();
       final start = DateTime.parse(startDate);
       final end = DateTime.parse(endDate);
       if (now.isBefore(start)) return 'UPCOMING';
       if (now.isAfter(end)) return 'CLOSED';
+      return 'ACTIVE';
     } catch (_) {}
     return 'CLOSED';
   }
@@ -264,15 +274,25 @@ class AdminAcademicYear {
   final String name;
   final String startDate;
   final String endDate;
-  final bool isCurrent;
 
   const AdminAcademicYear({
     required this.id,
     required this.name,
     required this.startDate,
     required this.endDate,
-    required this.isCurrent,
   });
+
+  bool get isCurrent {
+    try {
+      final now = DateTime.now();
+      final start = DateTime.parse(startDate);
+      final end = DateTime.parse(endDate);
+      return now.isAfter(start.subtract(const Duration(days: 7))) &&
+          now.isBefore(end.add(const Duration(days: 7)));
+    } catch (_) {
+      return false;
+    }
+  }
 
   String get fmtStart {
     try { return DateFormat('MMM d, yyyy').format(DateTime.parse(startDate)); } catch (_) { return startDate; }
@@ -590,6 +610,8 @@ class AdminClassTerm {
   final int maxStudents;
   final int enrolledCount;
   final String status;
+  final String startDate;
+  final String endDate;
   final List<AdminClassTermCourse> courses;
 
   const AdminClassTerm({
@@ -610,10 +632,20 @@ class AdminClassTerm {
     required this.maxStudents,
     required this.enrolledCount,
     required this.status,
+    required this.startDate,
+    required this.endDate,
     this.courses = const [],
   });
 
   double get pct => maxStudents > 0 ? enrolledCount / maxStudents : 0.0;
+
+  String get fmtStart {
+    try { return DateFormat('MMM d, yyyy').format(DateTime.parse(startDate)); } catch (_) { return startDate; }
+  }
+
+  String get fmtEnd {
+    try { return DateFormat('MMM d, yyyy').format(DateTime.parse(endDate)); } catch (_) { return endDate; }
+  }
 
   String get shiftLabel {
     switch (shift) {
@@ -1209,7 +1241,6 @@ class AdminService {
       academicYear: (s['academic_years'] as Map<String, dynamic>?)?['name'] as String? ?? '',
       startDate: s['start_date'] as String,
       endDate: s['end_date'] as String,
-      isCurrent: s['is_current'] as bool? ?? false,
       registrationOpen: (s['registration_open'] as bool?) ?? false,
       classCount: classCounts[s['id'] as String] ?? 0,
     )).toList();
@@ -1217,15 +1248,12 @@ class AdminService {
 
   Future<List<AdminAcademicYear>> getAcademicYears() async {
     final data = await _db.from('academic_years').select('id, name, start_date, end_date').order('start_date', ascending: false);
-    final currentSem = await _db.from('semesters').select('academic_year_id').eq('is_current', true).maybeSingle();
-    final currentYearId = currentSem?['academic_year_id'] as String?;
 
     return data.map((y) => AdminAcademicYear(
       id: y['id'] as String,
       name: y['name'] as String,
       startDate: y['start_date'] as String,
       endDate: y['end_date'] as String,
-      isCurrent: y['id'] == currentYearId,
     )).toList();
   }
 
@@ -1525,7 +1553,7 @@ class AdminService {
   /// and the enroll-student screen's "pick a class term" flow.
   Future<List<AdminClassTerm>> getClassTerms() async {
     final termsData = await _db.from('class_terms')
-        .select('id, class_id, semester_id, year_level, schedule_type, shift, room, max_students, status, classes(class_code, faculty_id, major_id, program_type)')
+        .select('id, class_id, semester_id, year_level, schedule_type, shift, room, max_students, status, start_date, end_date, classes(class_code, faculty_id, major_id, program_type)')
         .eq('status', 'active')
         .order('shift');
     if (termsData.isEmpty) return [];
@@ -1629,6 +1657,8 @@ class AdminService {
         maxStudents: t['max_students'] as int? ?? 30,
         enrolledCount: enrollCounts[termId] ?? 0,
         status: t['status'] as String? ?? 'active',
+        startDate: t['start_date'] as String? ?? '',
+        endDate: t['end_date'] as String? ?? '',
         courses: coursesByTerm[termId] ?? const [],
       );
     }).toList();
@@ -1805,6 +1835,8 @@ class AdminService {
     required String shift,
     String? room,
     int maxStudents = 30,
+    required String startDate,
+    required String endDate,
   }) async {
     final row = await _db.from('class_terms').insert({
       'class_id': classId,
@@ -1815,6 +1847,8 @@ class AdminService {
       if (room != null && room.trim().isNotEmpty) 'room': room.trim(),
       'max_students': maxStudents,
       'status': 'active',
+      'start_date': startDate,
+      'end_date': endDate,
     }).select('id').single();
     return row['id'] as String;
   }
@@ -1827,6 +1861,8 @@ class AdminService {
     required String shift,
     String? room,
     required int maxStudents,
+    required String startDate,
+    required String endDate,
   }) async {
     await _db.from('class_terms').update({
       'semester_id': semesterId,
@@ -1835,6 +1871,8 @@ class AdminService {
       'shift': shift,
       'room': (room != null && room.trim().isNotEmpty) ? room.trim() : null,
       'max_students': maxStudents,
+      'start_date': startDate,
+      'end_date': endDate,
     }).eq('id', classTermId);
   }
 
@@ -1850,13 +1888,28 @@ class AdminService {
     String? teacherId,
     List<Map<String, dynamic>> schedule = const [],
   }) async {
-    await _db.from('class_term_courses').insert({
-      'class_term_id': classTermId,
-      'course_id': courseId,
-      if (teacherId != null && teacherId.isNotEmpty) 'teacher_id': teacherId,
-      'schedule': schedule,
-      'status': 'active',
-    });
+    final existing = await _db
+        .from('class_term_courses')
+        .select('id')
+        .eq('class_term_id', classTermId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+    if (existing != null) {
+      await _db.from('class_term_courses').update({
+        'status': 'active',
+        'teacher_id': (teacherId != null && teacherId.isNotEmpty) ? teacherId : null,
+        'schedule': schedule,
+      }).eq('id', existing['id'] as String);
+    } else {
+      await _db.from('class_term_courses').insert({
+        'class_term_id': classTermId,
+        'course_id': courseId,
+        if (teacherId != null && teacherId.isNotEmpty) 'teacher_id': teacherId,
+        'schedule': schedule,
+        'status': 'active',
+      });
+    }
   }
 
   Future<void> updateClassTermCourse({
@@ -1885,11 +1938,25 @@ class AdminService {
     required String studentId,
     required String classTermId,
   }) async {
-    await _db.from('enrollments').insert({
-      'student_id': studentId,
-      'class_term_id': classTermId,
-      'status': 'enrolled',
-    });
+    final existing = await _db
+        .from('enrollments')
+        .select('id, status')
+        .eq('student_id', studentId)
+        .eq('class_term_id', classTermId)
+        .maybeSingle();
+
+    if (existing != null) {
+      await _db
+          .from('enrollments')
+          .update({'status': 'enrolled'})
+          .eq('id', existing['id'] as String);
+    } else {
+      await _db.from('enrollments').insert({
+        'student_id': studentId,
+        'class_term_id': classTermId,
+        'status': 'enrolled',
+      });
+    }
   }
 
   /// Bulk-enrolls every actively-enrolled student from [fromClassTermId]
@@ -2315,6 +2382,10 @@ class AdminService {
       'start_date': startDate,
       'end_date': endDate,
     }).eq('id', academicYearId);
+  }
+
+  Future<void> deleteSemester(String semesterId) async {
+    await _db.from('semesters').delete().eq('id', semesterId);
   }
 
   Future<void> deleteAcademicYear(String academicYearId) async {
