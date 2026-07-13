@@ -28,16 +28,22 @@ jobs:
         run: flutter pub get
 
       - name: Build Unsigned iOS App
-        # --no-codesign bypasses Apple's $99 payment requirement for testing
         run: |
           flutter build ipa --release --no-codesign \
             --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-
+          
+          # បញ្ជាឱ្យបង្កើតថត Payload និងបំលែងទៅជា .ipa ស្វ័យប្រវត្តិនៅលើ Cloud
+          mkdir -p build/ios/Payload
+          cp -r build/ios/archive/Products/Applications/Runner.app build/ios/Payload/
+          cd build/ios
+          zip -r beltei_portal.ipa Payload
+          
       - name: Upload Unsigned iOS Artifact
-        # This saves the compiled app folder so you can download it from GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build-unsigned
-          path: build/ios/
+          name: ios-app-file
+          # កំណត់ផ្លូវទាញយកចំឯកសារ .ipa តែម្តង
+          path: build/ios/beltei_portal.ipa
           retention-days: 5
+
