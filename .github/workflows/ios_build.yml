@@ -1,0 +1,43 @@
+name: Flutter iOS Build Pipeline
+
+on:
+  push:
+    branches:
+      - ios
+
+jobs:
+  build:
+    name: Compile iOS Application
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java (Required for Gradle/Flutter tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Flutter Framework
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Get Project Dependencies
+        run: flutter pub get
+
+      - name: Build Unsigned iOS App
+        # --no-codesign bypasses Apple's $99 payment requirement for testing
+        run: |
+          flutter build ipa --release --no-codesign \
+            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+
+      - name: Upload Unsigned iOS Artifact
+        # This saves the compiled app folder so you can download it from GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-unsigned
+          path: build/ios/ipa/
+          retention-days: 5
