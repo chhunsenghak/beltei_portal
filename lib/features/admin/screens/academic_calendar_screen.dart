@@ -17,8 +17,7 @@ class AcademicCalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen> {
-  // Track expanded state for academic years in memory
-  final Set<String> _expandedYearIds = {};
+  String? _selectedYearId;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +28,7 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
       backgroundColor: AppColors.bgPage,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAcademicYearSheet(context),
-        backgroundColor: AppColors.primaryBlue,
+        backgroundColor: AppColors.primaryNavy,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Add Year', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
@@ -92,45 +91,185 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
                 );
               }
 
-              // Pre-expand current academic year on first load
-              final currentYear = years.where((y) => y.isCurrent).firstOrNull;
-              if (currentYear != null && _expandedYearIds.isEmpty) {
-                _expandedYearIds.add(currentYear.id);
+              // Pre-select first academic year on first load
+              if (_selectedYearId == null || !years.any((y) => y.id == _selectedYearId)) {
+                _selectedYearId = years.first.id;
               }
+
+              final selectedYear = years.firstWhere((y) => y.id == _selectedYearId, orElse: () => years.first);
+              final yearSemesters = semesters.where((s) => s.academicYearId == selectedYear.id).toList()
+                ..sort((a, b) => a.startDate.compareTo(b.startDate));
 
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.screenPadding),
                 children: [
                   _buildHeader(),
-                  const SizedBox(height: 20),
-                  ...years.map((y) {
-                    final isExpanded = _expandedYearIds.contains(y.id);
-                    final yearSemesters = semesters.where((s) => s.academicYearId == y.id).toList();
+                  const SizedBox(height: 16),
+                  
+                  // Horizontal Year Tabs
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: years.length,
+                      itemBuilder: (context, idx) {
+                        final y = years[idx];
+                        final isSelected = y.id == _selectedYearId;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  y.name,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                // Active badge removed to prevent confusion with simultaneous cohort semesters,
+                              ],
+                            ),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryNavy,
+                            backgroundColor: AppColors.bgCard,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(color: isSelected ? AppColors.primaryNavy : AppColors.border),
+                            ),
+                            onSelected: (val) {
+                              if (val) setState(() => _selectedYearId = y.id);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _AcademicYearCard(
-                        year: y,
-                        semesters: yearSemesters,
-                        isExpanded: isExpanded,
-                        onToggleExpand: () {
-                          setState(() {
-                            if (isExpanded) {
-                              _expandedYearIds.remove(y.id);
-                            } else {
-                              _expandedYearIds.add(y.id);
-                            }
-                          });
-                        },
-                        onEdit: () => _showAcademicYearSheet(context, year: y),
-                        onDelete: () => _confirmDeleteAcademicYear(y),
-                        onAddSemester: () => _showSemesterSheet(context, parentYear: y),
-                        onEditSemester: (s) => _showSemesterSheet(context, parentYear: y, semester: s),
-                        onSetCurrentSemester: _setCurrentSemester,
-                        onToggleRegistration: _toggleSemesterRegistration,
+                  // Selected Year Banner Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: selectedYear.isCurrent ? AppColors.statusBlueBg : AppColors.statusGrayBg,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.calendar_today_outlined,
+                            color: selectedYear.isCurrent ? AppColors.primaryBlue : AppColors.textSecondary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Academic Year ${selectedYear.name}',
+                                style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${selectedYear.fmtStart} – ${selectedYear.fmtEnd}',
+                                style: AppTextStyles.caption.copyWith(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+                          onSelected: (v) {
+                            if (v == 'edit') _showAcademicYearSheet(context, year: selectedYear);
+                            if (v == 'delete') _confirmDeleteAcademicYear(selectedYear);
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(children: [
+                                Icon(Icons.edit_outlined, size: 16),
+                                SizedBox(width: 8),
+                                Text('Edit Year'),
+                              ]),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(children: [
+                                Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Delete Year', style: TextStyle(color: Colors.red)),
+                              ]),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Semesters List Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Semesters',
+                        style: AppTextStyles.h3.copyWith(color: AppColors.primaryNavy, fontWeight: FontWeight.bold),
                       ),
-                    );
-                  }),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryBlue,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _showSemesterSheet(context, parentYear: selectedYear),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Add Semester', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (yearSemesters.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border, style: BorderStyle.solid),
+                      ),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.calendar_view_month_outlined, size: 36, color: AppColors.textLabel),
+                            const SizedBox(height: 8),
+                            Text('No semesters defined yet', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary)),
+                            const SizedBox(height: 4),
+                            Text('Tap "Add Semester" to create one for this year.', style: AppTextStyles.caption),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ...yearSemesters.map((s) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _SemesterCard(
+                            semester: s,
+                            onEdit: () => _showSemesterSheet(context, parentYear: selectedYear, semester: s),
+                            onDelete: () => _confirmDeleteSemester(s),
+                          ),
+                        )),
                   const SizedBox(height: 80),
                 ],
               );
@@ -156,30 +295,30 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
-  Future<void> _setCurrentSemester(AdminSemester s) async {
+  Future<void> _confirmDeleteSemester(AdminSemester s) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Semester'),
+        content: Text('Are you sure you want to delete "${s.name}"?\nThis will permanently delete the semester and may fail if classes are already scheduled.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: TextStyle(color: AppColors.statusRed)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     try {
-      await ref.read(adminServiceProvider).setCurrentSemester(s.id);
+      await ref.read(adminServiceProvider).deleteSemester(s.id);
       ref.invalidate(adminSemestersProvider);
       ref.invalidate(adminAcademicYearsProvider);
       if (mounted) {
-        showSuccessToast(context, '${s.name} is now set as the current active semester.');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: AppColors.statusRed,
-        ));
-      }
-    }
-  }
-
-  Future<void> _toggleSemesterRegistration(AdminSemester s, bool open) async {
-    try {
-      await ref.read(adminServiceProvider).toggleSemesterRegistration(s.id, open: open);
-      ref.invalidate(adminSemestersProvider);
-      if (mounted) {
-        showSuccessToast(context, 'Registration is now ${open ? "OPEN" : "CLOSED"} for ${s.name}.');
+        showSuccessToast(context, 'Semester "${s.name}" deleted.');
       }
     } catch (e) {
       if (mounted) {
@@ -560,218 +699,7 @@ class _AcademicCalendarScreenState extends ConsumerState<AcademicCalendarScreen>
   }
 }
 
-// ── Academic Year Card ─────────────────────────────────────────────────────────
 
-class _AcademicYearCard extends StatelessWidget {
-  const _AcademicYearCard({
-    required this.year,
-    required this.semesters,
-    required this.isExpanded,
-    required this.onToggleExpand,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onAddSemester,
-    required this.onEditSemester,
-    required this.onSetCurrentSemester,
-    required this.onToggleRegistration,
-  });
-
-  final AdminAcademicYear year;
-  final List<AdminSemester> semesters;
-  final bool isExpanded;
-  final VoidCallback onToggleExpand;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onAddSemester;
-  final void Function(AdminSemester) onEditSemester;
-  final void Function(AdminSemester) onSetCurrentSemester;
-  final void Function(AdminSemester, bool) onToggleRegistration;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(
-          color: year.isCurrent ? AppColors.primaryBlue.withValues(alpha: 0.4) : AppColors.border,
-          width: year.isCurrent ? 1.5 : 1.0,
-        ),
-        boxShadow: year.isCurrent
-            ? [
-                BoxShadow(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          InkWell(
-            onTap: onToggleExpand,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.cardRadius)),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.cardPadding),
-              child: Row(
-                children: [
-                  // Expansion Icon
-                  Icon(
-                    isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // Calendar icon + Year Name
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: year.isCurrent ? AppColors.statusBlueBg : AppColors.bgPage,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.calendar_today_outlined,
-                      color: year.isCurrent ? AppColors.primaryBlue : AppColors.textSecondary,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  // Text fields
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Academic Year ${year.name}',
-                              style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            if (year.isCurrent) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryNavy.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
-                                ),
-                                child: Text(
-                                  'ACTIVE',
-                                  style: AppTextStyles.label.copyWith(color: AppColors.primaryNavy, fontSize: 8, letterSpacing: 0.5),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${year.fmtStart} – ${year.fmtEnd}',
-                          style: AppTextStyles.caption.copyWith(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Options Popup Menu for Academic Year
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
-                    onSelected: (v) {
-                      if (v == 'edit') onEdit();
-                      if (v == 'delete') onDelete();
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(children: [
-                          Icon(Icons.edit_outlined, size: 16),
-                          SizedBox(width: 8),
-                          Text('Edit Year'),
-                        ]),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(children: [
-                          Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete Year', style: TextStyle(color: Colors.red)),
-                        ]),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Semester details (Expandable List)
-          if (isExpanded) ...[
-            Divider(height: 1, color: AppColors.divider),
-            Container(
-              color: AppColors.bgPage.withValues(alpha: 0.3),
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  if (semesters.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
-                        child: Text(
-                          'No semesters defined for this academic year.',
-                          style: AppTextStyles.caption,
-                        ),
-                      ),
-                    )
-                  else
-                    ...semesters.map((s) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _SemesterCard(
-                            semester: s,
-                            onEdit: () => onEditSemester(s),
-                            onSetCurrent: s.isCurrent ? null : () => onSetCurrentSemester(s),
-                            onToggleRegistration: (open) => onToggleRegistration(s, open),
-                          ),
-                        )),
-                  
-                  const SizedBox(height: 4),
-                  // Inline add button
-                  InkWell(
-                    onTap: onAddSemester,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.3), style: BorderStyle.solid),
-                        borderRadius: BorderRadius.circular(8),
-                        color: AppColors.bgCard,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add, size: 16, color: AppColors.primaryBlue),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Add Semester',
-                            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
 
 // ── Semester Card ─────────────────────────────────────────────────────────────
 
@@ -779,14 +707,12 @@ class _SemesterCard extends StatelessWidget {
   const _SemesterCard({
     required this.semester,
     required this.onEdit,
-    this.onSetCurrent,
-    required this.onToggleRegistration,
+    required this.onDelete,
   });
 
   final AdminSemester semester;
   final VoidCallback onEdit;
-  final VoidCallback? onSetCurrent;
-  final void Function(bool) onToggleRegistration;
+  final VoidCallback onDelete;
 
   Color get _statusColor {
     switch (semester.statusLabel) {
@@ -833,8 +759,8 @@ class _SemesterCard extends StatelessWidget {
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: semester.isCurrent ? AppColors.primaryBlue.withValues(alpha: 0.3) : AppColors.border,
-            width: semester.isCurrent ? 1.2 : 1.0,
+            color: AppColors.border,
+            width: 1.0,
           ),
         ),
         child: Column(
@@ -864,20 +790,7 @@ class _SemesterCard extends StatelessWidget {
                             semester.name,
                             style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                           ),
-                          if (semester.isCurrent) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: AppColors.primaryBlue.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
-                              ),
-                              child: Text(
-                                'CURRENT',
-                                style: AppTextStyles.label.copyWith(color: AppColors.primaryBlue, fontSize: 7.5, letterSpacing: 0.5),
-                              ),
-                            ),
-                          ],
+                          // Current tag removed
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -914,9 +827,7 @@ class _SemesterCard extends StatelessWidget {
                   icon: Icon(Icons.more_vert, size: 16, color: AppColors.textSecondary),
                   onSelected: (v) {
                     if (v == 'edit') onEdit();
-                    if (v == 'set_current') onSetCurrent?.call();
-                    if (v == 'toggle_reg_open') onToggleRegistration(true);
-                    if (v == 'toggle_reg_close') onToggleRegistration(false);
+                    if (v == 'delete') onDelete();
                   },
                   itemBuilder: (_) => [
                     const PopupMenuItem(
@@ -927,33 +838,14 @@ class _SemesterCard extends StatelessWidget {
                         Text('Edit Semester'),
                       ]),
                     ),
-                    if (onSetCurrent != null)
-                      PopupMenuItem(
-                        value: 'set_current',
-                        child: Row(children: [
-                          Icon(Icons.check_circle_outline, size: 16, color: AppColors.primaryBlue),
-                          const SizedBox(width: 8),
-                          Text('Set as Current', style: TextStyle(color: AppColors.primaryBlue)),
-                        ]),
-                      ),
-                    if (!semester.registrationOpen)
-                      const PopupMenuItem(
-                        value: 'toggle_reg_open',
-                        child: Row(children: [
-                          Icon(Icons.how_to_reg_outlined, size: 16, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Open Registration', style: TextStyle(color: Colors.green)),
-                        ]),
-                      ),
-                    if (semester.registrationOpen)
-                      const PopupMenuItem(
-                        value: 'toggle_reg_close',
-                        child: Row(children: [
-                          Icon(Icons.block_outlined, size: 16, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Close Registration', style: TextStyle(color: Colors.red)),
-                        ]),
-                      ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete Semester', style: TextStyle(color: Colors.red)),
+                      ]),
+                    ),
                   ],
                 ),
               ],
@@ -971,39 +863,6 @@ class _SemesterCard extends StatelessWidget {
                 Text(
                   '${semester.classCount} class${semester.classCount == 1 ? "" : "es"}',
                   style: AppTextStyles.caption.copyWith(fontSize: 11),
-                ),
-                const Spacer(),
-                
-                // Registration status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: semester.registrationOpen
-                        ? Colors.green.withValues(alpha: 0.08)
-                        : AppColors.bgPage,
-                    borderRadius: BorderRadius.circular(AppSpacing.tagRadius),
-                    border: Border.all(
-                      color: semester.registrationOpen ? Colors.green.withValues(alpha: 0.3) : AppColors.border,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        semester.registrationOpen ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 10,
-                        color: semester.registrationOpen ? Colors.green : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        semester.registrationOpen ? 'REGISTRATION OPEN' : 'REGISTRATION CLOSED',
-                        style: AppTextStyles.label.copyWith(
-                          color: semester.registrationOpen ? Colors.green : AppColors.textSecondary,
-                          fontSize: 7.5,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),

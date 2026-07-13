@@ -13,7 +13,7 @@ final _kQuickManagement = [
   (icon: Icons.person_outlined,     label: 'Teachers',  route: '/admin/users?role=teacher'),
   (icon: Icons.menu_book_outlined,  label: 'Courses',   route: '/admin/academic?tab=courses'),
   (icon: Icons.class_outlined,      label: 'Classes',   route: '/admin/academic?tab=classes'),
-  (icon: Icons.how_to_reg_outlined, label: 'Enrollment',route: '/admin/academic?tab=enrollment'),
+  (icon: Icons.how_to_reg_outlined, label: 'Enrollment',route: '/admin/academic?tab=classes'),
   (icon: Icons.payments_outlined,   label: 'Payments',  route: '/admin/finance'),
 ];
 

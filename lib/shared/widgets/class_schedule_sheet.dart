@@ -38,7 +38,7 @@ Future<void> showClassScheduleSheet(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.bgCard,
     shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (ctx) => _ClassScheduleSheet(
@@ -82,9 +82,25 @@ class _ClassScheduleSheetState extends ConsumerState<_ClassScheduleSheet> {
   @override
   void initState() {
     super.initState();
-    _schedule = [...widget.initialSchedule];
     _allowedDays = _scheduleDaysFor(widget.scheduleType);
     _day = _allowedDays.first;
+    _schedule = [...widget.initialSchedule];
+    _sortSchedule(_schedule);
+  }
+
+  void _sortSchedule(List<Map<String, dynamic>> list) {
+    final dayOrder = {
+      for (int i = 0; i < _allowedDays.length; i++) _allowedDays[i]: i
+    };
+    list.sort((a, b) {
+      final dayA = dayOrder[a['day']] ?? 99;
+      final dayB = dayOrder[b['day']] ?? 99;
+      if (dayA != dayB) return dayA.compareTo(dayB);
+
+      final startA = _parseTimeToMinutes(a['start'] as String? ?? '');
+      final startB = _parseTimeToMinutes(b['start'] as String? ?? '');
+      return startA.compareTo(startB);
+    });
   }
 
   @override
@@ -94,13 +110,16 @@ class _ClassScheduleSheetState extends ConsumerState<_ClassScheduleSheet> {
   }
 
   Future<void> _persist(List<Map<String, dynamic>> updated) async {
+    final sorted = [...updated];
+    _sortSchedule(sorted);
+
     setState(() => _saving = true);
     try {
       await ref
           .read(adminServiceProvider)
-          .updateClassTermCourseSchedule(classTermCourseId: widget.classTermCourseId, schedule: updated);
+          .updateClassTermCourseSchedule(classTermCourseId: widget.classTermCourseId, schedule: sorted);
       setState(() {
-        _schedule = updated;
+        _schedule = sorted;
         _saving = false;
       });
       widget.onSaved();

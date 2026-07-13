@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/admin_providers.dart';
@@ -28,13 +29,22 @@ class _ClassManagementScreenState
   String? _semesterFilter; // semesterId
   String? _majorFilter;    // majorId
   String? _facultyFilter;  // facultyId
+  String? _classFilter;    // classId
+  String? _academicYearFilter; // academicYearId
+  int? _yearLevelFilter; // yearLevel (1, 2, 3, 4)
   String _search = '';
 
-  List<AdminClassTerm> _applyFilters(List<AdminClassTerm> all) {
+  List<AdminClassTerm> _applyFilters(List<AdminClassTerm> all, List<AdminSemester> semesters) {
     return all.where((t) {
       if (_semesterFilter != null && t.semesterId != _semesterFilter) return false;
       if (_facultyFilter != null && t.facultyId != _facultyFilter) return false;
       if (_majorFilter != null && t.majorId != _majorFilter) return false;
+      if (_classFilter != null && t.classId != _classFilter) return false;
+      if (_yearLevelFilter != null && t.yearLevel != _yearLevelFilter) return false;
+      if (_academicYearFilter != null) {
+        final semList = semesters.where((s) => s.id == t.semesterId);
+        if (semList.isEmpty || semList.first.academicYearId != _academicYearFilter) return false;
+      }
       if (_search.isNotEmpty) {
         final q = _search.toLowerCase();
         final matchesCourse =
@@ -51,6 +61,8 @@ class _ClassManagementScreenState
     final allSemesters = ref.watch(adminSemestersProvider).valueOrNull ?? [];
     final allMajors = ref.watch(adminMajorsProvider).valueOrNull ?? [];
     final allFaculties = ref.watch(adminFacultiesProvider).valueOrNull ?? [];
+    final allAcademicYears = ref.watch(adminAcademicYearsProvider).valueOrNull ?? [];
+    final allClasses = ref.watch(adminAllClassesProvider).valueOrNull ?? [];
 
     return termsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -66,14 +78,14 @@ class _ClassManagementScreenState
         ]),
       ),
       data: (all) {
-        final filtered = _applyFilters(all);
+        final filtered = _applyFilters(all, allSemesters);
         final totalEnrolled = filtered.fold(0, (s, r) => s + r.enrolledCount);
         final totalMax = filtered.fold(0, (s, r) => s + r.maxStudents);
         final fullCount = filtered.where((r) => r.pct >= 1.0).length;
 
         return Stack(children: [
           Column(children: [
-            _buildFilters(allSemesters, allMajors, allFaculties),
+            _buildFilters(allSemesters, allMajors, allFaculties, allAcademicYears, allClasses),
             _buildFacultyCounts(allFaculties, all),
             _buildStats(filtered.length, totalEnrolled, totalMax - totalEnrolled, fullCount),
             Expanded(child: _buildList(context, filtered)),
@@ -100,6 +112,8 @@ class _ClassManagementScreenState
     List<AdminSemester> semesters,
     List<AdminMajor> majors,
     List<AdminFaculty> faculties,
+    List<AdminAcademicYear> academicYears,
+    List<AdminClass> classes,
   ) {
     final sortedSemesters = semesters.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
@@ -112,6 +126,12 @@ class _ClassManagementScreenState
         .where((m) => _facultyFilter == null || m.facultyId == _facultyFilter)
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
+
+    final sortedAcademicYears = academicYears.toList()
+      ..sort((a, b) => b.name.compareTo(a.name)); // chronological descending
+
+    final sortedClasses = classes.toList()
+      ..sort((a, b) => a.classCode.compareTo(b.classCode));
 
     return Container(
       color: AppColors.bgPage,
@@ -187,9 +207,53 @@ class _ClassManagementScreenState
               onChanged: (v) => setState(() => _majorFilter = v),
             ),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _Drop<String>(
+              value: _academicYearFilter,
+              hint: 'All Acad. Years',
+              items: sortedAcademicYears
+                  .map((ay) => DropdownMenuItem(
+                      value: ay.id,
+                      child: Text(ay.name, overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (v) => setState(() => _academicYearFilter = v),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: _Drop<String>(
+              value: _classFilter,
+              hint: 'All Classes',
+              items: sortedClasses
+                  .map((c) => DropdownMenuItem(
+                      value: c.id,
+                      child: Text(c.classCode, overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (v) => setState(() => _classFilter = v),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _Drop<int>(
+              value: _yearLevelFilter,
+              hint: 'All Years',
+              items: [1, 2, 3, 4]
+                  .map((yl) => DropdownMenuItem<int>(
+                      value: yl,
+                      child: Text('Year $yl')))
+                  .toList(),
+              onChanged: (v) => setState(() => _yearLevelFilter = v),
+            ),
+          ),
           if (_facultyFilter != null ||
               _semesterFilter != null ||
               _majorFilter != null ||
+              _academicYearFilter != null ||
+              _classFilter != null ||
+              _yearLevelFilter != null ||
               _search.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 8),
@@ -198,10 +262,13 @@ class _ClassManagementScreenState
                   _facultyFilter = null;
                   _semesterFilter = null;
                   _majorFilter = null;
+                  _academicYearFilter = null;
+                  _classFilter = null;
+                  _yearLevelFilter = null;
                   _search = '';
                 }),
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: AppColors.statusRed.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -583,9 +650,11 @@ class _ClassTermCardState extends State<_ClassTermCard> {
                   ]),
                   if (term.semesterName != null) ...[
                     const SizedBox(height: 4),
-                    Text(term.semesterName!,
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.textSecondary)),
+                    Text(
+                      '${term.semesterName}\n${term.fmtStart} – ${term.fmtEnd}',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
                   ],
                   if (term.facultyName != null) ...[
                     const SizedBox(height: 2),
@@ -686,7 +755,7 @@ class _ClassTermCardState extends State<_ClassTermCard> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: Color(0xFFF8FAFF),
+              color: AppColors.bgInput,
               border: Border(top: BorderSide(color: AppColors.border)),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
             ),
@@ -716,9 +785,29 @@ class _CourseRow extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onSchedule;
 
+  static const _dayOrder = {
+    'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6
+  };
+
+  int _parseTimeToMinutes(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return 0;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return h * 60 + m;
+  }
+
   String get _scheduleSummary {
     if (course.schedule.isEmpty) return 'No timeslot yet';
-    return course.schedule
+    final sorted = [...course.schedule]..sort((a, b) {
+      final dayA = _dayOrder[a['day']] ?? 99;
+      final dayB = _dayOrder[b['day']] ?? 99;
+      if (dayA != dayB) return dayA.compareTo(dayB);
+      final startA = _parseTimeToMinutes(a['start'] as String? ?? '');
+      final startB = _parseTimeToMinutes(b['start'] as String? ?? '');
+      return startA.compareTo(startB);
+    });
+    return sorted
         .map((s) => '${s['day']} ${s['start']}–${s['end']}')
         .join(', ');
   }
@@ -781,6 +870,8 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
   String _program  = 'national';
   String _schedule = 'weekday';
   String _shift    = 'morning';
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
   bool _saving = false;
 
   bool get _isEdit => widget.existing != null;
@@ -800,6 +891,8 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
       _maxCtrl.text  = '${e.maxStudents}';
       _roomCtrl.text = e.room ?? '';
       _yearCtrl.text = '${e.yearLevel}';
+      _customStartDate = DateTime.tryParse(e.startDate);
+      _customEndDate = DateTime.tryParse(e.endDate);
     }
   }
 
@@ -815,6 +908,9 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
   Future<void> _save() async {
     if (_semesterId == null) {
       _snack('Please select a semester'); return;
+    }
+    if (_customStartDate == null || _customEndDate == null) {
+      _snack('Start and End dates are required'); return;
     }
     final code = _codeCtrl.text.trim();
     if (code.isEmpty) {
@@ -832,6 +928,9 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
     setState(() => _saving = true);
     try {
       final svc = ref.read(adminServiceProvider);
+      final startStr = DateFormat('yyyy-MM-dd').format(_customStartDate!);
+      final endStr = DateFormat('yyyy-MM-dd').format(_customEndDate!);
+
       if (_isEdit) {
         await svc.updateClass(
           classId: widget.existing!.classId,
@@ -848,6 +947,8 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
           shift: _shift,
           room: _roomCtrl.text.trim().isEmpty ? null : _roomCtrl.text.trim(),
           maxStudents: max,
+          startDate: startStr,
+          endDate: endStr,
         );
       } else {
         final classId = await svc.createClass(
@@ -864,6 +965,8 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
           shift: _shift,
           room: _roomCtrl.text.trim().isEmpty ? null : _roomCtrl.text.trim(),
           maxStudents: max,
+          startDate: startStr,
+          endDate: endStr,
         );
       }
       widget.onSaved();
@@ -999,7 +1102,74 @@ class _ClassFormSheetState extends ConsumerState<_ClassFormSheet> {
                             value: s.id,
                             child: Text('${s.name} (${s.academicYear})', overflow: TextOverflow.ellipsis)))
                         .toList(),
-                    onChanged: (v) => setState(() => _semesterId = v),
+                    onChanged: (v) {
+                      setState(() {
+                        _semesterId = v;
+                        if (v != null) {
+                          final sem = sortedSemesters.firstWhere((s) => s.id == v);
+                          _customStartDate = DateTime.tryParse(sem.startDate);
+                          _customEndDate = DateTime.tryParse(sem.endDate);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _FieldLabel('Start Date *'),
+                            _DatePickerField(
+                              date: _customStartDate,
+                              hint: 'Select start date',
+                              onPick: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: _customStartDate ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2035),
+                                );
+                                if (d != null) {
+                                  setState(() {
+                                    _customStartDate = d;
+                                    if (_customEndDate == null || _customEndDate!.isBefore(d)) {
+                                      _customEndDate = d.add(const Duration(days: 120));
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _FieldLabel('End Date *'),
+                            _DatePickerField(
+                              date: _customEndDate,
+                              hint: 'Select end date',
+                              onPick: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: _customEndDate ?? (_customStartDate ?? DateTime.now()),
+                                  firstDate: _customStartDate ?? DateTime(2020),
+                                  lastDate: DateTime(2035),
+                                );
+                                if (d != null) {
+                                  setState(() => _customEndDate = d);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
@@ -1116,6 +1286,8 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
   String? _semesterId;
   String _schedule = 'weekday';
   String _shift    = 'morning';
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
   bool _saving = false;
 
   // The class's most recent prior term (if any), offered as a one-tap way to
@@ -1165,6 +1337,9 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
     if (_semesterId == null) {
       _snack('Please select a semester'); return;
     }
+    if (_customStartDate == null || _customEndDate == null) {
+      _snack('Start and End dates are required'); return;
+    }
     final max = int.tryParse(_maxCtrl.text.trim()) ?? 0;
     if (max <= 0) {
       _snack('Max students must be greater than 0'); return;
@@ -1177,6 +1352,9 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
     setState(() => _saving = true);
     try {
       final svc = ref.read(adminServiceProvider);
+      final startStr = DateFormat('yyyy-MM-dd').format(_customStartDate!);
+      final endStr = DateFormat('yyyy-MM-dd').format(_customEndDate!);
+
       final newTermId = await svc.createClassTerm(
         classId: _classId!,
         semesterId: _semesterId!,
@@ -1185,6 +1363,8 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
         shift: _shift,
         room: _roomCtrl.text.trim().isEmpty ? null : _roomCtrl.text.trim(),
         maxStudents: max,
+        startDate: startStr,
+        endDate: endStr,
       );
 
       var copied = 0;
@@ -1308,7 +1488,74 @@ class _NewTermFormSheetState extends ConsumerState<_NewTermFormSheet> {
                             value: s.id,
                             child: Text('${s.name} (${s.academicYear})', overflow: TextOverflow.ellipsis)))
                         .toList(),
-                    onChanged: (v) => setState(() => _semesterId = v),
+                    onChanged: (v) {
+                      setState(() {
+                        _semesterId = v;
+                        if (v != null) {
+                          final sem = sortedSemesters.firstWhere((s) => s.id == v);
+                          _customStartDate = DateTime.tryParse(sem.startDate);
+                          _customEndDate = DateTime.tryParse(sem.endDate);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _FieldLabel('Start Date *'),
+                            _DatePickerField(
+                              date: _customStartDate,
+                              hint: 'Select start date',
+                              onPick: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: _customStartDate ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2035),
+                                );
+                                if (d != null) {
+                                  setState(() {
+                                    _customStartDate = d;
+                                    if (_customEndDate == null || _customEndDate!.isBefore(d)) {
+                                      _customEndDate = d.add(const Duration(days: 120));
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _FieldLabel('End Date *'),
+                            _DatePickerField(
+                              date: _customEndDate,
+                              hint: 'Select end date',
+                              onPick: () async {
+                                final d = await showDatePicker(
+                                  context: context,
+                                  initialDate: _customEndDate ?? (_customStartDate ?? DateTime.now()),
+                                  firstDate: _customStartDate ?? DateTime(2020),
+                                  lastDate: DateTime(2035),
+                                );
+                                if (d != null) {
+                                  setState(() => _customEndDate = d);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
@@ -1483,11 +1730,23 @@ class _ClassTermCourseFormSheetState extends ConsumerState<_ClassTermCourseFormS
   Widget build(BuildContext context) {
     final allCourses = ref.watch(adminCoursesProvider).valueOrNull ?? [];
     final allTeachers = ref.watch(adminTeachersProvider).valueOrNull ?? [];
+    final allClassTerms = ref.watch(adminClassTermsProvider).valueOrNull ?? [];
+
+    final addedCourseIds = allClassTerms.any((t) => t.id == widget.classTermId)
+        ? allClassTerms
+            .firstWhere((t) => t.id == widget.classTermId)
+            .courses
+            .map((c) => c.courseId)
+            .toSet()
+        : <String>{};
 
     // Scope course choices to the class's own major (or faculty, if the
     // class has no major set) so a class's curriculum stays within the
     // program it was created for.
     final sortedCourses = allCourses.where((c) {
+      if (addedCourseIds.contains(c.courseId) && widget.existing?.courseId != c.courseId) {
+        return false;
+      }
       if (widget.classMajorId != null) return c.majorId == widget.classMajorId;
       if (widget.classFacultyId != null) return c.facultyId == widget.classFacultyId;
       return true;
@@ -1583,117 +1842,183 @@ class _ClassTermCourseFormSheetState extends ConsumerState<_ClassTermCourseFormS
 
 // ── Students sheet ────────────────────────────────────────────────────────────
 
-class _StudentsSheet extends ConsumerWidget {
+class _StudentsSheet extends StatefulWidget {
   const _StudentsSheet({required this.term});
   final AdminClassTerm term;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final enrollmentsAsync =
-        ref.watch(classTermEnrollmentsProvider(term.id));
+  State<_StudentsSheet> createState() => _StudentsSheetState();
+}
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.65,
-      maxChildSize: 0.9,
-      minChildSize: 0.4,
-      expand: false,
-      builder: (_, sc) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+class _StudentsSheetState extends State<_StudentsSheet> {
+  final Set<String> _dropping = {};
+
+  Future<void> _dropStudent(CourseEnrollmentEntry entry, WidgetRef ref) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Drop Student?'),
+        content: Text(
+          'Remove ${entry.studentName} from ${widget.term.classCode}?',
         ),
-        child: Column(children: [
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 36, height: 4,
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.statusRed),
+              child: const Text('Drop')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    setState(() => _dropping.add(entry.enrollmentId));
+    try {
+      await ref.read(adminServiceProvider).dropEnrollment(entry.enrollmentId);
+      ref.invalidate(classTermEnrollmentsProvider(widget.term.id));
+      ref.invalidate(adminClassTermsProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppColors.statusRed,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _dropping.remove(entry.enrollmentId));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final enrollmentsAsync = ref.watch(classTermEnrollmentsProvider(widget.term.id));
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (_, sc) => Container(
             decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(term.classCode, style: AppTextStyles.h2),
-                  Text('${term.semesterName ?? ''} · ${term.shiftLabel} · Year ${term.yearLevel}',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.textSecondary)),
+              color: AppColors.bgCard,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 12, 12),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(widget.term.classCode, style: AppTextStyles.h2),
+                      Text('${widget.term.semesterName ?? ''} · ${widget.term.shiftLabel} · Year ${widget.term.yearLevel}',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                    ]),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => showEnrollStudentSheet(
+                      context,
+                      classTermId: widget.term.id,
+                      onEnrolled: () {
+                        ref.invalidate(classTermEnrollmentsProvider(widget.term.id));
+                        ref.invalidate(adminClassTermsProvider);
+                      },
+                    ),
+                    icon: Icon(Icons.person_add_outlined, size: 18, color: AppColors.primaryBlue),
+                    label: Text('Add', style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
+                  ),
                 ]),
               ),
-              TextButton.icon(
-                onPressed: () => showEnrollStudentSheet(
-                  context,
-                  classTermId: term.id,
-                  onEnrolled: () {
-                    ref.invalidate(classTermEnrollmentsProvider(term.id));
-                    ref.invalidate(adminClassTermsProvider);
+              const Divider(height: 0),
+              Expanded(
+                child: enrollmentsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Error: $e')),
+                  data: (students) {
+                    if (students.isEmpty) {
+                      return Center(
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.people_outline,
+                              size: 40, color: AppColors.textSecondary),
+                          const SizedBox(height: 8),
+                          Text('No students enrolled',
+                              style: AppTextStyles.bodyMedium),
+                        ]),
+                      );
+                    }
+                    return ListView.separated(
+                      controller: sc,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: students.length,
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 0, indent: 16, endIndent: 16),
+                      itemBuilder: (_, i) {
+                        final s = students[i];
+                        final isDropping = _dropping.contains(s.enrollmentId);
+
+                        return ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
+                            child: Text(s.initials,
+                                style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.primaryNavy,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11)),
+                          ),
+                          title: Text(s.studentName,
+                              style: AppTextStyles.body.copyWith(fontSize: 13)),
+                          subtitle: Text(s.studentCode,
+                              style: AppTextStyles.caption),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.statusGreen.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(s.status.toUpperCase(),
+                                    style: AppTextStyles.label.copyWith(
+                                        color: AppColors.statusGreen, fontSize: 9)),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isDropping)
+                                const SizedBox(
+                                  width: 20, height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                IconButton(
+                                  icon: Icon(Icons.person_remove_outlined, color: AppColors.statusRed, size: 18),
+                                  onPressed: () => _dropStudent(s, ref),
+                                  tooltip: 'Drop Student',
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
                   },
                 ),
-                icon: Icon(Icons.person_add_outlined, size: 18, color: AppColors.primaryBlue),
-                label: Text('Add', style: AppTextStyles.caption.copyWith(color: AppColors.primaryBlue, fontWeight: FontWeight.w600)),
               ),
             ]),
           ),
-          const Divider(height: 0),
-          Expanded(
-            child: enrollmentsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (students) {
-                if (students.isEmpty) {
-                  return Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.people_outline,
-                          size: 40, color: AppColors.textSecondary),
-                      const SizedBox(height: 8),
-                      Text('No students enrolled',
-                          style: AppTextStyles.bodyMedium),
-                    ]),
-                  );
-                }
-                return ListView.separated(
-                  controller: sc,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: students.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 0, indent: 16, endIndent: 16),
-                  itemBuilder: (_, i) {
-                    final s = students[i];
-                    return ListTile(
-                      dense: true,
-                      leading: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: AppColors.primaryNavy.withValues(alpha: 0.1),
-                        child: Text(s.initials,
-                            style: AppTextStyles.caption.copyWith(
-                                color: AppColors.primaryNavy,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11)),
-                      ),
-                      title: Text(s.studentName,
-                          style: AppTextStyles.body.copyWith(fontSize: 13)),
-                      subtitle: Text(s.studentCode,
-                          style: AppTextStyles.caption),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.statusGreen.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(s.status.toUpperCase(),
-                            style: AppTextStyles.label.copyWith(
-                                color: AppColors.statusGreen, fontSize: 9)),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ]),
-      ),
+        );
+      },
     );
   }
 }
@@ -1945,6 +2270,63 @@ class _SegmentRow extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  const _DatePickerField({
+    required this.date,
+    required this.hint,
+    required this.onPick,
+    this.onClear,
+  });
+  final DateTime? date;
+  final String hint;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final fmtDate = date != null ? DateFormat('MMM d, yyyy').format(date!) : hint;
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.bgInput,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: onPick,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(
+                      fmtDate,
+                      style: AppTextStyles.body.copyWith(
+                        fontSize: 14,
+                        color: date != null ? AppColors.textPrimary : AppColors.textLabel,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (date != null && onClear != null)
+            IconButton(
+              icon: Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
+              onPressed: onClear,
+            ),
+        ],
+      ),
     );
   }
 }

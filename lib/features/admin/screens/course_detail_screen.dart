@@ -149,7 +149,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   Widget _buildNavRow(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -308,17 +308,19 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF9C4),
+        color: AppColors.statusAmberBg,
         borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        border: Border.all(color: const Color(0xFFF9A825)),
+        border: Border.all(color: AppColors.statusAmber.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 16, color: Color(0xFFF9A825)),
+          Icon(Icons.info_outline, size: 16, color: AppColors.statusAmber),
           const SizedBox(width: 8),
           Expanded(
-            child: Text('You have unsaved changes.',
-                style: AppTextStyles.caption.copyWith(color: const Color(0xFF5D4037))),
+            child: Text(
+              'You have unsaved changes.',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textPrimary),
+            ),
           ),
         ],
       ),

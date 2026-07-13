@@ -18,7 +18,7 @@ Future<void> showEnrollStudentSheet(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.bgCard,
     shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (ctx) => _EnrollStudentSheet(
@@ -121,7 +121,7 @@ class _EnrollStudentSheetState extends ConsumerState<_EnrollStudentSheet> {
                 Container(
                   constraints: const BoxConstraints(maxHeight: 240),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.bgCard,
                     borderRadius: BorderRadius.circular(AppSpacing.inputRadius),
                     border: Border.all(color: AppColors.border),
                   ),

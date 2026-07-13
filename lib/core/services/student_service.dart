@@ -307,7 +307,7 @@ class StudentService {
 
       final termRows = await _db
           .from('class_terms')
-          .select('id, semester_id, schedule_type')
+          .select('id, semester_id, schedule_type, start_date, end_date')
           .inFilter('id', classTermIds);
       final termMap = {for (final t in termRows) t['id'] as String: t};
 
@@ -412,7 +412,18 @@ class StudentService {
               teacherId != null ? teacherNames[teacherId] : null,
           semesterName: sem?['name'] as String?,
           semesterAcademicYear: (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?,
-          isCurrentSemester: sem?['is_current'] as bool? ?? false,
+          isCurrentSemester: () {
+            try {
+              final startStr = term?['start_date'] as String?;
+              final endStr = term?['end_date'] as String?;
+              if (startStr == null || endStr == null) return false;
+              final now = DateTime.now();
+              return now.isAfter(DateTime.parse(startStr).subtract(const Duration(days: 7))) &&
+                     now.isBefore(DateTime.parse(endStr).add(const Duration(days: 7)));
+            } catch (_) {
+              return false;
+            }
+          }(),
           enrollmentStatus: EnrollmentStatus.values.byName(
               enrollment['status'] as String? ?? 'enrolled'),
           attendanceRate: attendanceRates[courseId],

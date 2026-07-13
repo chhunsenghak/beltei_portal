@@ -439,7 +439,7 @@ class TeacherService {
           .from('class_term_courses')
           .select('id, course_id, class_term_id, schedule, status, '
               'courses(code, name, credits, status), '
-              'class_terms(semester_id, class_id, classes(class_code))')
+              'class_terms(semester_id, class_id, start_date, end_date, classes(class_code))')
           .eq('teacher_id', teacherId)
           .eq('status', 'active');
 
@@ -495,8 +495,8 @@ class TeacherService {
           semesterId: semId,
           semesterName: sem?['name'] as String?,
           semesterAcademicYear: (sem?['academic_years'] as Map<String, dynamic>?)?['name'] as String?,
-          semesterStartDate: sem?['start_date'] as String?,
-          semesterEndDate: sem?['end_date'] as String?,
+          semesterStartDate: term?['start_date'] as String? ?? sem?['start_date'] as String?,
+          semesterEndDate: term?['end_date'] as String? ?? sem?['end_date'] as String?,
           isCurrentSemester: sem?['is_current'] as bool? ?? false,
           studentCount: countByTerm[classTermId] ?? 0,
           scheduleDisplay: _formatSchedule(rawSchedule),
@@ -520,7 +520,7 @@ class TeacherService {
           .from('class_term_courses')
           .select('id, course_id, class_term_id, schedule, status, '
               'courses(code, name, credits, status), '
-              'class_terms(semester_id, class_id, classes(class_code))')
+              'class_terms(semester_id, class_id, start_date, end_date, classes(class_code))')
           .eq('id', classTermCourseId)
           .maybeSingle();
       if (row == null) return null;
@@ -571,8 +571,8 @@ class TeacherService {
         semesterId: semId,
         semesterName: semesterName,
         semesterAcademicYear: semesterAcademicYear,
-        semesterStartDate: semesterStartDate,
-        semesterEndDate: semesterEndDate,
+        semesterStartDate: term?['start_date'] as String? ?? semesterStartDate,
+        semesterEndDate: term?['end_date'] as String? ?? semesterEndDate,
         isCurrentSemester: isCurrentSemester,
         studentCount: enrollRows.length,
         scheduleDisplay: _formatSchedule(rawSchedule),
