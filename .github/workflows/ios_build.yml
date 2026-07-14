@@ -1,0 +1,48 @@
+name: Flutter iOS Build Pipeline
+
+on:
+  push:
+    branches:
+      - ios
+
+jobs:
+  build:
+    name: Compile iOS Application
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Flutter Framework
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Get Project Dependencies
+        run: flutter pub get
+
+      - name: Build Unsigned iOS App
+        run: |
+          flutter build ipa --release --no-codesign \
+            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          
+          mkdir -p build/ios/Payload
+          
+          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/Payload/
+          
+          cd build/ios
+          zip -r beltei_portal.ipa Payload
+          
+      - name: Upload Unsigned iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-file
+          path: build/ios/beltei_portal.ipa
+          retention-days: 5
