@@ -94,22 +94,17 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
           SizedBox(
             height: 56,
             child: Padding(
-              padding: const EdgeInsets.only(left: 0, right: 6),
+              padding: const EdgeInsets.only(left: 12, right: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  ClipRect(
-                    child: Transform.translate(
-                      offset: const Offset(-10, 0),
-                      child: logoUrl != null
-                          ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
-                          : Image.asset(
-                              'assets/images/beltei_logo.png',
-                              height: 40,
-                              fit: BoxFit.contain,
-                            ),
-                    ),
-                  ),
+                  logoUrl != null
+                      ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
+                      : Image.asset(
+                          'assets/images/beltei_logo.png',
+                          height: 40,
+                          fit: BoxFit.contain,
+                        ),
                   const SizedBox(width: 5),
                   Text(
                     l.appTitle,
@@ -136,52 +131,68 @@ class _TeacherShellState extends ConsumerState<TeacherShell> {
 
   Widget _buildBottomNav(BuildContext context, int active) {
     final labels = _tabLabels(AppLocalizations.of(context)!);
-    return Container(
-      height: 64,
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final isActive = i == active;
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => context.go(_tabs[i].route),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? AppColors.primaryNavy.withValues(alpha: 0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(
-                      _tabs[i].icon,
-                      size: 22,
-                      color: isActive ? AppColors.primaryNavy : AppColors.textLabel,
+    return Material(
+      color: AppColors.bgCard,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: List.generate(_tabs.length, (i) {
+                final isActive = i == active;
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => context.go(_tabs[i].route),
+                    borderRadius: BorderRadius.circular(12),
+                    hoverColor: AppColors.primaryNavy.withValues(alpha: 0.05),
+                    splashColor: AppColors.primaryNavy.withValues(alpha: 0.1),
+                    highlightColor: Colors.transparent,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: AnimatedScale(
+                            scale: isActive ? 1.15 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutBack,
+                            child: Icon(
+                              _tabs[i].icon,
+                              size: 22,
+                              color: isActive ? AppColors.primaryNavy : AppColors.textLabel,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          labels[i],
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 10,
+                            color: isActive ? AppColors.primaryNavy : AppColors.textLabel,
+                            fontWeight:
+                                isActive ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.only(top: 4),
+                          width: isActive ? 16 : 0,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryNavy,
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    labels[i],
-                    style: AppTextStyles.caption.copyWith(
-                      fontSize: 10,
-                      color: isActive ? AppColors.primaryNavy : AppColors.textLabel,
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              }),
             ),
-          );
-        }),
+          ),
+        ),
       ),
     );
   }

@@ -526,11 +526,13 @@ class _MaterialRow extends StatelessWidget {
                 color: AppColors.primaryBlue, size: 20),
             onPressed: () async {
               try {
-                final uri = Uri.parse(item.fileUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  throw 'Cannot launch URL';
+                final downloadUrl = item.fileUrl.contains('?')
+                    ? '${item.fileUrl}&download='
+                    : '${item.fileUrl}?download=';
+                final uri = Uri.parse(downloadUrl);
+                final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!launched) {
+                  throw 'Could not launch download URL';
                 }
               } catch (e) {
                 if (context.mounted) {

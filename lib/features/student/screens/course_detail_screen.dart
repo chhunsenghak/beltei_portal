@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -889,11 +890,13 @@ class _MaterialCard extends StatelessWidget {
                 color: AppColors.primaryBlue, size: 20),
             onPressed: () async {
               try {
-                final uri = Uri.parse(item.fileUrl);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  throw 'Cannot launch URL';
+                final downloadUrl = item.fileUrl.contains('?')
+                    ? '${item.fileUrl}&download='
+                    : '${item.fileUrl}?download=';
+                final uri = Uri.parse(downloadUrl);
+                final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (!launched) {
+                  throw 'Could not launch download URL';
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -1146,12 +1149,16 @@ class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> 
 
   Future<void> _pickFile() async {
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery);
-      if (file != null) {
-        setState(() {
-          _selectedFile = file;
-        });
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.path != null) {
+          setState(() {
+            _selectedFile = XFile(file.path!);
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error picking submission file: $e');
@@ -1181,12 +1188,30 @@ class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> 
         final uniqueName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}';
         final storagePath = 'submissions/${widget.assessment.id}/${widget.studentId}/$uniqueName';
 
+        String getMimeType(String ext) {
+          switch (ext.toLowerCase()) {
+            case 'pdf': return 'application/pdf';
+            case 'doc': return 'application/msword';
+            case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            case 'xls': return 'application/vnd.ms-excel';
+            case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            case 'png': return 'image/png';
+            case 'jpg':
+            case 'jpeg': return 'image/jpeg';
+            case 'gif': return 'image/gif';
+            case 'txt': return 'text/plain';
+            case 'zip': return 'application/zip';
+            default: return 'application/octet-stream';
+          }
+        }
+        final mimeType = getMimeType(fileExt);
+
         await Supabase.instance.client.storage
             .from('course-materials')
             .uploadBinary(
               storagePath,
               bytes,
-              fileOptions: FileOptions(contentType: 'image/$fileExt'),
+              fileOptions: FileOptions(contentType: mimeType),
             );
 
         finalFileUrl = Supabase.instance.client.storage
@@ -1322,10 +1347,9 @@ class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> 
                   onTap: () async {
                     try {
                       final uri = Uri.parse(sub!.fileUrl!);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      } else {
-                        throw 'Cannot launch URL';
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched) {
+                        throw 'Could not launch file viewer';
                       }
                     } catch (e) {
                       if (context.mounted) {
@@ -1359,7 +1383,7 @@ class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> 
                       Icon(
                         _selectedFile != null || sub?.fileUrl != null
                             ? Icons.check_circle_outline
-                            : Icons.add_photo_alternate_outlined,
+                            : Icons.upload_file_outlined,
                         color: _selectedFile != null || sub?.fileUrl != null
                             ? AppColors.statusGreen
                             : AppColors.primaryBlue,
@@ -1371,7 +1395,7 @@ class _SubmitAssignmentSheetState extends ConsumerState<_SubmitAssignmentSheet> 
                             ? "Selected: ${_selectedFile!.name}"
                             : sub?.fileUrl != null
                                 ? "Existing attachment: file loaded"
-                                : "Tap to attach a file/image",
+                                : "Tap to attach a file (PDF, Image, Doc, etc.)",
                         style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
                         textAlign: TextAlign.center,
                       ),

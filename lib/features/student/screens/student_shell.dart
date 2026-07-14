@@ -37,22 +37,17 @@ class StudentShell extends ConsumerWidget {
           SizedBox(
             height: 56,
             child: Padding(
-              padding: const EdgeInsets.only(left: 0, right: 6),
+              padding: const EdgeInsets.only(left: 12, right: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  ClipRect(
-                    child: Transform.translate(
-                      offset: const Offset(-10, 0),
-                      child: logoUrl != null
-                          ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
-                          : Image.asset(
-                              'assets/images/beltei_logo.png',
-                              height: 40,
-                              fit: BoxFit.contain,
-                            ),
-                    ),
-                  ),
+                  logoUrl != null
+                      ? Image.network(logoUrl, height: 40, fit: BoxFit.contain)
+                      : Image.asset(
+                          'assets/images/beltei_logo.png',
+                          height: 40,
+                          fit: BoxFit.contain,
+                        ),
                   const SizedBox(width: 5),
                   Text(
                     l.appTitle,
@@ -361,53 +356,66 @@ class _BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final labels = [l.navHome, l.navCourses, l.navSchedule, l.navAlerts, l.navProfile];
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: SafeArea(
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final item = _items[i];
-              final isActive = i == currentIndex;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => context.go(_routes[i]),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        decoration: isActive
-                            ? BoxDecoration(
-                                color: AppColors.primaryNavy.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              )
-                            : null,
-                        child: Icon(
-                          isActive ? item.activeIcon : item.icon,
-                          color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
-                          size: 22,
+    return Material(
+      color: AppColors.bgCard,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: List.generate(_items.length, (i) {
+                final item = _items[i];
+                final isActive = i == currentIndex;
+                return Expanded(
+                  child: InkWell(
+                    onTap: () => context.go(_routes[i]),
+                    borderRadius: BorderRadius.circular(12),
+                    hoverColor: AppColors.primaryNavy.withValues(alpha: 0.05),
+                    splashColor: AppColors.primaryNavy.withValues(alpha: 0.1),
+                    highlightColor: Colors.transparent,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: AnimatedScale(
+                            scale: isActive ? 1.15 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutBack,
+                            child: Icon(
+                              isActive ? item.activeIcon : item.icon,
+                              color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
+                              size: 22,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        labels[i],
-                        style: AppTextStyles.caption.copyWith(
-                          color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
-                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                          fontSize: 11,
+                        Text(
+                          labels[i],
+                          style: AppTextStyles.caption.copyWith(
+                            color: isActive ? AppColors.primaryNavy : AppColors.textSecondary,
+                            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                            fontSize: 11,
+                          ),
                         ),
-                      ),
-                    ],
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.only(top: 4),
+                          width: isActive ? 16 : 0,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryNavy,
+                            borderRadius: BorderRadius.circular(1.5),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),

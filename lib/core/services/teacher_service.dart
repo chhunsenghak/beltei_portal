@@ -636,9 +636,8 @@ class TeacherService {
       rethrow;
     }
   }
-
   Future<void> saveAttendance({
-    required String teacherId,
+    String? teacherId,
     required String classTermCourseId,
     required String date,
     required int sessionNumber,
@@ -648,10 +647,11 @@ class TeacherService {
 
     final ctc = await _db
         .from('class_term_courses')
-        .select('course_id, class_terms(semester_id)')
+        .select('course_id, teacher_id, class_terms(semester_id)')
         .eq('id', classTermCourseId)
         .single();
     final courseId = ctc['course_id'] as String;
+    final teacherIdDb = ctc['teacher_id'] as String?;
     final semesterId = (ctc['class_terms'] as Map<String, dynamic>?)?['semester_id'] as String?;
 
     final rows = statuses.entries.map((entry) {
@@ -662,6 +662,7 @@ class TeacherService {
         'LV' || 'excused' => 'excused',
         _ => 'present',
       };
+      final finalTeacherId = teacherId ?? teacherIdDb;
       return {
         'student_id': entry.key,
         'class_term_course_id': classTermCourseId,
@@ -670,7 +671,7 @@ class TeacherService {
         'date': date,
         'session_number': sessionNumber,
         'status': statusName,
-        'marked_by': teacherId,
+        if (finalTeacherId != null) 'marked_by': finalTeacherId,
       };
     }).toList();
 

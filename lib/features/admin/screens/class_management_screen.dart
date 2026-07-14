@@ -8,6 +8,7 @@ import '../../../core/services/admin_service.dart';
 import '../../../shared/widgets/app_toast.dart';
 import '../../../shared/widgets/class_schedule_sheet.dart';
 import '../../../shared/widgets/enroll_student_sheet.dart';
+import '../../teacher/screens/mark_attendance_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // A class is a stable cohort (e.g. "Batch 2025-A") that persists across
@@ -376,6 +377,11 @@ class _ClassManagementScreenState
           scheduleType: terms[i].scheduleType,
           onSaved: () => ref.invalidate(adminClassTermsProvider),
         ),
+        onAttendanceCourse: (c) => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MarkAttendanceScreen(courseId: c.id),
+          ),
+        ),
       ),
     );
   }
@@ -567,6 +573,7 @@ class _ClassTermCard extends StatefulWidget {
     required this.onEditCourse,
     required this.onRemoveCourse,
     required this.onScheduleCourse,
+    required this.onAttendanceCourse,
   });
   final AdminClassTerm term;
   final VoidCallback onEditTerm;
@@ -576,6 +583,7 @@ class _ClassTermCard extends StatefulWidget {
   final ValueChanged<AdminClassTermCourse> onEditCourse;
   final ValueChanged<AdminClassTermCourse> onRemoveCourse;
   final ValueChanged<AdminClassTermCourse> onScheduleCourse;
+  final ValueChanged<AdminClassTermCourse> onAttendanceCourse;
 
   @override
   State<_ClassTermCard> createState() => _ClassTermCardState();
@@ -592,6 +600,7 @@ class _ClassTermCardState extends State<_ClassTermCard> {
   ValueChanged<AdminClassTermCourse> get onEditCourse => widget.onEditCourse;
   ValueChanged<AdminClassTermCourse> get onRemoveCourse => widget.onRemoveCourse;
   ValueChanged<AdminClassTermCourse> get onScheduleCourse => widget.onScheduleCourse;
+  ValueChanged<AdminClassTermCourse> get onAttendanceCourse => widget.onAttendanceCourse;
 
   Color get _shiftColor {
     switch (term.shift) {
@@ -745,6 +754,7 @@ class _ClassTermCardState extends State<_ClassTermCard> {
                         onEdit: () => onEditCourse(c),
                         onRemove: () => onRemoveCourse(c),
                         onSchedule: () => onScheduleCourse(c),
+                        onAttendance: () => onAttendanceCourse(c),
                       )),
               ],
             ),
@@ -779,11 +789,13 @@ class _CourseRow extends StatelessWidget {
     required this.onEdit,
     required this.onRemove,
     required this.onSchedule,
+    required this.onAttendance,
   });
   final AdminClassTermCourse course;
   final VoidCallback onEdit;
   final VoidCallback onRemove;
   final VoidCallback onSchedule;
+  final VoidCallback onAttendance;
 
   static const _dayOrder = {
     'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6
@@ -837,6 +849,8 @@ class _CourseRow extends StatelessWidget {
             ],
           ),
         ),
+        _IconBtn(icon: Icons.fact_check_outlined, color: AppColors.primaryNavy, onTap: onAttendance),
+        const SizedBox(width: 4),
         _IconBtn(icon: Icons.schedule_outlined, color: AppColors.textSecondary, onTap: onSchedule),
         const SizedBox(width: 4),
         _IconBtn(icon: Icons.edit_outlined, color: AppColors.primaryBlue, onTap: onEdit),

@@ -12,6 +12,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../auth/models/app_user.dart';
 import '../../../core/providers/teacher_providers.dart';
 import '../../../core/services/teacher_service.dart';
 import '../../../core/supabase/database.types.dart';
@@ -125,6 +126,7 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
       AppLocalizations l) async {
     final user = ref.read(currentUserProvider).valueOrNull;
     if (user == null) return;
+    final isAdmin = user.role == UserRole.admin;
 
     setState(() => _saving = true);
     try {
@@ -177,7 +179,7 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
         }
 
         await teacherService.saveAttendance(
-          teacherId: user.id,
+          teacherId: isAdmin ? null : user.id,
           classTermCourseId: widget.courseId,
           date: dateStr,
           sessionNumber: sessionNum,
@@ -317,8 +319,10 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
       _initStatuses(students, leaves, allExisting);
     }
 
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isAdmin = user?.role == UserRole.admin;
     final sessionDates = course?.getSessionDatesForWeek(_selectedWeek) ?? [];
-    final isEditable = _selectedWeek == (course?.currentWeek ?? 1);
+    final isEditable = isAdmin || (_selectedWeek == (course?.currentWeek ?? 1));
     final hasChanges = _hasChanges(students, sessionDates, allExisting, course?.schedule ?? []);
     final Map<String, int> totalAbsences = {for (final s in (summary?.students ?? [])) s.studentId: s.absentCount};
 
@@ -426,10 +430,18 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
   }
 
   Widget _buildLockBanner(TeacherCourse course, AppLocalizations l) {
-    final isEditable = _selectedWeek == course.currentWeek;
-    final bg = isEditable ? AppColors.statusGreenBg : AppColors.statusAmberBg;
-    final color = isEditable ? AppColors.statusGreen : AppColors.statusAmber;
-    final text = isEditable ? l.activeWeekLockBanner : l.lockedWeekLockBanner;
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isAdmin = user?.role == UserRole.admin;
+    final isEditable = isAdmin || (_selectedWeek == course.currentWeek);
+    final bg = isAdmin
+        ? AppColors.primaryBlue.withValues(alpha: 0.1)
+        : (isEditable ? AppColors.statusGreenBg : AppColors.statusAmberBg);
+    final color = isAdmin
+        ? AppColors.primaryNavy
+        : (isEditable ? AppColors.statusGreen : AppColors.statusAmber);
+    final text = isAdmin
+        ? "Admin Mode: You have permission to edit attendance for any week."
+        : (isEditable ? l.activeWeekLockBanner : l.lockedWeekLockBanner);
 
     return Container(
       width: double.infinity,
@@ -567,6 +579,32 @@ class _MarkAttendanceScreenState extends ConsumerState<MarkAttendanceScreen> {
       return Center(
         child: Text(l.markAttendanceEmptyState,
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
+      );
+    }
+
+    if (sessionDates.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_outlined, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+              const SizedBox(height: 16),
+              Text(
+                "No schedule timeslots found for this course.",
+                style: AppTextStyles.bodySemiBold,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Please configure the course schedule in Class Management to enable attendance marking.",
+                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       );
     }
 

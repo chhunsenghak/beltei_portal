@@ -122,6 +122,7 @@ class AdminDashboardScreen extends ConsumerWidget {
       crossAxisCount: Responsive.getStatsGridColumns(context),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.7,
@@ -240,10 +241,13 @@ class AdminDashboardScreen extends ConsumerWidget {
             title: 'Revenue',
             subtitle: 'by Faculty',
             child: depts.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'No revenue data available',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                      ),
                     ),
                   )
                 : Column(
@@ -337,6 +341,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
           childAspectRatio: 1.2,
