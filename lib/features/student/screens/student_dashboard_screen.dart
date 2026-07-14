@@ -605,6 +605,7 @@ class _SummaryGrid extends StatelessWidget {
       crossAxisCount: Responsive.getSummaryGridColumns(context),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
       childAspectRatio: 1.8,

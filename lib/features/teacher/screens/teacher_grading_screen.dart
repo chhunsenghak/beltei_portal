@@ -413,7 +413,7 @@ class _GradeSubmissionSheetState extends State<_GradeSubmissionSheet> {
                     const SizedBox(height: 10),
                     const Divider(),
                     const SizedBox(height: 6),
-                    ListTile(
+                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.insert_drive_file_outlined, color: AppColors.primaryBlue),
                       title: const Text("View submission file"),
@@ -421,10 +421,9 @@ class _GradeSubmissionSheetState extends State<_GradeSubmissionSheet> {
                       onTap: () async {
                         try {
                           final uri = Uri.parse(sub!.fileUrl!);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          } else {
-                            throw 'Cannot launch URL';
+                          final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          if (!launched) {
+                            throw 'Could not launch file viewer';
                           }
                         } catch (e) {
                           if (context.mounted) {

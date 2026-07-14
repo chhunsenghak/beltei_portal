@@ -827,6 +827,89 @@ void main() async {
     ]);
     print('  ✓ 2 active leave requests seeded');
 
+    // ── 18. Invoices and Payments ───────────────────────────────────────────
+    print('\n💵 Inserting student invoices and payments...');
+    final invoicesResult = await supabase.from('invoices').insert([
+      {
+        'student_id': ranutId,
+        'semester_id': semY4S1Id,
+        'description': 'Year 4 Semester 1 Tuition Fee',
+        'amount': 650.00,
+        'due_date': '2026-04-15',
+        'status': 'paid',
+        'paid_at': '2026-04-10T10:30:00+07:00',
+      },
+      {
+        'student_id': kimhengId,
+        'semester_id': semY4S1Id,
+        'description': 'Year 4 Semester 1 Tuition Fee',
+        'amount': 650.00,
+        'due_date': '2026-04-15',
+        'status': 'paid',
+        'paid_at': '2026-04-12T14:15:00+07:00',
+      },
+      {
+        'student_id': samornId,
+        'semester_id': semY4S1Id,
+        'description': 'Year 4 Semester 1 Tuition Fee',
+        'amount': 650.00,
+        'due_date': '2026-04-15',
+        'status': 'unpaid',
+      },
+      {
+        'student_id': rathId,
+        'semester_id': semY4S1Id,
+        'description': 'Year 4 Semester 1 Tuition Fee',
+        'amount': 650.00,
+        'due_date': '2026-04-15',
+        'status': 'overdue',
+      },
+      {
+        'student_id': senghakId,
+        'semester_id': semY4S1Id,
+        'description': 'Year 4 Semester 1 Tuition Fee',
+        'amount': 650.00,
+        'due_date': '2026-04-15',
+        'status': 'paid',
+        'paid_at': '2026-04-09T08:45:00+07:00',
+      },
+    ]).select();
+
+    final invoiceRanut = invoicesResult.firstWhere((i) => i['student_id'] == ranutId)['id'] as String;
+    final invoiceKimheng = invoicesResult.firstWhere((i) => i['student_id'] == kimhengId)['id'] as String;
+    final invoiceSenghak = invoicesResult.firstWhere((i) => i['student_id'] == senghakId)['id'] as String;
+
+    await supabase.from('payments').insert([
+      {
+        'invoice_id': invoiceRanut,
+        'student_id': ranutId,
+        'amount': 650.00,
+        'payment_method': 'ABA Pay',
+        'reference_number': 'ABA-9831742',
+        'paid_at': '2026-04-10T10:30:00+07:00',
+        'verified_by': adminId,
+      },
+      {
+        'invoice_id': invoiceKimheng,
+        'student_id': kimhengId,
+        'amount': 650.00,
+        'payment_method': 'Wing',
+        'reference_number': 'WING-102948',
+        'paid_at': '2026-04-12T14:15:00+07:00',
+        'verified_by': adminId,
+      },
+      {
+        'invoice_id': invoiceSenghak,
+        'student_id': senghakId,
+        'amount': 650.00,
+        'payment_method': 'ABA Pay',
+        'reference_number': 'ABA-1123490',
+        'paid_at': '2026-04-09T08:45:00+07:00',
+        'verified_by': adminId,
+      },
+    ]);
+    print('  ✓ Invoices and payments seeded successfully');
+
     // ── Summary ─────────────────────────────────────────────────────────────
     print('''
 
